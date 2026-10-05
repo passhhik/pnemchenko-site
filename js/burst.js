@@ -51,7 +51,8 @@ export class Burst {
   show(from, items, avoid, opts = {}) {
     this.hide();
     const area = { w: this.root.clientWidth || window.innerWidth, h: this.root.clientHeight || window.innerHeight };
-    const spots = layout(items, avoid, area, opts);
+    // места могут прийти готовыми (телефон: работы встают по бокам головы) — тогда раскладка не считается
+    const spots = opts.spots || layout(items, avoid, area, opts);
     const fx = from.x + from.w / 2, fy = from.y + from.h * 0.35;
     this.from = { x: fx, y: fy };
     const batch = [];

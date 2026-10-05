@@ -109,6 +109,55 @@ export class Voice {
     o.start(t); o.stop(t + 0.52);
   }
 
+  // белый шум — основа «мокрых» звуков
+  _noise() {
+    if (!this.noiseBuf) {
+      const n = Math.floor(this.ctx.sampleRate * 0.4), buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = buf;
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    return src;
+  }
+
+  // плевок: короткое шипящее «тьфу» — шум через полосовой фильтр, частота быстро падает
+  spit(strength = 0.6) {
+    if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+    const t = this.ctx.currentTime, s = Math.min(1, Math.max(0.2, strength));
+    const src = this._noise(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+    f.type = 'bandpass'; f.Q.value = 0.9;
+    f.frequency.setValueAtTime(3600, t);
+    f.frequency.exponentialRampToValueAtTime(800, t + 0.15);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.1 + 0.16 * s, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    src.connect(f).connect(g).connect(this.out);
+    src.start(t); src.stop(t + 0.2);
+  }
+
+  // шлепок о «стекло»: глухой удар и мокрый хвост
+  splat(strength = 0.5) {
+    if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+    const t = this.ctx.currentTime, s = Math.min(1, Math.max(0.2, strength));
+    const o = this.ctx.createOscillator(), og = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(55, t + 0.09);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.1 + 0.14 * s, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(og).connect(this.out);
+    o.start(t); o.stop(t + 0.13);
+    const src = this._noise(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+    f.type = 'lowpass'; f.frequency.setValueAtTime(1500, t); f.frequency.exponentialRampToValueAtTime(350, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05 + 0.1 * s, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    src.connect(f).connect(g).connect(this.out);
+    src.start(t); src.stop(t + 0.22);
+  }
+
   // каждый кадр: рот по громкости записи или по «хлопкам» на гласных
   tick(dt) {
     let target;

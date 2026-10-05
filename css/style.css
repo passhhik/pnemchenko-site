@@ -40,7 +40,8 @@ body[data-tone="dark"]{ --fg:#FFFFFF; --on-fg:#000000; --mute:rgba(255,255,255,.
 
 *,*::before,*::after{ box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
-html.is-arc{ scroll-snap-type:y proximity; }      /* каталог: прокрутка мягко останавливается на проекте */
+html.is-arc{ scroll-snap-type:y proximity; }      /* каталог на компьютере: прокрутка мягко останавливается на проекте */
+html.is-arc.is-touch,html.is-list{ scroll-snap-type:y mandatory; }      /* на телефоне и планшете — защёлкивается на папке */
 body{ margin:0; background:var(--paper); color:var(--fg); font:400 19px/1.45 var(--font); -webkit-font-smoothing:antialiased; transition:color .35s; }
 body[data-view="hero"]{ overflow:hidden; height:100vh; height:100dvh; }
 a{ color:inherit; }
@@ -75,12 +76,15 @@ body[data-view="case"].is-scrolled .topbar::before{ opacity:1; }
 body[data-view="work"] .topbar::before{ opacity:1; inset:0 0 -34px 0; background:var(--theme-c, #fff); -webkit-backdrop-filter:none; backdrop-filter:none; transition:background-color .6s ease, opacity .3s;
   -webkit-mask-image:linear-gradient(180deg, #000 0, rgba(0,0,0,.88) 48%, transparent); mask-image:linear-gradient(180deg, #000 0, rgba(0,0,0,.88) 48%, transparent); }
 .topbar-side{ grid-column:1; justify-self:start; display:flex; gap:2px; }
-.logo{ grid-column:2; display:flex; justify-content:center; align-items:center; width:var(--logo-w,27vw); text-decoration:none; color:inherit; }
+/* Логотип — свой слой. На главной он лежит под головой (z-index ниже сцены): голова может его перекрывать,
+   когда её тянут вверх или она подпрыгивает. Внутри сайта он часть шапки и стоит над содержимым. Место задаёт скрипт. */
+.logo{ position:fixed; z-index:0; left:calc(50% - var(--logo-w,27vw) / 2); top:var(--logo-y, var(--pad-top)); display:flex; justify-content:center; align-items:center; width:var(--logo-w,27vw); text-decoration:none; color:var(--fg); }
+body:not([data-view="hero"]) .logo{ z-index:42; }
 .logo-mark{ display:block; width:100%; aspect-ratio:var(--logo-ar, 393/95); visibility:hidden; background:currentColor; -webkit-mask:var(--logo-url) center/contain no-repeat; mask:var(--logo-url) center/contain no-repeat; }
 .logo.is-ready .logo-mark{ visibility:visible; }      /* до загрузки содержимого на месте логотипа пусто, а не чёрная плашка */
 .logo.is-text .logo-mark{ aspect-ratio:auto; background:none; -webkit-mask:none; mask:none; font-size:calc(var(--logo-w,27vw) * .15); line-height:1; text-align:center; white-space:nowrap; }
 .is-switching .topbar{ transition:min-height .5s var(--ease), padding .5s var(--ease); }
-.is-switching .logo{ transition:width .5s var(--ease); }
+.is-switching .logo{ transition:width .5s var(--ease), left .5s var(--ease), top .5s var(--ease); }
 .topnav{ grid-column:3; justify-self:end; display:flex; align-items:center; gap:clamp(8px, calc(var(--u) * 1.3), 26px); }
 /* на главной кнопки стоят чуть ниже середины логотипа — как в макете */
 body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
@@ -190,6 +194,33 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 .veil{ position:fixed; inset:0; z-index:50; pointer-events:none;
   -webkit-backdrop-filter:blur(calc(var(--blur,0) * 1px)); backdrop-filter:blur(calc(var(--blur,0) * 1px));
   box-shadow:inset 0 0 22vmin rgba(0,0,0,calc(var(--blind,0) * .045)); }
+
+/* ---------- пасхалка: заплёванный экран (js/spit.js) ----------
+   Слой лежит поверх страницы, но под субтитрами: реплики головы остаются читаемыми. Клики пропускает. */
+.spit{ position:fixed; inset:0; z-index:58; pointer-events:none; overflow:hidden; }
+.spit-defs{ position:absolute; }
+/* сквозь слюну страница видна размытой; контур — объединение всех клякс (clip-path задаёт скрипт) */
+.spit-blur{ position:absolute; inset:0; -webkit-backdrop-filter:blur(2.6px) saturate(1.12) brightness(1.03); backdrop-filter:blur(2.6px) saturate(1.12) brightness(1.03); background-color:rgba(212,224,234,0); transition:background-color .9s; }
+.spit.is-flood .spit-blur{ -webkit-clip-path:none !important; clip-path:none !important; background-color:rgba(212,224,234,.2); }
+.spit-layer{ position:absolute; inset:0; }
+.spit-blob{ position:absolute; left:0; top:0; width:0; height:0; }
+.spit-blob svg{ position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+.spit-in{ position:absolute; left:0; top:0; width:0; height:0; }
+.spit-drop,.spit-fly,.spit-bead{ position:absolute; left:0; top:0; border-radius:50% 46% 52% 48%; box-shadow:0 1px 2px rgba(30,50,70,.2);
+  background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.95) 0 10%, rgba(236,243,248,.55) 30%, rgba(190,206,219,.62) 78%, rgba(130,152,170,.72)); }
+.spit-fly{ will-change:transform; }
+/* подтёк: капля сползает вниз, струйка тянется за ней; сначала быстро, потом всё медленнее */
+.spit-drip{ position:absolute; width:0; height:0; }
+.spit-stream{ position:absolute; left:0; top:0; border-radius:50% 50% 0 0 / 12px 12px 0 0; transform:scaleY(.02); transform-origin:50% 0; transition:transform var(--t,4s) cubic-bezier(.16,.6,.3,1);
+  background:linear-gradient(90deg, rgba(110,135,156,.42), rgba(232,240,246,.72) 26%, rgba(255,255,255,.92) 40%, rgba(224,234,242,.62) 64%, rgba(110,135,156,.46)); }
+.spit-bead{ border-radius:48% 48% 50% 50% / 44% 44% 56% 56%; transform:translateY(0) scale(.55); transition:transform var(--t,4s) cubic-bezier(.16,.6,.3,1); }
+.spit-drip.is-on .spit-stream{ transform:none; }
+.spit-drip.is-on .spit-bead{ transform:translateY(var(--run)) scale(1); }
+/* посетитель очнулся — всё стекает вниз */
+.spit.is-wiping{ transform:translateY(55%); opacity:0; transition:transform .8s cubic-bezier(.5,0,.85,.4), opacity .8s ease-in; }
+
+/* проверка на телефоне: адрес …/?diag */
+.diag{ position:fixed; z-index:90; left:6px; top:calc(6px + env(safe-area-inset-top)); max-width:calc(100vw - 12px); margin:0; padding:6px 8px; border-radius:8px; background:rgba(0,0,0,.82); color:#fff; font:400 11px/1.35 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; pointer-events:none; }
 
 /* экраны сменяются мягко */
 @keyframes view-in{ from{ opacity:0; } to{ opacity:1; } }
@@ -307,7 +338,6 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .topbar{ grid-template-columns:1fr; padding-top:max(var(--pad-top), env(safe-area-inset-top)); }
   .topbar-side{ position:absolute; top:max(4px, env(safe-area-inset-top)); right:8px; }
   .lang{ height:36px; font-size:15px; }
-  .logo{ grid-column:1; justify-self:center; }
   /* кнопки — в нижней панели, под большим пальцем */
   .topnav,body[data-view="hero"] .topnav{ position:fixed; left:0; right:0; bottom:0; z-index:41; justify-self:stretch; gap:10px; padding:8px 10px max(12px, env(safe-area-inset-bottom)); transform:none; transition:none; }
   .topnav .btn{ flex:1 1 0; min-width:0; padding:0 6px; }
@@ -318,20 +348,26 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   body[data-view="work"] .subs-line:empty{ display:none; }
   .tip{ top:max(5px, env(safe-area-inset-top)); bottom:auto; }
   /* папки разделов — горизонтальная лента; первая стоит по центру, соседние выглядывают по бокам */
-  .folders{ inset:auto 0 var(--bar) 0; display:flex; align-items:flex-start; gap:14px; padding:calc(var(--mfw,170px) * .4) calc(50% - var(--mfw,170px) / 2) 8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; pointer-events:auto; -webkit-overflow-scrolling:touch; }
+  .folders{ inset:auto 0 var(--bar) 0; display:flex; align-items:flex-start; gap:22px; padding:calc(var(--mfw,170px) * .4) calc(50% - var(--mfw,170px) / 2) 8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; pointer-events:auto; -webkit-overflow-scrolling:touch; }
   .folders::-webkit-scrollbar{ display:none; }
-  .folders .gf,.folders .gf.is-open{ position:static; flex:none; transform:none; scroll-snap-align:center; cursor:pointer; touch-action:pan-x; }
+  .folders .gf,.folders .gf.is-open{ position:static; flex:none; transform:none; scroll-snap-align:center; scroll-snap-stop:always; cursor:pointer; touch-action:pan-x; }
+  .folders.is-tight .gf-pill{ display:none; }      /* на невысоком экране счётчик уступает место голове */
   .folders .gf:last-child:nth-child(n+3){ order:-1; }
-  .folders .gf-title{ margin-left:-14%; margin-right:-14%; }      /* подпись может быть чуть шире маленькой папки */
+  .folders .gf-title{ margin-left:-14%; margin-right:-14%; color:var(--mute); transition:color .25s; }      /* подпись может быть чуть шире маленькой папки */
+  .folders .gf.is-cur .gf-title{ color:var(--fg); }      /* папка в центре ленты — текущая, соседние приглушены */
   /* каталог — обычная лента сверху вниз */
   .arc-side{ position:static; width:auto; padding-top:calc(var(--hdr) + 10px); }
   .filters{ flex-wrap:nowrap; margin:0; padding:0 var(--pad-x); overflow-x:auto; scrollbar-width:none; }
   .filters::-webkit-scrollbar{ display:none; }
   .chip{ flex:none; height:38px; font-size:16px; }
   .arc-index,.arc-track{ display:none; }
-  .arc{ position:static; display:flex; flex-direction:column; align-items:center; gap:44px; padding:30px 0 calc(var(--bar) + 120px); overflow:visible; pointer-events:auto; }
+  .arc{ position:static; display:flex; flex-direction:column; align-items:center; gap:64px; padding:30px 0 calc(var(--bar) + 120px); overflow:visible; pointer-events:auto; }
   .arc-item{ position:static; will-change:auto; }
-  .arc-title{ align-self:stretch; width:auto; max-width:none; padding:0 var(--pad-x) 14px; --fw:160px; }
+  /* прокрутка защёлкивается на папке: она встаёт в центр экрана и раскрывается. Самый верх — тоже остановка,
+     там первая папка и так на виду, поэтому своей точки у неё нет */
+  .arc-side{ scroll-snap-align:start; }
+  .arc-item:not(.arc-title):not(:nth-child(2)){ scroll-snap-align:center; }
+  .arc-title{ align-self:stretch; width:auto; max-width:none; margin-bottom:-24px; padding:0 var(--pad-x) 14px; --fw:160px; }      /* первая папка — ближе к заголовку: её подпись не уходит под кружок с головой */
   .arc-title p{ transform:none; }
   .arc-item .gf{ --fw:min(72vw, 320px); transform:none; }
   .empty{ position:static; padding:140px var(--pad-x); }

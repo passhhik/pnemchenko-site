@@ -18,6 +18,9 @@ const DEFAULT_BOX = { cx: 0, cy: 0.0, w: 1.5, h: 1.95 };   // габариты �
 const EYE_FAR = 9;               // глаза сводятся на далёкой точке по линии взгляда — без косоглазия
 const EYE_YAW = 0.3, EYE_UP = 0.1, EYE_DOWN = 0.2;   // пределы поворота глаз, рад (≈17° / 6° / 11°)
 const GLASSES_HOLD = 4200;       // сколько очки висят там, где их отпустили, прежде чем голова наденет их сама, мс
+// Плевок: где голова «берётся» сама за себя (координаты головы) и радиус щипка — две щеки и губы
+const SPIT_AT = [[0.33, -0.52, 0.5, 0.2], [-0.33, -0.52, 0.5, 0.2], [0.005, -0.6, 0.8, 0.14]];
+const SPIT_MOUTH = [0.005, -0.6, 0.92];   // откуда вылетает плевок
 
 // Все параметры «света и кожи» в одном месте. Два пресета; сравнить можно параметром адреса:
 // http://localhost:8765/?look=cinema — прежний «киношный» вариант.
@@ -456,8 +459,10 @@ export class Head extends EventTarget {
     this._plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -2.0);
     // Гироскоп: зрительный контакт с посетителем при наклоне телефона
     this.tiltGain = 1.6;              // >1 — живее; отрицательное значение — голова «смотрит» по наклону, а не на зрителя
-    this.tilt = { on: false, has: false, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0,
+    this.tilt = { on: false, has: false, n: 0, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0,
       target: new THREE.Vector3(0, 0.05, 2), announced: false };
+    // плевок: фаза (t < 0 — покой), три «своих» щипка (щёки, губы) и пружины рывка головы
+    this.spitS = { t: -1, wind: 0.46, fired: false, big: false, h: [null, null, null], p: 0, pv: 0, z: 0, zv: 0, jaw: 0, squint: 0 };
     this._tq = new THREE.Quaternion(); this._tq2 = new THREE.Quaternion(); this._te = new THREE.Euler();
     this._tq1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);   // экран смотрит на зрителя, а не в небо
     this._tz = new THREE.Vector3(0, 0, 1); this._tu = new THREE.Vector3(); this._tt = new THREE.Vector3();
@@ -1022,6 +1027,7 @@ export class Head extends EventTarget {
 
   _tiltEvent(e) {
     if (e.alpha == null && e.beta == null && e.gamma == null) return;   // ноутбук без датчиков
+    this.tilt.n++;
     const d = THREE.MathUtils.DEG2RAD;
     const orient = (((screen.orientation && screen.orientation.angle) ?? window.orientation) || 0) * d;
     const q = this._tq.setFromEuler(this._te.set((e.beta || 0) * d, (e.alpha || 0) * d, -(e.gamma || 0) * d, 'YXZ'));
@@ -1045,6 +1051,83 @@ export class Head extends EventTarget {
     const yaw = clamp(Math.atan2(u.x, u.z) * G, -0.9, 0.9);
     const pitch = clamp(Math.atan2(u.y, Math.hypot(u.x, u.z)) * G, -0.7, 0.7);
     t.target.lerp(this._tt.set(Math.tan(yaw) * 2, 0.05 + Math.tan(pitch) * 2, 2), damp(dt, 10));
+  }
+
+  // ---------- плевок ----------
+  // Голова набирает в щёки, откидывается назад и резко подаётся вперёд: «тьфу». Щёки и губы — те же резиновые щипки,
+  // что и от пальца, только тянет их сама голова. В момент «выстрела» — событие spit с точкой рта на экране.
+  // quick — короткий замах (когда плюёт часто), big — долгое «хррр» перед большим плевком.
+  spit({ quick = false, big = false } = {}) {
+    const s = this.spitS;
+    if (!this.loaded || this.rm || (s.t >= 0 && !s.fired)) return false;
+    s.t = 0; s.fired = false; s.big = big; s.wind = big ? 0.95 : quick ? 0.2 : 0.46;
+    for (let i = 0; i < 3; i++) {
+      let h = s.h[i];
+      if (!h || h.owner !== s) {                     // щипок ещё не взят или его забрал палец — берём свободный
+        h = s.h[i] = this._allocHandle();
+        h.d.set(0, 0, 0); h.v.set(0, 0, 0); h.e.set(0, 0, 0); h.ev.set(0, 0, 0);
+      }
+      const at = SPIT_AT[i];
+      h.owner = s; h.sig = at[3]; h.c.set(at[0], at[1], at[2]); h.t.set(0, 0, 0); h.goal.set(0, 0, 0);
+      h.grabbed = true; h.active = true;
+    }
+    return true;
+  }
+
+  stopSpit() {
+    const s = this.spitS;
+    s.t = -1; s.fired = false;
+    for (const h of s.h) if (h && h.owner === s) h.grabbed = false;     // щёки и губы пружинят обратно
+  }
+
+  // где на экране рот (CSS-пиксели окна) — оттуда вылетает плевок
+  mouthClient() {
+    const r = this.canvas.getBoundingClientRect(), v = this._v[5].set(SPIT_MOUTH[0], SPIT_MOUTH[1], SPIT_MOUTH[2]);
+    this.root.localToWorld(v).project(this.camera);
+    return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+  }
+
+  _updateSpit(dt) {
+    const s = this.spitS;
+    let pT = 0, zT = 0, sqT = 0;
+    if (s.t >= 0) {
+      s.t += dt;
+      const [L, R, M] = s.h, own = (h) => h && h.owner === s, amp = s.big ? 1.3 : 1;
+      if (!s.fired) {
+        // набирает: щёки раздуваются, губы поджаты, голова откидывается и отъезжает назад
+        const k = smoothstep(0, s.wind, s.t);
+        const wob = s.big ? Math.sin(s.t * 44) * 0.014 * k : 0;                 // долгое «хррр» — щёки дрожат
+        if (own(L)) L.t.set((0.16 + wob) * k * amp, -0.01 * k, 0.06 * k);
+        if (own(R)) R.t.set(-(0.16 - wob) * k * amp, -0.01 * k, 0.06 * k);
+        if (own(M)) M.t.set(0, 0.012 * k, -0.045 * k);
+        pT = -0.16 * k * amp; zT = -0.3 * k * amp; sqT = 0.6 * k;
+        if (s.t >= s.wind) {
+          s.fired = true;
+          // воздух вышел: щёки втягиваются, губы — трубочкой вперёд
+          if (own(L)) L.t.set(-0.07 * amp, 0, 0.03);
+          if (own(R)) R.t.set(0.07 * amp, 0, 0.03);
+          if (own(M)) M.t.set(0, -0.015, 0.2 * amp);
+          s.jaw = 0.36;
+          this.sq.v -= 0.45 * amp;                                               // вся голова пружинит от отдачи
+          s.pv += 3.4 * amp; s.zv += 7 * amp;                                    // рывок вперёд
+          this._emit('spit', { from: this.mouthClient(), big: s.big });
+        }
+      } else {
+        const u = s.t - s.wind, k = 1 - smoothstep(0.04, 0.3, u);
+        pT = 0.1 * k; zT = 0.3 * k; sqT = 0.35 * k;
+        if (u > 0.1) for (const hd of s.h) if (own(hd)) hd.grabbed = false;      // всё отпущено — пружинит обратно
+        if (u > (s.big ? 0.8 : 0.32)) s.t = -1;
+      }
+    }
+    // наклон и подача головы — на пружине: рывок вперёд и мягкий возврат
+    const kS = 170, cS = 2 * 0.5 * Math.sqrt(kS), n = 2, h = dt / n;
+    for (let i = 0; i < n; i++) {
+      s.pv += ((pT - s.p) * kS - s.pv * cS) * h; s.p += s.pv * h;
+      s.zv += ((zT - s.z) * kS - s.zv * cS) * h; s.z += s.zv * h;
+    }
+    s.squint += (sqT - s.squint) * damp(dt, 16);
+    s.jaw *= Math.exp(-dt * 8);
+    this.pivot.position.z = PIVOT.z + s.z;
   }
 
   // ---------- ввод ----------
@@ -1087,7 +1170,7 @@ export class Head extends EventTarget {
       const h = this._allocHandle();
       h.c.copy(local); h.t.set(0, 0, 0); h.goal.set(0, 0, 0);
       h.d.set(0, 0, 0); h.v.set(0, 0, 0); h.e.set(0, 0, 0); h.ev.set(0, 0, 0);
-      h.grabbed = true; h.active = true;
+      h.grabbed = true; h.active = true; h.owner = null; h.sig = 0;
       drag.handle = h;
       const nW = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : camDir.clone().negate();
       drag.normal = nW.transformDirection(this._headInv);
@@ -1101,8 +1184,12 @@ export class Head extends EventTarget {
   }
 
   _move(e) {
-    this.pointer.x = e.clientX; this.pointer.y = e.clientY; this.pointer.has = true;
-    this.pointer.lastMove = performance.now();
+    // Взгляд ведёт только курсор мыши. За пальцем голова не следит: на телефоне она смотрит на посетителя,
+    // на папки, когда их листают (это решает страница — lookAtClient), и по наклону телефона.
+    if (e.pointerType !== 'touch') {
+      this.pointer.x = e.clientX; this.pointer.y = e.clientY; this.pointer.has = true;
+      this.pointer.lastMove = performance.now();
+    }
     const drag = this.drags.get(e.pointerId);
     if (!drag) { this._hover(e); return; }
     drag.px = e.clientX; drag.py = e.clientY;
@@ -1211,6 +1298,7 @@ export class Head extends EventTarget {
     if (this.onTick) this.onTick(dt, now);
     this._updatePop(dt);
     this._updateTilt(dt);
+    this._updateSpit(dt);
     this._updateLook(dt, now);
     this._updateBlink(dt);
     this._updateMouth(dt);
@@ -1277,7 +1365,7 @@ export class Head extends EventTarget {
     const k = this.drags.size ? 1.5 : (this.rm ? 3 : 4.5);
     this.rot.yaw += (yaw - this.rot.yaw) * damp(dt, k);
     this.rot.pitch += (pitch - this.rot.pitch) * damp(dt, k);
-    this._q.setFromEuler(this._e.set(this.rot.pitch, this.rot.yaw, 0, 'YXZ'));
+    this._q.setFromEuler(this._e.set(this.rot.pitch + this.spitS.p, this.rot.yaw, 0, 'YXZ'));
     const la = this.lean.a, ang = la.length();
     if (ang > 1e-6) this._q.multiply(this._q2.setFromAxisAngle(this._v[4].copy(la).divideScalar(ang), ang));
     this.pivot.quaternion.copy(this._q);
@@ -1322,8 +1410,8 @@ export class Head extends EventTarget {
       }
     }
     v = clamp(v, 0, 1);
-    const sqT = this.glasses.off ? 0.38 : 0;
-    this.squint += (sqT - this.squint) * damp(dt, 6);
+    const sqT = Math.max(this.glasses.off ? 0.38 : 0, this.spitS.squint);
+    this.squint += (sqT - this.squint) * damp(dt, sqT > this.squint ? 12 : 6);
     for (const s of ['L', 'R']) {
       this.winkT[s] = Math.max(0, this.winkT[s] - dt);
       this.winkV[s] += ((this.winkT[s] > 0 ? 1 : 0) - this.winkV[s]) * damp(dt, 28);
@@ -1335,8 +1423,9 @@ export class Head extends EventTarget {
   }
 
   _updateMouth(dt) {
-    const up = this.mouthTarget > this.mouth;
-    this.mouth += (this.mouthTarget - this.mouth) * damp(dt, up ? 30 : 16);
+    const tgt = Math.max(this.mouthTarget, this.spitS.jaw);
+    const up = tgt > this.mouth;
+    this.mouth += (tgt - this.mouth) * damp(dt, up ? 30 : 16);
     const m = clamp(this.mouth, 0, 1);
     this._setMorph('JawOpen', m);
     this.mouthU.uMouthOpen.value = m;
@@ -1435,7 +1524,7 @@ export class Head extends EventTarget {
         }
       }
       const LD = hd.d.length(), LE = hd.e.length();
-      const sD = Math.max(SIG_MIN, LD / 1.2);
+      const sD = Math.max(hd.sig || SIG_MIN, LD / 1.2);
       this.shared.uSqC.value[i].copy(hd.c);
       this.shared.uSqD.value[i].copy(hd.d);
       this.shared.uSqE.value[i].copy(hd.e);

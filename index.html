@@ -36,9 +36,11 @@
   <!-- фон «в стиле проекта»: два слоя для плавной смены -->
   <div class="bg" data-bg aria-hidden="true"><div class="bg-layer"></div><div class="bg-layer"></div></div>
 
+  <!-- логотип — отдельным слоем: на главной он лежит под головой (голова может его перекрывать), внутри сайта — в шапке -->
+  <a class="logo" href="#/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
+
   <header class="topbar" data-topbar>
     <div class="topbar-side" data-lang></div>
-    <a class="logo" href="#/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
     <nav class="topnav" aria-label="Основное меню">
       <a class="btn" data-cv href="assets/cv.pdf" download>CV</a>
       <a class="btn" href="#/work" data-t="allWork">Все работы</a>

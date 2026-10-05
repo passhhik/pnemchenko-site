@@ -43,7 +43,7 @@ export function buildLine(text) {
 export class Subtitles {
   constructor({ el, srEl, voice, lines, fmt, reducedMotion }) {
     this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion;
-    this.token = 0; this.last = 0; this.busyUntil = 0;
+    this.token = 0; this.last = 0; this.busyUntil = 0; this.readUntil = 0;
   }
 
   text(id) { return this.fmt(this.lines[id] ?? id); }
@@ -119,6 +119,7 @@ export class Subtitles {
     if (audio) await audio.done;
     if (!alive()) return;
     this._speaking(false);
+    this.readUntil = performance.now() + 1400;        // реплику только что договорили — дайте её дочитать
     await sleep(more ? 700 : Math.max(1600, text.length * 55));
     if (!alive()) return;
     p.classList.add('is-out');

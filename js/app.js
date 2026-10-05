@@ -24,6 +24,8 @@ const store = box(() => localStorage);        // помнит посетител
 const session = box(() => sessionStorage);    // живёт, пока открыта вкладка
 const debug = /^(localhost|127\.)/.test(location.hostname);
 const rs = document.documentElement.style;
+const query = new URLSearchParams(location.search);
+document.documentElement.classList.toggle('is-touch', touchUI);      // стилям: наведения нет — каталог защёлкивается на папке
 
 // Аналитика: подключите счётчик (Метрика, GA4, Plausible…) к window.dataLayer
 export function track(event, props = {}) {
@@ -40,6 +42,7 @@ const els = {
 };
 
 const HEAD_AR = 1.33;             // пропорции головы, пока модель не загрузилась (потом берутся с самой модели)
+const MOBILE_HEAD = 0.76;         // телефон: голова (от уха до уха) занимает не больше этой доли ширины экрана
 const SUBS_LH = 1.15;             // межстрочный интервал субтитров — тот же, что у .subs в css/style.css
 let head = null, subs = null, catalog = null, caseView = null;
 let view = null, folderEls = [], logoAR = 393 / 95;
@@ -175,20 +178,27 @@ function layout() {
   const hero = (view || 'hero') === 'hero';
   geo.mobile = mobile;
 
-  // шапка: на главной логотип крупный (как в макете), внутри сайта — компактный
-  let padTop, logoW, hdr;
+  // шапка: на главной логотип крупный (как в макете), внутри сайта — компактный.
+  // Логотип — отдельный слой (на главной он лежит под головой), поэтому его место считаем здесь, а не сеткой шапки.
+  let padTop, logoW, hdr, logoY;
   if (!mobile) {
     padTop = hero ? clamp(H * 0.042, 12, 60) : clamp(1.2 * u, 10, 22);
     logoW = hero ? clamp(27 * u, 200, 640) : clamp(13 * u, 132, 250);
-    hdr = hero ? padTop + logoW / logoAR : padTop * 2 + Math.max(clamp(3.3 * u, 40, 66), logoW / logoAR);
+    const row = hero ? logoW / logoAR : Math.max(clamp(3.3 * u, 40, 66), logoW / logoAR);
+    hdr = hero ? padTop + row : padTop * 2 + row;
+    logoY = padTop + (row - logoW / logoAR) / 2;
   } else {
     rs.setProperty('--pad-top', hero ? '12px' : '8px');
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
-    logoW = hero ? Math.min(0.83 * W, 0.105 * H * logoAR) : Math.min(0.42 * W, 36 * logoAR);
-    hdr = hero ? padTop + logoW / logoAR + 6 : padTop * 2 + Math.max(36, logoW / logoAR);
+    // телефон: логотип — треть ширины экрана; всё освободившееся место отдаём голове
+    logoW = hero ? W / 3 : Math.min(W / 3, 36 * logoAR);
+    const row = hero ? logoW / logoAR : Math.max(36, logoW / logoAR);
+    hdr = hero ? padTop + row + 4 : padTop * 2 + row;
+    logoY = padTop + (row - logoW / logoAR) / 2;
   }
   if (!mobile) rs.setProperty('--pad-top', `${padTop.toFixed(1)}px`);
   rs.setProperty('--logo-w', `${logoW.toFixed(1)}px`);
+  rs.setProperty('--logo-y', `${logoY.toFixed(1)}px`);
   rs.setProperty('--hdr', `${Math.ceil(hdr)}px`);
   if (!hero) return;
 
@@ -235,12 +245,13 @@ function layout() {
     });
     geo.centered = false;
   } else {
-    // телефон: логотип, голова, три строки субтитров, лента папок, кнопки под большим пальцем
+    // телефон: маленький логотип, крупная голова, три строки субтитров, лента папок, кнопки под большим пальцем
     subsSize = clamp(0.05 * W, 16, 32);
     subsH = subsSize * SUBS_LH * 3;
     subsW = Math.min(W - 28, subsSize * 30);
     const bar = els.nav.getBoundingClientRect().height || 66;
-    fw = clamp((0.27 * H - 59) / 0.795, 140, 0.62 * W);
+    // папки компактные: соседние разделы почти целиком видны по бокам, а высота уходит голове
+    fw = clamp(0.2 * H, 116, 0.5 * W);
     rs.setProperty('--mfw', `${fw.toFixed(1)}px`);
     folderEls.forEach((el) => {
       el.style.setProperty('--fw', `${fw.toFixed(1)}px`);
@@ -248,18 +259,25 @@ function layout() {
     });
     // высоту папки с подписью берём по факту: длинное название раздела может занять две строки
     const em = clamp(fw * 0.078, 15, 26);
-    const fh = Math.max(fw * 0.795 + em * 3.9, ...folderEls.map((el) => el.offsetHeight || 0));
-    const avail = H - hdr - 8 - 14 - subsH - 18 - fh - 8 - bar;
-    width = clamp(avail / ar, 110, 0.66 * W);
+    const room = (tight) => {
+      els.folders.classList.toggle('is-tight', tight);
+      const fh = Math.max(fw * 0.795 + em * (tight ? 2.1 : 3.9), ...folderEls.map((el) => el.offsetHeight || 0));
+      return H - hdr - 12 - subsH - 12 - fh - 6 - bar;
+    };
+    // на невысоком экране (телефон с панелями браузера) счётчик проектов под папкой уступает место голове
+    let avail = room(false);
+    if (avail / ar < 0.6 * W) avail = room(true);
+    width = clamp(avail / ar, 110, MOBILE_HEAD * W);
     const hh = width * ar;
-    top = hdr + 8 + Math.max(0, (avail - hh) * 0.5);
-    subsY = top + hh + 14;
+    top = hdr + Math.max(0, (avail - hh) * 0.5);
+    subsY = top + hh + 12;
     if (!geo.centered && folderEls.length) {
       // лента открывается на первом разделе, соседние выглядывают по бокам
       geo.centered = true;
       const first = folderEls[0];
       els.folders.scrollLeft = first.offsetLeft - (W - fw) / 2;
     }
+    if (!folderEls.some((f) => f.classList.contains('is-cur'))) stripScroll();
   }
   geo.fw = fw;
   geo.subs = { x: cx - subsW / 2, y: subsY, w: subsW, h: subsH };
@@ -309,6 +327,24 @@ function avoidRects(openEl) {
   if (geo.subs) list.push(geo.subs);
   return list;
 }
+// Телефон: свободного места вокруг головы почти нет, поэтому работы встают по бокам головы и выглядывают
+// из-за неё (слой работ лежит под головой): по углам над висками, у ушей и у подбородка.
+const FLANK = [[0, 0.03, 1], [1, 0.07, 1], [0, 0.86, 1], [1, 0.9, 1], [0, 0.45, 0.82], [1, 0.5, 0.82]];   // сторона, высота вдоль головы, размер
+function flankSpots(items) {
+  const r = head && head.rect, W = window.innerWidth;
+  if (!r) return [];
+  const base = clamp(W * 0.25, 76, 190);
+  const floor = (geo.subs ? geo.subs.y : r.y + r.h) - 6;        // ниже — субтитры: на них работы не кладём
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  return items.slice(0, FLANK.length).map((it, i) => {
+    const [side, k, sz] = FLANK[i];
+    const ar = (it.w || 1) / (it.h || 1), long = base * sz * rnd(0.92, 1.08);
+    const w = ar >= 1 ? long : long * ar, h = ar >= 1 ? long / ar : long;
+    const x = side ? W - w - rnd(6, 12) : rnd(6, 12);
+    const y = clamp(r.y + r.h * k - h / 2 + rnd(-6, 6), 6, floor - h);
+    return { x, y, w, h, src: it.src, print: !!it.print, rot: rnd(4, 11) * (side ? 1 : -1) };
+  });
+}
 let openId = null, openT = 0, closeT = 0, dragging = null;
 function openFolder(el) {
   const id = el.dataset.section;
@@ -318,7 +354,7 @@ function openFolder(el) {
   const items = shuffle(artsOf(id).map((a) => ({ ...a, ...(sizes.get(a.src) || (a.cover ? { w: 4, h: 3 } : { w: 1, h: 1 })) })));
   const u = Math.min(window.innerWidth, 1.5 * window.innerHeight) / 100;
   burst.show(rectOf($('.gf-body', el)), items, avoidRects(el),
-    { size: geo.mobile ? clamp(window.innerWidth * 0.22, 68, 110) : clamp(12 * u, 110, 230), max: BURST_MAX });
+    geo.mobile ? { spots: flankSpots(items) } : { size: clamp(12 * u, 110, 230), max: BURST_MAX });
   say(`folder_${id}`, { force: true });
   lookAtEl(el);
   track('folder_open', { section: id });
@@ -398,13 +434,64 @@ function bindFolder(el) {
   el.addEventListener('click', (e) => {
     // отпустили после перетаскивания — это не клик
     if (performance.now() - dropped < 400) { e.preventDefault(); return; }
-    // на телефоне наведения нет: касание показывает работы и через мгновение открывает раздел
-    if (lastPointer !== 'touch' || reduced) return;
+    if (lastPointer !== 'touch') return;
+    // лента на телефоне: касание боковой папки ставит её в центр (там она раскроется), касание центральной — открывает раздел
+    if (geo.mobile && stripCenter().el !== el) { e.preventDefault(); stripTo(el); return; }
+    if (reduced || openId === el.dataset.section) return;
+    // наведения нет: касание показывает работы и через мгновение открывает раздел
     e.preventDefault();
     openFolder(el);
     setTimeout(() => { location.hash = el.getAttribute('href'); }, 750);
   });
 }
+
+// ---------- телефон: лента папок ----------
+// Лента защёлкивается на папке (scroll-snap в стилях). Папка, вставшая в центр, раскрывается и показывает работы.
+// Пока лента едет, голова следит за подъезжающей папкой — на телефоне она следит только за папками и за наклоном
+// (за пальцем — нет, см. head.js).
+let stripArmed = false, stripT = 0, lookT = 0;
+function stripCenter() {
+  const mid = window.innerWidth / 2;
+  let el = null, off = Infinity, x = mid, y = 0;
+  for (const f of folderEls) {
+    const r = f.getBoundingClientRect(), cx = r.left + r.width / 2, d = Math.abs(cx - mid);
+    if (d < off) { off = d; el = f; x = cx; y = r.top + r.width * 0.4; }
+  }
+  return { el, off, x, y, mid };
+}
+function stripTo(el, smooth = true) {
+  stripArmed = true;
+  els.folders.scrollTo({ left: el.offsetLeft - (els.folders.clientWidth - el.offsetWidth) / 2, behavior: smooth && !reduced ? 'smooth' : 'auto' });
+}
+// взгляд возвращается к посетителю, когда папки перестали ехать
+function holdLook(ms = 1900) { clearTimeout(lookT); lookT = setTimeout(() => { if (head && geo.mobile && !dragging) head.clearLook(); }, ms); }
+function stripSettle() {
+  clearTimeout(stripT);
+  if (!geo.mobile || view !== 'hero' || !stripArmed) return;
+  const c = stripCenter();
+  if (!c.el || c.off > 10) return;                 // палец ещё держит ленту между папками
+  if (openId !== c.el.dataset.section) { openFolder(c.el); vibrate(8); }
+  holdLook();
+}
+function stripScroll() {
+  if (!geo.mobile || view !== 'hero') return;
+  const c = stripCenter();
+  if (!c.el) return;
+  folderEls.forEach((f) => f.classList.toggle('is-cur', f === c.el));      // текущая папка — та, что ближе к центру
+  if (!stripArmed) return;                          // ленту поставил на место скрипт, а не посетитель
+  // раскрытая папка уехала из центра — работы возвращаются в неё
+  if (openId && (c.el.dataset.section !== openId || c.off > c.el.offsetWidth * 0.3)) closeFolder();
+  // взгляд ведёт папка, которая сейчас ближе к центру; сдвиг усилен, чтобы поворот головы читался
+  if (head) head.lookAtClient(c.mid + (c.x - c.mid) * 2.2, c.y);
+  holdLook();
+  clearTimeout(stripT);
+  stripT = setTimeout(stripSettle, 140);
+}
+els.folders.addEventListener('scroll', stripScroll, { passive: true });
+els.folders.addEventListener('scrollend', stripSettle);
+['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach((ev) => els.folders.addEventListener(ev, () => { stripArmed = true; }, { passive: true }));
+const vibrate = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) { /* noop */ } };
+if (debug) window.__strip = () => ({ armed: stripArmed, openId, mobile: geo.mobile, view });
 
 // ---------- роутинг ----------
 let catalogHi = false, switchT = 0, greeted = false, booted = false;
@@ -533,9 +620,12 @@ function wireHead() {
   });
   head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); say('glasses_self', { force: true }); });
   head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; head.wink('R'); });
+  head.addEventListener('spit', (e) => onSpit(e.detail));
   head.onTick = (dt) => { voice.tick(dt); };
   head.onFrame = updateVeil;
 
+  // Датчик наклона браузеры отдают только сайту, открытому по https (защищённое соединение):
+  // по http события не приходят вовсе, и голова на телефоне следит только за папками.
   const coarse = window.matchMedia('(pointer: coarse)').matches;
   const tiltOk = coarse && !reduced && window.isSecureContext && 'DeviceOrientationEvent' in window;
   tiltAsk = tiltOk && typeof DeviceOrientationEvent.requestPermission === 'function';
@@ -574,21 +664,127 @@ function greet() {
   if (greeted) return;
   greeted = true;
   activity();               // отсчёт «скучающих» реплик — от приветствия, а не от начала загрузки
+  spit.input = performance.now() + 600;
   const returning = store.get('seen', false);
   store.set('seen', true);
   // если за эти полсекунды посетитель уже ушёл в каталог — приветствие главного экрана там не нужно
   setTimeout(() => {
-    if (view === 'hero') say(returning ? ['hello_back'] : ['hello_1', touchUI ? 'hello_2_touch' : 'hello_2'], { force: true });
+    // вторая реплика — про то, как здесь смотреть папки: навести, нажать или листать ленту (телефон)
+    if (view === 'hero') say(returning ? ['hello_back'] : ['hello_1', isStack() ? 'hello_2_strip' : touchUI ? 'hello_2_touch' : 'hello_2'], { force: true });
   }, reduced ? 0 : 500);
 }
 function activity() { lastActivity = performance.now(); }
 ['pointermove', 'pointerdown', 'pointerup', 'keydown', 'scroll', 'touchstart'].forEach((ev) => window.addEventListener(ev, activity, { passive: true }));
 setInterval(() => {
-  if (view !== 'hero' || !greeted || openId || dragging || idleCount >= REACTIONS.idle.length) return;
+  if (view !== 'hero' || !greeted || openId || dragging || spit.state !== 'off' || idleCount >= REACTIONS.idle.length) return;
   if (head && head.drags.size) { activity(); return; }
   const last = Math.max(lastActivity, head ? head.tilt.lastMove : 0);
   if (performance.now() - last > 14000) { say(REACTIONS.idle[idleCount++], { force: true }); activity(); }
 }, 1000);
+
+// ---------- пасхалка: посетитель «залип» — голова заплёвывает экран ----------
+// Если долго ничего не трогать, голова начинает плевать в экран: плевки остаются на «стекле» в случайных местах,
+// пока не покроют его целиком. Любое действие посетителя — и экран вытирается. Сами кляксы — в js/spit.js,
+// движение головы — в head.js (spit).
+// СКОЛЬКО ЖДАТЬ: сейчас 5 секунд — для проверки. На боевом сайте поставьте 600 (10 минут).
+// Проверить с любым значением можно и адресом: …/?spit=5
+const SPIT_AFTER = Number(query.get('spit')) > 0 ? Number(query.get('spit')) : 5;
+const spit = { state: 'off', fx: null, n: 0, t: 0, to: null, pending: null, input: performance.now(), px: -1, py: -1 };   // state: off | on | done | dead
+if (debug) window.__spit = spit;
+const speaking = () => !!subs && (document.body.classList.contains('is-speaking') || performance.now() < Math.max(subs.busyUntil, subs.readUntil));
+// Настоящее действие посетителя (не наклон телефона и не речь головы): отсчёт заново, плевки стираются
+function userInput() {
+  spit.input = performance.now();
+  if (spit.state === 'on' || spit.state === 'done') stopSpit();
+}
+['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((ev) => window.addEventListener(ev, userInput, { passive: true, capture: true }));
+window.addEventListener('pointermove', (e) => {
+  // браузер шлёт «движение» и когда под неподвижным курсором что-то поменялось — считаем только настоящий сдвиг
+  if (Math.hypot(e.clientX - spit.px, e.clientY - spit.py) < 4) return;
+  spit.px = e.clientX; spit.py = e.clientY;
+  userInput();
+}, { passive: true });
+document.addEventListener('visibilitychange', () => { spit.input = performance.now(); });      // считаем только время, когда вкладка на виду
+setInterval(() => {
+  if (spit.state !== 'off' || !head || !head.loaded || !booted || reduced || document.hidden) return;
+  if (head.drags.size || dragging || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
+  if (performance.now() - spit.input > SPIT_AFTER * 1000 && !speaking()) startSpit();
+}, 250);
+
+async function startSpit() {
+  spit.state = 'on'; spit.n = 0;
+  try {
+    if (!spit.fx) { const { SpitScreen } = await import('./spit.js'); spit.fx = new SpitScreen(); }
+  } catch (e) { console.warn('Плевки недоступны', e); spit.state = 'dead'; return; }
+  if (spit.state !== 'on') return;                 // пока модуль грузился, посетитель очнулся
+  spit.fx.reset();
+  say('spit_warn', { force: true });
+  spit.t = setTimeout(spitNext, 1700);
+  track('spit_start');
+}
+function spitNext() {
+  if (spit.state !== 'on' || !head) return;
+  const to = spit.pending || spit.fx.next();       // куда плюнуть: в ещё чистое место; null — экран покрыт
+  if (!to) { spitDone(); return; }
+  // голова целится туда, куда плюёт; последний плевок — во весь экран, с долгим «хррр»
+  if (!head.spit({ quick: spit.n > 2 && !to.last, big: !!to.last })) { spit.pending = to; spit.t = setTimeout(spitNext, 120); return; }
+  spit.pending = null; spit.to = to;
+  head.lookAtClient(to.x, to.y);
+  spit.n++;
+  // всё чаще и чаще; после последнего плевка серию завершает его приземление (см. onSpit)
+  if (!to.last) spit.t = setTimeout(spitNext, Math.max(360, 1500 * 0.85 ** spit.n));
+}
+function spitDone() {
+  if (spit.state !== 'on') return;
+  clearTimeout(spit.t);
+  spit.state = 'done';
+  if (head) head.clearLook();
+  say('spit_done', { force: true });
+  track('spit_done', { n: spit.n });
+}
+// голова «выстрелила» — плевок летит от рта в экран
+const SPIT_LINES = { 1: 'spit_1', 4: 'spit_2', 9: 'spit_3', 16: 'spit_4' };
+function onSpit({ from }) {
+  const to = spit.to;
+  if (spit.state !== 'on' || !to) return;
+  voice.spit(to.last ? 1 : 0.6);
+  if (to.last) spit.t = setTimeout(spitDone, 5000);          // страховка: если плевок почему-то не «приземлится»
+  spit.fx.launch(from, to, () => {
+    voice.splat(to.last ? 1 : 0.5); vibrate(10);
+    if (to.last && spit.state === 'on') { clearTimeout(spit.t); spit.t = setTimeout(spitDone, 1100); }
+  });
+  if (SPIT_LINES[spit.n]) say(SPIT_LINES[spit.n], { force: true });
+}
+function stopSpit() {
+  clearTimeout(spit.t);
+  spit.state = 'off'; spit.to = null; spit.pending = null;
+  if (head) { head.stopSpit(); head.clearLook(); }
+  if (spit.fx && spit.fx.wipe()) say('spit_back', { force: true });
+  spit.input = performance.now();
+  track('spit_wipe', { n: spit.n });
+}
+
+// ---------- проверка на телефоне: адрес …/?diag показывает, что видит сайт ----------
+// Удобно, когда «на телефоне что-то не так»: размер экрана, размер головы, защищено ли соединение и жив ли датчик наклона.
+function diag() {
+  const el = document.createElement('pre');
+  el.className = 'diag';
+  document.body.appendChild(el);
+  const yes = (v) => (v ? 'да' : 'нет');
+  const draw = () => {
+    const W = window.innerWidth, H = window.innerHeight, r = head && head.rect, tl = head && head.tilt;
+    el.textContent = [
+      `экран ${W}×${H} @${(window.devicePixelRatio || 1).toFixed(2)}, раскладка: ${isStack() ? 'телефон' : 'компьютер'}`,
+      `голова: ${r ? `${Math.round(r.w)} px — ${Math.round((r.w / W) * 100)}% ширины` : (head ? 'в углу' : 'нет (WebGL)')}`,
+      `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
+      `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
+      `наклон: ${tl && tl.on ? `включён, событий ${tl.n}` : 'выключен'}`,
+      `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки через ${SPIT_AFTER} с`,
+    ].join('\n');
+  };
+  draw();
+  setInterval(draw, 500);
+}
 
 // ---------- предпросмотр из админки: содержимое приходит черновиком, голова не нужна ----------
 function redraw() {
@@ -670,13 +866,15 @@ async function boot() {
   preloadArtifacts();
   await voice.init();
   booted = true;
+  spit.input = performance.now();      // бездействие считаем с момента, когда сайт готов, а не пока он грузился
   if (view === 'hero') greet();
+  if (query.has('diag')) diag();
   // Плашка про наклон (iPhone/iPad): появляется после приветствия и сама уходит, если её не тронули
   if (tiltTip && store.get('tilt') == null) {
     setTimeout(() => {
       if (view !== 'hero') return;
       tiltTip.hidden = false;
-      setTimeout(() => { tiltTip.hidden = true; }, 12000);
+      setTimeout(() => { tiltTip.hidden = true; }, 20000);
     }, 4000);
   }
 }

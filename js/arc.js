@@ -1,5 +1,6 @@
 // Каталог: папки проектов стоят на большой дуге и едут по ней при прокрутке — ближние крупнее и чуть не в фокусе.
-// При наведении на папку фон страницы принимает стиль проекта. На телефоне — обычная лента сверху вниз.
+// При наведении на папку фон страницы принимает стиль проекта. На телефоне — лента сверху вниз: прокрутка
+// защёлкивается на папке, папка в центре экрана раскрывается и показывает работы, фон принимает стиль проекта.
 import { content, tx, t, count, esc, projectsOf, peekItems, sectionById, isStack } from './content.js';
 import { folderHTML } from './folders.js';
 import { setTheme, themeOf } from './theme.js';
@@ -45,6 +46,7 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
   }
 
   function render() {
+    state.flat = false; state.hoverKey = null;      // список пересобран: папку в фокусе надо отметить заново
     state.list = projectsOf(state.cat);
     const sec = sectionById(state.cat);
     // заголовок раздела едет по дуге первым — пока каталог не прокрутили, он занимает место «предыдущей» папки
@@ -79,9 +81,14 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     state.raf = 0;
     if (!state.active) return;
     if (mobile()) {
-      for (const li of [state.title, ...state.items]) { li.style.transform = ''; li.style.filter = ''; li.style.zIndex = ''; li.style.opacity = ''; li.classList.remove('is-far'); }
+      if (!state.flat) {
+        state.flat = true;
+        for (const li of [state.title, ...state.items]) { li.style.transform = ''; li.style.filter = ''; li.style.zIndex = ''; li.style.opacity = ''; li.classList.remove('is-far'); }
+      }
+      follow();
       return;
     }
+    state.flat = false;
     const W = window.innerWidth, H = window.innerHeight, u = Math.min(W, 1.5 * H) / 100;
     const fw = clamp(FW * u, 200, 560);
     const rho = RHO * u, a0 = A0 * Math.PI / 180;
@@ -125,23 +132,37 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     window.scrollTo({ top: clamp(i, 0, Math.max(0, state.list.length - 1)) * state.step, behavior: smooth && !reduced ? 'smooth' : 'auto' });
   }
 
+  // Телефон: пока лента едет, голова в углу следит за папкой в центре экрана, а когда лента остановилась —
+  // снова смотрит на посетителя (за пальцем она не следит)
+  function follow() {
+    const li = state.hovered == null ? null : state.items[state.hovered];
+    if (!onHover || !li || !state.moving) return;
+    onHover(li.querySelector('.gf'));
+    clearTimeout(state.lookT);
+    state.lookT = setTimeout(() => { state.moving = false; if (state.active && mobile()) onHover(null); }, 1900);
+  }
+
   // фон в стиле проекта: на компьютере — под курсором или фокусом, на телефоне — у проекта в центре экрана
   function hover(i) {
     clearTimeout(state.hoverT);
-    if (i === state.hovered) return;
-    state.hovered = i;
-    const p = i == null ? null : state.list[i];
+    const p = i == null ? null : state.list[i], key = p ? p.slug : null;
+    if (i === state.hovered && key === state.hoverKey) return;
+    state.hovered = i; state.hoverKey = key;
+    // наведения нет (телефон, планшет): папка в фокусе раскрывается сама и показывает работы
+    if (mobile() || noHover) state.items.forEach((li, k) => li.querySelector('.gf').classList.toggle('is-open', k === i));
     // фон меняется, когда курсор задержался на папке: при быстрой прокрутке под курсором он не мигает
     clearTimeout(state.themeT);
     state.themeT = setTimeout(() => setTheme(themeOf(p)), p ? 130 : 0);
-    if (onHover) onHover(i == null || !state.items[i] ? null : state.items[i].querySelector('.gf'));
+    if (mobile()) follow();
+    else if (onHover) onHover(i == null || !state.items[i] ? null : state.items[i].querySelector('.gf'));
   }
   const unhover = () => { clearTimeout(state.hoverT); state.hoverT = setTimeout(() => hover(null), 140); };
   const idxOf = (target) => { const el = target.closest && target.closest('[data-i]'); return el ? Number(el.dataset.i) : null; };
-  arc.addEventListener('pointerover', (e) => { if (e.pointerType === 'touch') return; const i = idxOf(e.target); if (i != null) hover(i); });
-  arc.addEventListener('pointerout', (e) => { if (e.pointerType === 'touch') return; if (!e.relatedTarget || !arc.contains(e.relatedTarget) || idxOf(e.relatedTarget) == null) unhover(); });
-  arc.addEventListener('focusin', (e) => { const i = idxOf(e.target); if (i == null) return; if (e.target.matches(':focus-visible')) { scrollToIndex(i); hover(i); } });
-  arc.addEventListener('focusout', unhover);
+  // В ленте (телефон) папку в фокусе выбирает прокрутка — та, что в центре экрана; курсор и фокус её не переключают
+  arc.addEventListener('pointerover', (e) => { if (e.pointerType === 'touch' || mobile()) return; const i = idxOf(e.target); if (i != null) hover(i); });
+  arc.addEventListener('pointerout', (e) => { if (e.pointerType === 'touch' || mobile()) return; if (!e.relatedTarget || !arc.contains(e.relatedTarget) || idxOf(e.relatedTarget) == null) unhover(); });
+  arc.addEventListener('focusin', (e) => { const i = idxOf(e.target); if (i == null) return; if (e.target.matches(':focus-visible')) { scrollToIndex(i); if (!mobile()) hover(i); } });
+  arc.addEventListener('focusout', () => { if (!mobile()) unhover(); });
   index.addEventListener('pointerover', (e) => { const i = idxOf(e.target); if (i == null || e.pointerType === 'touch') return; hover(i); scrollToIndex(i); });
   index.addEventListener('pointerout', unhover);
 
@@ -164,9 +185,12 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     else if (e.key === 'Home') { e.preventDefault(); scrollToIndex(0); }
     else if (e.key === 'End') { e.preventDefault(); scrollToIndex(state.list.length - 1); }
   }
-  const snap = () => document.documentElement.classList.toggle('is-arc', state.active && !mobile());
+  const snap = () => {
+    document.documentElement.classList.toggle('is-arc', state.active && !mobile());
+    document.documentElement.classList.toggle('is-list', state.active && mobile());      // телефон: лента защёлкивается на папке
+  };
   const onResize = () => { if (!state.active) return; snap(); measure(); layout(); watchCenter(); };
-  window.addEventListener('scroll', () => { if (state.active) schedule(); }, { passive: true });
+  window.addEventListener('scroll', () => { if (state.active) { state.moving = true; schedule(); } }, { passive: true });
   window.addEventListener('resize', onResize);
   window.addEventListener('keydown', onKey);
 
@@ -189,6 +213,7 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
       window.scrollTo(0, restore ? (state.saved[state.cat] || 0) : 0);
       layout();
       watchCenter();
+      requestAnimationFrame(() => { state.moving = false; });      // вход в каталог — не прокрутка: голова смотрит на посетителя
     } else { hover(null); clearTimeout(state.themeT); setTheme(null); if (io) { io.disconnect(); io = null; } }
   }
 
