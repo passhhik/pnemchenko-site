@@ -1,0 +1,182 @@
+{
+  "bank-onboarding": {
+    "cover": "assets/artifacts/bank-onboarding-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/bank-onboarding-1.webp",
+        "w": 420,
+        "h": 860
+      },
+      {
+        "src": "assets/artifacts/bank-onboarding-2.webp",
+        "w": 720,
+        "h": 180
+      },
+      {
+        "src": "assets/artifacts/bank-onboarding-3.webp",
+        "w": 560,
+        "h": 700
+      }
+    ]
+  },
+  "delivery-checkout": {
+    "cover": "assets/artifacts/delivery-checkout-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/delivery-checkout-1.webp",
+        "w": 600,
+        "h": 398
+      },
+      {
+        "src": "assets/artifacts/delivery-checkout-2.webp",
+        "w": 600,
+        "h": 686
+      },
+      {
+        "src": "assets/artifacts/delivery-checkout-3.webp",
+        "w": 600,
+        "h": 196
+      }
+    ]
+  },
+  "b2b-analytics": {
+    "cover": "assets/artifacts/b2b-analytics-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/b2b-analytics-1.webp",
+        "w": 520,
+        "h": 316
+      },
+      {
+        "src": "assets/artifacts/b2b-analytics-2.webp",
+        "w": 640,
+        "h": 444
+      },
+      {
+        "src": "assets/artifacts/b2b-analytics-3.webp",
+        "w": 640,
+        "h": 188
+      }
+    ]
+  },
+  "travel-campaign": {
+    "cover": "assets/artifacts/travel-campaign-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/travel-campaign-1.webp",
+        "w": 680,
+        "h": 340
+      },
+      {
+        "src": "assets/artifacts/travel-campaign-2.webp",
+        "w": 480,
+        "h": 480
+      },
+      {
+        "src": "assets/artifacts/travel-campaign-3.webp",
+        "w": 680,
+        "h": 340
+      }
+    ]
+  },
+  "city-posters": {
+    "cover": "assets/artifacts/city-posters-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/city-posters-1.webp",
+        "w": 440,
+        "h": 622
+      },
+      {
+        "src": "assets/artifacts/city-posters-2.webp",
+        "w": 440,
+        "h": 622
+      },
+      {
+        "src": "assets/artifacts/city-posters-3.webp",
+        "w": 440,
+        "h": 622
+      }
+    ]
+  },
+  "label-promo": {
+    "cover": "assets/artifacts/label-promo-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/label-promo-1.webp",
+        "w": 480,
+        "h": 480
+      },
+      {
+        "src": "assets/artifacts/label-promo-2.webp",
+        "w": 480,
+        "h": 480
+      },
+      {
+        "src": "assets/artifacts/label-promo-3.webp",
+        "w": 400,
+        "h": 712
+      }
+    ]
+  },
+  "zerno-coffee": {
+    "cover": "assets/artifacts/zerno-coffee-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/zerno-coffee-1.webp",
+        "w": 520,
+        "h": 300
+      },
+      {
+        "src": "assets/artifacts/zerno-coffee-2.webp",
+        "w": 400,
+        "h": 540
+      },
+      {
+        "src": "assets/artifacts/zerno-coffee-3.webp",
+        "w": 600,
+        "h": 412
+      }
+    ]
+  },
+  "shum-festival": {
+    "cover": "assets/artifacts/shum-festival-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/shum-festival-1.webp",
+        "w": 440,
+        "h": 622
+      },
+      {
+        "src": "assets/artifacts/shum-festival-2.webp",
+        "w": 640,
+        "h": 272
+      },
+      {
+        "src": "assets/artifacts/shum-festival-3.webp",
+        "w": 520,
+        "h": 520
+      }
+    ]
+  },
+  "breathe-yoga": {
+    "cover": "assets/artifacts/breathe-yoga-cover.webp",
+    "artifacts": [
+      {
+        "src": "assets/artifacts/breathe-yoga-1.webp",
+        "w": 520,
+        "h": 300
+      },
+      {
+        "src": "assets/artifacts/breathe-yoga-2.webp",
+        "w": 660,
+        "h": 472
+      },
+      {
+        "src": "assets/artifacts/breathe-yoga-3.webp",
+        "w": 560,
+        "h": 676
+      }
+    ]
+  }
+}

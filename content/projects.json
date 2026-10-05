@@ -1,0 +1,950 @@
+{
+ "projects": [
+  {
+   "slug": "bank-onboarding",
+   "section": "digital",
+   "year": 2025,
+   "title": "Онбординг в банке за 3 минуты",
+   "summary": "Пересобрал путь нового клиента: от установки приложения до первой карты.",
+   "client": "Финтех, B2C",
+   "role": "Lead Product Designer",
+   "team": "2 дизайнера, 6 разработчиков",
+   "duration": "4 месяца",
+   "cover": "assets/artifacts/bank-onboarding-cover.webp",
+   "sticker": "assets/stickers/bank-onboarding.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/bank-onboarding-1.webp",
+     "alt": "Экран приложения: сфотографируйте паспорт",
+     "cut": true,
+     "w": 420,
+     "h": 860
+    },
+    {
+     "src": "assets/artifacts/bank-onboarding-2.webp",
+     "alt": "Индикатор шагов: телефон, паспорт, адрес, карта",
+     "cut": true,
+     "w": 720,
+     "h": 180
+    },
+    {
+     "src": "assets/artifacts/bank-onboarding-3.webp",
+     "alt": "Экран «Карта готова» с кнопкой «Начать пользоваться»",
+     "cut": true,
+     "w": 560,
+     "h": 700
+    }
+   ],
+   "theme": {
+    "color": "#3452FC",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "+34%",
+     "l": "завершили онбординг"
+    },
+    {
+     "v": "−41%",
+     "l": "обращений в поддержку"
+    },
+    {
+     "v": "3 мин",
+     "l": "среднее время"
+    }
+   ],
+   "tldr": {
+    "task": "Половина новых клиентов бросала регистрацию на шаге с документами.",
+    "did": "Разбил анкету на короткие шаги, добавил распознавание паспорта и понятные статусы проверки.",
+    "result": "Онбординг завершают на треть чаще, поддержка разгружена."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Что было не так",
+     "text": "Регистрация занимала одиннадцать экранов. На шаге с паспортом люди уходили искать документ и не возвращались: приложение не сохраняло прогресс и не объясняло, зачем нужны данные.",
+     "say": "Одиннадцать экранов. Я бы тоже ушёл."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/bank-onboarding-1.webp",
+     "alt": "Экран приложения: сфотографируйте паспорт",
+     "width": "text",
+     "caption": "Камера сама находит разворот и подсказывает, если мешает блик.",
+     "cut": true
+    },
+    {
+     "type": "steps",
+     "title": "Как решал",
+     "items": [
+      {
+       "title": "Интервью и запись сессий",
+       "text": "12 интервью с новыми клиентами и 200 записей сессий показали три точки отказа."
+      },
+      {
+       "title": "Короткие шаги",
+       "text": "Одно действие на экран, прогресс сохраняется, можно вернуться с любого устройства."
+      },
+      {
+       "title": "Распознавание паспорта",
+       "text": "Вместо девяти полей — одна фотография и проверка распознанного."
+      },
+      {
+       "title": "Понятные статусы",
+       "text": "Проверка документов показывает, что происходит и сколько осталось."
+      }
+     ]
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/bank-onboarding-2.webp",
+       "alt": "Индикатор шагов"
+      },
+      {
+       "src": "assets/artifacts/bank-onboarding-3.webp",
+       "alt": "Экран «Карта готова»"
+      }
+     ]
+    },
+    {
+     "type": "quote",
+     "text": "Мы перестали терять клиентов на паспорте. Поддержка впервые за год закрыла квартал без переработок.",
+     "author": "Руководитель продукта",
+     "role": "банк-заказчик"
+    }
+   ],
+   "tags": [
+    "Мобильное приложение",
+    "Исследования",
+    "A/B-тесты"
+   ],
+   "published": true
+  },
+  {
+   "slug": "delivery-checkout",
+   "section": "digital",
+   "year": 2024,
+   "title": "Чекаут сервиса доставки",
+   "summary": "Сократил оформление заказа с пяти экранов до двух.",
+   "client": "E-commerce",
+   "role": "Product Designer",
+   "team": "Продуктовая команда из 8 человек",
+   "duration": "3 месяца",
+   "cover": "assets/artifacts/delivery-checkout-cover.webp",
+   "sticker": "assets/stickers/delivery-checkout.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/delivery-checkout-1.webp",
+     "alt": "Выбор времени доставки по слотам",
+     "cut": true,
+     "w": 600,
+     "h": 398
+    },
+    {
+     "src": "assets/artifacts/delivery-checkout-2.webp",
+     "alt": "Блок оплаты с итогом заказа",
+     "cut": true,
+     "w": 600,
+     "h": 686
+    },
+    {
+     "src": "assets/artifacts/delivery-checkout-3.webp",
+     "alt": "Статус «Курьер в пути»",
+     "cut": true,
+     "w": 600,
+     "h": 196
+    }
+   ],
+   "theme": {
+    "color": "#097A54",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "+12%",
+     "l": "конверсия в заказ"
+    },
+    {
+     "v": "2",
+     "l": "экрана вместо пяти"
+    },
+    {
+     "v": "−18%",
+     "l": "брошенных корзин"
+    }
+   ],
+   "tldr": {
+    "task": "Пользователи терялись между выбором слота, адреса и оплатой.",
+    "did": "Собрал оформление в единый экран с умными значениями по умолчанию.",
+    "result": "Заказ оформляют быстрее, корзины бросают реже."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Что было не так",
+     "text": "Адрес, время и оплата жили на разных экранах. Ошибка в любом из них возвращала в начало, а итоговая сумма появлялась только в конце."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/delivery-checkout-2.webp",
+     "alt": "Блок оплаты с итогом заказа",
+     "width": "text",
+     "caption": "Итог виден всё время, а не только на последнем шаге.",
+     "cut": true
+    },
+    {
+     "type": "steps",
+     "title": "Как решал",
+     "items": [
+      {
+       "title": "Карта сценариев",
+       "text": "Разобрал 40 тысяч заказов: 80% клиентов повторяют адрес и способ оплаты."
+      },
+      {
+       "title": "Значения по умолчанию",
+       "text": "Последний адрес, ближайший слот и сохранённая карта подставляются сами."
+      },
+      {
+       "title": "Один экран",
+       "text": "Всё оформление помещается в один экран и подтверждение."
+      }
+     ]
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/delivery-checkout-1.webp",
+       "alt": "Выбор времени доставки"
+      },
+      {
+       "src": "assets/artifacts/delivery-checkout-3.webp",
+       "alt": "Статус «Курьер в пути»"
+      }
+     ]
+    }
+   ],
+   "tags": [
+    "Веб",
+    "Мобайл",
+    "Конверсия"
+   ],
+   "published": true
+  },
+  {
+   "slug": "b2b-analytics",
+   "section": "digital",
+   "year": 2023,
+   "title": "Дашборд B2B-аналитики",
+   "summary": "Спроектировал дашборд, который отвечает на вопрос раньше, чем его зададут.",
+   "client": "SaaS",
+   "role": "Product Designer",
+   "team": "1 дизайнер, 4 разработчика",
+   "duration": "6 месяцев",
+   "cover": "assets/artifacts/b2b-analytics-cover.webp",
+   "sticker": "assets/stickers/b2b-analytics.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/b2b-analytics-1.webp",
+     "alt": "Карточка «Выручка» с графиком",
+     "cut": true,
+     "w": 520,
+     "h": 316
+    },
+    {
+     "src": "assets/artifacts/b2b-analytics-2.webp",
+     "alt": "График новых клиентов по месяцам",
+     "cut": true,
+     "w": 640,
+     "h": 444
+    },
+    {
+     "src": "assets/artifacts/b2b-analytics-3.webp",
+     "alt": "Панель фильтров отчёта",
+     "cut": true,
+     "w": 640,
+     "h": 188
+    }
+   ],
+   "theme": {
+    "color": "#672CC8",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "4 мин",
+     "l": "до первого инсайта"
+    },
+    {
+     "v": "×2",
+     "l": "рост ежедневной аудитории"
+    },
+    {
+     "v": "38",
+     "l": "компонентов в системе"
+    }
+   ],
+   "tldr": {
+    "task": "Клиенты выгружали данные в таблицы, потому что в продукте ничего не находили.",
+    "did": "Сценарные виджеты, шаблоны отчётов и дизайн-система для графиков.",
+    "result": "Время до инсайта сократилось с 20 до 4 минут."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Что было не так",
+     "text": "В продукте было 60 графиков и ни одного ответа. Аналитики клиентов выгружали всё в таблицы и строили отчёты заново.",
+     "say": "Шестьдесят графиков. И все молчат."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/b2b-analytics-2.webp",
+     "alt": "График новых клиентов по месяцам",
+     "width": "wide",
+     "caption": "Каждый виджет отвечает на один вопрос и объясняет изменение.",
+     "cut": true
+    },
+    {
+     "type": "steps",
+     "title": "Как решал",
+     "items": [
+      {
+       "title": "Вопросы вместо графиков",
+       "text": "Собрал 25 вопросов, которые клиенты задают данным каждую неделю."
+      },
+      {
+       "title": "Сценарные виджеты",
+       "text": "Виджет показывает ответ, сравнение и причину изменения."
+      },
+      {
+       "title": "Система графиков",
+       "text": "38 компонентов с едиными правилами цвета и подписей."
+      }
+     ]
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/b2b-analytics-1.webp",
+       "alt": "Карточка «Выручка»"
+      },
+      {
+       "src": "assets/artifacts/b2b-analytics-3.webp",
+       "alt": "Панель фильтров"
+      }
+     ]
+    }
+   ],
+   "tags": [
+    "B2B",
+    "Data viz",
+    "Дизайн-система"
+   ],
+   "published": true
+  },
+  {
+   "slug": "travel-campaign",
+   "section": "marketing",
+   "year": 2025,
+   "title": "Кампания карты для путешествий",
+   "summary": "Запуск новой карты: ключевой визуал, баннеры, соцсети и наружная реклама.",
+   "client": "Финтех",
+   "role": "Арт-директор кампании",
+   "team": "3 дизайнера, копирайтер",
+   "duration": "2 месяца",
+   "cover": "assets/artifacts/travel-campaign-cover.webp",
+   "sticker": "assets/stickers/travel-campaign.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/travel-campaign-1.webp",
+     "alt": "Баннер «Путешествуй легко»",
+     "cut": true,
+     "w": 680,
+     "h": 340
+    },
+    {
+     "src": "assets/artifacts/travel-campaign-2.webp",
+     "alt": "Баннер «Кешбэк 10% на отели»",
+     "w": 480,
+     "h": 480
+    },
+    {
+     "src": "assets/artifacts/travel-campaign-3.webp",
+     "alt": "Баннер «До моря — одна карта»",
+     "w": 680,
+     "h": 340
+    }
+   ],
+   "theme": {
+    "color": "#0E1A3C",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "120 тыс.",
+     "l": "карт за квартал"
+    },
+    {
+     "v": "×1,8",
+     "l": "CTR баннеров к прошлой кампании"
+    },
+    {
+     "v": "40+",
+     "l": "форматов"
+    }
+   ],
+   "tldr": {
+    "task": "Карту для путешествий путали с обычной кредиткой банка.",
+    "did": "Один узнаваемый образ — карта-билет — и система форматов от сторис до билборда.",
+    "result": "120 000 оформленных карт за квартал."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "Карта выглядит как посадочный талон. Этот образ не нужно объяснять: он сразу говорит про поездки и работает в любом формате.",
+     "say": "Карта как билет. Моя идея. Ну, тела."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/travel-campaign-1.webp",
+     "alt": "Баннер «Путешествуй легко»",
+     "width": "wide",
+     "caption": "Ключевой визуал кампании.",
+     "cut": true
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/travel-campaign-2.webp",
+       "alt": "Баннер «Кешбэк 10% на отели»"
+      },
+      {
+       "src": "assets/artifacts/travel-campaign-3.webp",
+       "alt": "Баннер «До моря — одна карта»"
+      }
+     ]
+    },
+    {
+     "type": "steps",
+     "title": "Система форматов",
+     "items": [
+      {
+       "title": "Ключевой визуал",
+       "text": "Карта-билет и короткое обещание."
+      },
+      {
+       "title": "Сетка",
+       "text": "Один модуль собирает и сторис, и билборд 6×3."
+      },
+      {
+       "title": "Шаблоны",
+       "text": "40 форматов собираются из шаблонов без дизайнера."
+      }
+     ]
+    }
+   ],
+   "tags": [
+    "Кампания",
+    "Ключевой визуал",
+    "Наружная реклама"
+   ],
+   "published": true
+  },
+  {
+   "slug": "city-posters",
+   "section": "marketing",
+   "year": 2024,
+   "title": "Плакаты «Город» для урбан-фестиваля",
+   "summary": "Серия плакатов о районах Москвы — типографика вместо фотографий.",
+   "client": "Городской фестиваль",
+   "role": "Дизайнер коммуникации",
+   "team": "Соло",
+   "duration": "3 месяца",
+   "cover": "assets/artifacts/city-posters-cover.webp",
+   "sticker": "assets/stickers/city-posters.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/city-posters-1.webp",
+     "alt": "Плакат «Замоскворечье»",
+     "w": 440,
+     "h": 622
+    },
+    {
+     "src": "assets/artifacts/city-posters-2.webp",
+     "alt": "Плакат «Сокольники»",
+     "w": 440,
+     "h": 622
+    },
+    {
+     "src": "assets/artifacts/city-posters-3.webp",
+     "alt": "Плакат «Хамовники»",
+     "w": 440,
+     "h": 622
+    }
+   ],
+   "theme": {
+    "color": "#101626",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "24",
+     "l": "плаката"
+    },
+    {
+     "v": "3",
+     "l": "города"
+    },
+    {
+     "v": "1",
+     "l": "шрифт на всё"
+    }
+   ],
+   "tldr": {
+    "task": "Показать характер района одной типографской идеей.",
+    "did": "Каждый плакат — набор правил вёрстки, выведенный из планировки улиц.",
+    "result": "24 плаката и выставка в трёх городах."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "У каждого района свой рисунок улиц. Я перевёл его в правила набора: лучи Сокольников, излучина Хамовников, плотная сетка Замоскворечья."
+    },
+    {
+     "type": "gallery",
+     "columns": 3,
+     "items": [
+      {
+       "src": "assets/artifacts/city-posters-1.webp",
+       "alt": "Плакат «Замоскворечье»"
+      },
+      {
+       "src": "assets/artifacts/city-posters-2.webp",
+       "alt": "Плакат «Сокольники»"
+      },
+      {
+       "src": "assets/artifacts/city-posters-3.webp",
+       "alt": "Плакат «Хамовники»"
+      }
+     ]
+    },
+    {
+     "type": "quote",
+     "text": "Плакаты уносили со стендов в первый же день. Пришлось допечатывать тираж.",
+     "author": "Куратор фестиваля",
+     "role": ""
+    }
+   ],
+   "tags": [
+    "Плакат",
+    "Типографика",
+    "Наружная реклама"
+   ],
+   "published": true
+  },
+  {
+   "slug": "label-promo",
+   "section": "marketing",
+   "year": 2023,
+   "title": "Промо релизов инди-лейбла",
+   "summary": "Обложки и анонсы в соцсетях, которые узнаются в ленте за полсекунды.",
+   "client": "Музыка",
+   "role": "Дизайнер",
+   "team": "Соло",
+   "duration": "Сезон",
+   "cover": "assets/artifacts/label-promo-cover.webp",
+   "sticker": "assets/stickers/label-promo.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/label-promo-1.webp",
+     "alt": "Обложка релиза «Огни»",
+     "w": 480,
+     "h": 480
+    },
+    {
+     "src": "assets/artifacts/label-promo-2.webp",
+     "alt": "Обложка релиза «Сад. Лето в городе»",
+     "w": 480,
+     "h": 480
+    },
+    {
+     "src": "assets/artifacts/label-promo-3.webp",
+     "alt": "Сторис с анонсом релиза",
+     "cut": true,
+     "w": 400,
+     "h": 712
+    }
+   ],
+   "theme": {
+    "color": "#AE175E",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "24",
+     "l": "релиза"
+    },
+    {
+     "v": "0,5 с",
+     "l": "на узнавание"
+    },
+    {
+     "v": "1",
+     "l": "сетка на всю серию"
+    }
+   ],
+   "tldr": {
+    "task": "Релизы разных жанров терялись в стримингах и лентах.",
+    "did": "Общая сетка, переменный цвет по жанру и шаблоны сторис для анонсов.",
+    "result": "24 релиза в одном узнаваемом стиле."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "Обложки разных жанров объединяет сетка и место названия. Меняются только цвет и картинка — серию узнают, не читая."
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/label-promo-1.webp",
+       "alt": "Обложка релиза «Огни»"
+      },
+      {
+       "src": "assets/artifacts/label-promo-2.webp",
+       "alt": "Обложка релиза «Сад. Лето в городе»"
+      }
+     ]
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/label-promo-3.webp",
+     "alt": "Сторис с анонсом релиза",
+     "width": "text",
+     "caption": "Шаблон сторис: обложка, дата, кнопка.",
+     "cut": true
+    }
+   ],
+   "tags": [
+    "Обложки",
+    "Соцсети",
+    "Музыка"
+   ],
+   "published": true
+  },
+  {
+   "slug": "zerno-coffee",
+   "section": "identity",
+   "year": 2025,
+   "title": "Кофейня «Зерно»",
+   "summary": "Айдентика сети кофеен: от знака до стаканов и навигации.",
+   "client": "HoReCa",
+   "role": "Арт-директор, дизайнер",
+   "team": "2 дизайнера",
+   "duration": "2 месяца",
+   "cover": "assets/artifacts/zerno-coffee-cover.webp",
+   "sticker": "assets/stickers/zerno-coffee.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/zerno-coffee-1.webp",
+     "alt": "Логотип «Зерно»",
+     "cut": true,
+     "w": 520,
+     "h": 300
+    },
+    {
+     "src": "assets/artifacts/zerno-coffee-2.webp",
+     "alt": "Стакан с логотипом",
+     "cut": true,
+     "w": 400,
+     "h": 540
+    },
+    {
+     "src": "assets/artifacts/zerno-coffee-3.webp",
+     "alt": "Палитра обжарки",
+     "cut": true,
+     "w": 600,
+     "h": 412
+    }
+   ],
+   "theme": {
+    "color": "#A65412",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "12",
+     "l": "кофеен в сети"
+    },
+    {
+     "v": "60+",
+     "l": "носителей"
+    },
+    {
+     "v": "1",
+     "l": "гайдлайн на всех"
+    }
+   ],
+   "tldr": {
+    "task": "Сеть росла, а каждая точка выглядела по-своему.",
+    "did": "Гибкая система на модульном знаке и тёплой палитре обжарки.",
+    "result": "Единая айдентика для 12 кофеен."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "Знак — зерно, которое читается и как буква, и как узор. Палитра взята из стадий обжарки: от светлой до эспрессо.",
+     "say": "Кофе я не пью. Нечем."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/zerno-coffee-1.webp",
+     "alt": "Логотип «Зерно»",
+     "width": "text",
+     "cut": true
+    },
+    {
+     "type": "palette",
+     "title": "Палитра обжарки",
+     "colors": [
+      {
+       "hex": "#D9A066",
+       "name": "Светлая"
+      },
+      {
+       "hex": "#A65412",
+       "name": "Средняя"
+      },
+      {
+       "hex": "#6B3410",
+       "name": "Тёмная"
+      },
+      {
+       "hex": "#2E1A0F",
+       "name": "Эспрессо"
+      }
+     ]
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/zerno-coffee-2.webp",
+       "alt": "Стакан с логотипом"
+      },
+      {
+       "src": "assets/artifacts/zerno-coffee-3.webp",
+       "alt": "Палитра обжарки на носителях"
+      }
+     ]
+    }
+   ],
+   "tags": [
+    "Айдентика",
+    "Упаковка",
+    "Навигация"
+   ],
+   "published": true
+  },
+  {
+   "slug": "shum-festival",
+   "section": "identity",
+   "year": 2024,
+   "title": "Фестиваль «Шум»",
+   "summary": "Громкая айдентика музыкального фестиваля на генеративной типографике.",
+   "client": "Культура",
+   "role": "Дизайнер айдентики",
+   "team": "Команда фестиваля",
+   "duration": "3 месяца",
+   "cover": "assets/artifacts/shum-festival-cover.webp",
+   "sticker": "assets/stickers/shum-festival.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/shum-festival-1.webp",
+     "alt": "Афиша фестиваля «Шум»",
+     "w": 440,
+     "h": 622
+    },
+    {
+     "src": "assets/artifacts/shum-festival-2.webp",
+     "alt": "Билет на фестиваль",
+     "cut": true,
+     "w": 640,
+     "h": 272
+    },
+    {
+     "src": "assets/artifacts/shum-festival-3.webp",
+     "alt": "Шрифт «Шум Гротеск»",
+     "w": 520,
+     "h": 520
+    }
+   ],
+   "theme": {
+    "color": "#C0123F",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "200+",
+     "l": "носителей"
+    },
+    {
+     "v": "15 000",
+     "l": "гостей"
+    },
+    {
+     "v": "3",
+     "l": "сцены"
+    }
+   ],
+   "tldr": {
+    "task": "Нужен узнаваемый образ, который выдержит и афишу, и сторис.",
+    "did": "Шрифт, который «звучит» — буквы деформируются по громкости трека.",
+    "result": "Система из 200+ носителей."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "Буквы растягиваются по громкости трека. Каждая афиша — кадр из звучащей композиции, поэтому двух одинаковых нет.",
+     "say": "Тянуть буквы — это у нас семейное."
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/shum-festival-1.webp",
+       "alt": "Афиша фестиваля"
+      },
+      {
+       "src": "assets/artifacts/shum-festival-3.webp",
+       "alt": "Шрифт «Шум Гротеск»"
+      }
+     ]
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/shum-festival-2.webp",
+     "alt": "Билет на фестиваль",
+     "width": "text",
+     "caption": "Билет с отрывным корешком.",
+     "cut": true
+    }
+   ],
+   "tags": [
+    "Айдентика",
+    "Моушн",
+    "Генеративный дизайн"
+   ],
+   "published": true
+  },
+  {
+   "slug": "breathe-yoga",
+   "section": "identity",
+   "year": 2023,
+   "title": "Студия йоги «Дыши»",
+   "summary": "Спокойный ребрендинг студии: знак, фирменный стиль и сайт.",
+   "client": "Wellness",
+   "role": "Дизайнер",
+   "team": "Соло",
+   "duration": "6 недель",
+   "cover": "assets/artifacts/breathe-yoga-cover.webp",
+   "sticker": "assets/stickers/breathe-yoga.webp",
+   "artifacts": [
+    {
+     "src": "assets/artifacts/breathe-yoga-1.webp",
+     "alt": "Логотип студии «Дыши»",
+     "cut": true,
+     "w": 520,
+     "h": 300
+    },
+    {
+     "src": "assets/artifacts/breathe-yoga-2.webp",
+     "alt": "Визитки студии",
+     "cut": true,
+     "w": 660,
+     "h": 472
+    },
+    {
+     "src": "assets/artifacts/breathe-yoga-3.webp",
+     "alt": "Экран расписания занятий",
+     "cut": true,
+     "w": 560,
+     "h": 676
+    }
+   ],
+   "theme": {
+    "color": "#127B96",
+    "tone": "dark"
+   },
+   "metrics": [
+    {
+     "v": "+27%",
+     "l": "записей на пробное занятие"
+    },
+    {
+     "v": "6 недель",
+     "l": "от брифа до запуска"
+    },
+    {
+     "v": "40",
+     "l": "страниц гайдлайна"
+    }
+   ],
+   "tldr": {
+    "task": "Студия выглядела как фитнес-клуб, а продавала спокойствие.",
+    "did": "Мягкая типографика, воздух и знак на ритме дыхания.",
+    "result": "На пробное занятие записываются на четверть чаще."
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "title": "Идея",
+     "text": "Знак построен на ритме дыхания: три дуги — вдох, пауза, выдох. Всё остальное в стиле делает то же самое: оставляет воздух."
+    },
+    {
+     "type": "image",
+     "src": "assets/artifacts/breathe-yoga-1.webp",
+     "alt": "Логотип студии «Дыши»",
+     "width": "text",
+     "cut": true
+    },
+    {
+     "type": "gallery",
+     "columns": 2,
+     "items": [
+      {
+       "src": "assets/artifacts/breathe-yoga-2.webp",
+       "alt": "Визитки студии"
+      },
+      {
+       "src": "assets/artifacts/breathe-yoga-3.webp",
+       "alt": "Экран расписания занятий"
+      }
+     ]
+    }
+   ],
+   "tags": [
+    "Ребрендинг",
+    "Сайт",
+    "Гайдлайн"
+   ],
+   "published": true
+  }
+ ]
+}

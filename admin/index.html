@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Админка портфолио</title>
+  <link rel="icon" href="../favicon.ico" sizes="48x48">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-l">
+      <strong class="bar-title">Админка</strong>
+      <span class="bar-folder" data-folder></span>
+    </div>
+    <div class="bar-r">
+      <span class="langs" data-langs hidden></span>
+      <span class="status" data-status role="status"></span>
+      <a class="btn btn--line" href="../" target="_blank" rel="noopener">Открыть сайт</a>
+      <button class="btn" type="button" data-act="save" disabled>Сохранить</button>
+    </div>
+  </header>
+
+  <!-- первый экран: откуда брать и куда сохранять содержимое -->
+  <section class="gate" data-gate>
+    <div class="gate-card">
+      <h1>Здесь добавляются и настраиваются кейсы</h1>
+      <p data-gate-text>Подключите папку сайта на своём компьютере — админка будет читать и сохранять файлы прямо в ней. Ничего никуда не отправляется.</p>
+      <div class="row">
+        <button class="btn" type="button" data-act="pick-dir" data-need-fs>Выбрать папку сайта</button>
+        <button class="btn" type="button" data-act="resume-dir" hidden></button>
+        <button class="btn btn--line" type="button" data-act="no-dir">Работать без папки</button>
+      </div>
+      <p class="hint" data-gate-hint>Без папки изменения скачиваются архивом: его нужно распаковать в папку сайта.</p>
+      <p class="error" data-gate-error role="alert" hidden></p>
+    </div>
+  </section>
+
+  <div class="app" data-app hidden>
+    <aside class="side" data-side aria-label="Проекты"></aside>
+    <main class="edit" data-edit></main>
+    <section class="prev" aria-label="Предпросмотр">
+      <div class="prev-bar">
+        <div class="seg" role="group" aria-label="Что показывать" data-views></div>
+        <div class="seg" role="group" aria-label="Устройство">
+          <button type="button" data-act="device" data-device="desktop" aria-pressed="true">Компьютер</button>
+          <button type="button" data-act="device" data-device="phone" aria-pressed="false">Телефон</button>
+        </div>
+      </div>
+      <div class="prev-wrap" data-frame-wrap><iframe class="prev-frame" data-frame title="Предпросмотр сайта"></iframe></div>
+    </section>
+  </div>
+
+  <input type="file" data-file hidden>
+  <div class="toast" data-toast role="status" hidden></div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

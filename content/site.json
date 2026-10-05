@@ -1,0 +1,68 @@
+{
+ "languages": [
+  "ru"
+ ],
+ "defaultLang": "ru",
+ "name": {
+  "ru": "Павел Немченко",
+  "en": "Pavel Nemchenko"
+ },
+ "nameGen": {
+  "ru": "Павла Немченко",
+  "en": "Pavel Nemchenko"
+ },
+ "role": {
+  "ru": "продуктовый дизайнер",
+  "en": "product designer"
+ },
+ "email": "",
+ "telegram": "",
+ "cv": {
+  "ru": "",
+  "en": ""
+ },
+ "logo": "assets/logo.svg",
+ "sections": [
+  {
+   "id": "digital",
+   "label": {
+    "ru": "Цифровые продукты",
+    "en": "Digital products"
+   },
+   "pos": [
+    0.848,
+    0.5
+   ],
+   "tilt": 11
+  },
+  {
+   "id": "marketing",
+   "label": {
+    "ru": "Маркетинг и коммуникация",
+    "en": "Marketing & communication"
+   },
+   "pos": [
+    0.17,
+    0.665
+   ],
+   "tilt": -10
+  },
+  {
+   "id": "identity",
+   "label": {
+    "ru": "Айдентика и брендинг",
+    "en": "Identity & branding"
+   },
+   "pos": [
+    0.17,
+    0.3
+   ],
+   "tilt": 8
+  }
+ ],
+ "cvFileName": "Pavel-Nemchenko-CV.pdf",
+ "description": {
+  "ru": "Портфолио Павла Немченко: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.",
+  "en": "Pavel Nemchenko’s portfolio: digital products, marketing and communication, identity and branding."
+ }
+}

@@ -1,0 +1,1456 @@
+// Интерактивная 3D-голова: взгляд за курсором, моргание, рот, резиновое растягивание, снимаемые очки.
+// Деформация считается в вершинном шейдере как гладкое поле смещений в пространстве головы:
+// все меши (кожа, глаза, зубы, очки) деформируются одним полем, поэтому голова тянется
+// как единое целое и внутренности никогда не видны.
+// Three.js лежит на сайте (vendor/three) и подключается относительными путями — без CDN и без import map
+import * as THREE from '../vendor/three/three.module.js';
+import { GLTFLoader } from '../vendor/three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from '../vendor/three/addons/libs/meshopt_decoder.module.js';
+
+const NH = 4;                    // одновременных «щипков» (мультитач)
+const SIG_MIN = 0.22;            // радиус щипка в покое, в единицах головы (ширина головы ≈ 1.5)
+const JELLY = 0.42;              // доля широкого «желейного» слоя в растяжении
+const R_MAX = 1.25;              // резиновый предел: чем дальше тянешь, тем туже
+const PIVOT = new THREE.Vector3(0, -0.62, -0.05);   // шея — точка поворота головы
+const FIT_H = 2.1, FIT_W = 1.62;
+const CORNER_FIT = 0.86;         // какую долю кружка в углу занимает голова (по макету)
+const DEFAULT_BOX = { cx: 0, cy: 0.0, w: 1.5, h: 1.95 };   // габариты головы до загрузки модели (уточняются по модели)
+const EYE_FAR = 9;               // глаза сводятся на далёкой точке по линии взгляда — без косоглазия
+const EYE_YAW = 0.3, EYE_UP = 0.1, EYE_DOWN = 0.2;   // пределы поворота глаз, рад (≈17° / 6° / 11°)
+const GLASSES_HOLD = 4200;       // сколько очки висят там, где их отпустили, прежде чем голова наденет их сама, мс
+
+// Все параметры «света и кожи» в одном месте. Два пресета; сравнить можно параметром адреса:
+// http://localhost:8765/?look=cinema — прежний «киношный» вариант.
+const PRESETS = {
+  // «Фотосвет» (по умолчанию): текстура снята с фото и уже содержит мягкий студийный свет, поэтому
+  // 3D-свет лишь слегка лепит форму — ровная заливка + ключ справа, без плёночной кривой.
+  photo: {
+    toneMapping: THREE.LinearToneMapping,
+    exposure: 1.0,
+    hemi: [0xffffff, 0xffffff, 1.1],          // ровная заливка
+    key: [0xffffff, 1.8, [3.0, 1.0, 4.0]],     // ключ справа от зрителя, чуть выше глаз
+    fill: [0xffffff, 0.0, [-2.5, 1.5, 5.0]],
+    rim: [0xffffff, 0.2, [2.4, 2.8, -4.0]],
+    rim2: [0xffffff, 0.0, [-3.4, 0.8, -2.4]],   // цветной контровой от фона (см. setSceneColor)
+    skin: {
+      rough: 0.6, env: 0.1, glow: 0,
+      tint: [0.84, 1.0, 1.07],                 // баланс белого: кожа без «оранжевости»
+      sat: 1.0,
+      wrap: [0.22, 0.09, 0.055],               // «подповерхностное» тепло: свет заворачивает за границу тени, красный дальше
+      hair: 0.58,                              // яркость волос и бровей (1 — как в текстуре)
+      keyTint: [1.0, 1.0, 1.0], ambTint: [1.0, 1.0, 1.0],   // оттенок прямого и рассеянного света на коже
+      sheen: 0.45,                             // бархатистый блик кожи (сильнее в Т-зоне), 0 — матовая
+      blush: 1.0,                              // живые цветовые зоны: щёки, кончик носа, уши чуть краснее
+      lips: 0,                                 // губы: 0 — как на фото, матовые; 1 — чуть ярче и с влажным бликом
+      hairShine: 1.0,                          // блики вдоль прядей волос
+      rim: 0.15,                               // край силуэта ловит цвет фона сцены
+      photo: 1.0,                              // центр лица (нос, вокруг рта) — с настоящей фотографии
+    },
+    eyes: { white: 0.8, glow: 0.18, shadow: 0.65,  // белизна белков, их подсветка и плотность теней вокруг глаз
+      catch: 1.0, iris: 1.0, limbus: 1.0 },       // блик-отражение, яркость радужки, тёмный ободок радужки
+    shadows: 0.85,                               // мягкие тени от оправы и пирсинга на лице (0 — выкл)
+    metal: { color: 0xe4e6ea, rough: 0.08, env: 1.2 }, // полированное серебро оправы и пирсинга
+    sceneRim: 1.1,                             // сила цветного контрового света от фона
+  },
+  // «Кино»: плёночная кривая ACES, мягкий ключ сверху-слева, контровые — более «3D», но кожа бледнее.
+  cinema: {
+    toneMapping: THREE.ACESFilmicToneMapping,
+    exposure: 0.82,
+    hemi: [0xf4f1ec, 0x5d5047, 0.5],
+    key: [0xffffff, 2.8, [-1.2, 2.2, 5.0]],
+    fill: [0xeef2fb, 0.45, [3.0, 0.2, 3.6]],
+    rim: [0xffffff, 1.7, [2.4, 2.8, -4.0]],
+    rim2: [0xfff0e2, 0.7, [-3.2, 1.2, -3.2]],
+    skin: {
+      rough: 0.56, env: 0.75, glow: 0.03,
+      tint: [1.02, 1.0, 0.9], sat: 0.92, wrap: [0.25, 0.12, 0.08], hair: 1.0,
+      keyTint: [1.0, 1.0, 1.0], ambTint: [1.0, 1.0, 1.0],
+      sheen: 0.3, blush: 0.6, lips: 0.6, hairShine: 0.8, rim: 0.15, photo: 1.0,
+    },
+    eyes: { white: 0.5, glow: 0, shadow: 1, catch: 0.8, iris: 0.6, limbus: 0.6 },
+    shadows: 0.6,
+    metal: { color: 0xd4d6da, rough: 0.2, env: 1.0 },
+    sceneRim: 0.7,
+  },
+};
+const lookParam = (() => { try { return new URLSearchParams(location.search).get('look'); } catch (_) { return null; } })();
+export const LOOK = PRESETS[lookParam] || PRESETS.photo;
+
+const SQUISH_GLSL = /* glsl */`
+#define SQ_N ${NH}
+uniform vec3 uSqC[SQ_N];
+uniform vec3 uSqD[SQ_N];
+uniform vec3 uSqE[SQ_N];
+uniform float uSqS[SQ_N];
+uniform float uSqW[SQ_N];
+uniform float uSqA[SQ_N];
+uniform mat4 uObjToHead;
+uniform mat4 uHeadToObj;
+// Два гауссовых слоя на каждый щипок: узкий держит точку под пальцем, широкий «желейный»
+// запаздывает и колышется. Плюс лёгкое сужение «шейки» у вытянутой части.
+// J — якобиан поля: нужен, чтобы корректно повернуть нормали и свет на растянутой коже.
+vec3 squishField(vec3 p, out mat3 J) {
+  vec3 d = vec3(0.0);
+  J = mat3(1.0);
+  for (int i = 0; i < SQ_N; i++) {
+    vec3 D = uSqD[i];
+    vec3 E = uSqE[i];
+    float LD = length(D);
+    if (LD + length(E) < 1e-5) continue;
+    vec3 r = p - uSqC[i];
+    float rr = dot(r, r);
+    float s2 = uSqS[i] * uSqS[i];
+    float w = exp(-rr / (2.0 * s2));
+    vec3 gw = -w * r / s2;
+    d += D * w;
+    J += outerProduct(D, gw);
+    float q2 = uSqW[i] * uSqW[i];
+    float we = exp(-rr / (2.0 * q2));
+    d += E * we;
+    J += outerProduct(E, -we * r / q2);
+    float a = uSqA[i];
+    if (a > 0.0 && LD > 1e-5) {
+      vec3 u = D / LD;
+      vec3 rp = r - dot(r, u) * u;
+      d -= a * w * rp;
+      J -= a * (outerProduct(rp, gw) + w * (mat3(1.0) - outerProduct(u, u)));
+    }
+  }
+  return d;
+}
+`;
+
+// Фото-накладка: губы и зона под глазами берутся с фотографии (как в Blender), остальное — из текстуры.
+const FACE_VERT = /* glsl */`
+attribute vec2 aFaceUv;
+varying vec2 vFaceUv;
+varying vec3 vRest;
+varying vec3 vRestN;
+varying vec3 vHairT;
+`;
+const FACE_FRAG = /* glsl */`
+uniform sampler2D uFaceMap;
+uniform vec3 uSkinKeyTint;
+uniform vec3 uSkinAmbTint;
+uniform vec3 uSkinWrap;
+uniform float uHairTone;
+uniform float uSkinSat;
+uniform vec3 uSkinTint;
+uniform float uSkinGlow;
+uniform float uSkinSheen;
+uniform float uBlush;
+uniform float uLips;
+uniform float uHairShine;
+uniform vec3 uRimColor;
+uniform float uRimK;
+uniform float uPhotoCenter;
+varying vec2 vFaceUv;
+varying vec3 vRest;
+varying vec3 vRestN;
+varying vec3 vHairT;
+// зоны лица (в координатах головы), считаются один раз в color_fragment и дальше используются в свете
+float sqLum = 0.5;       // яркость текстуры до тонировки: волосы и брови — тёмные
+float sqHairM = 0.0;     // маска волос (для бликов вдоль прядей)
+vec3 sqHairT = vec3(0.0, 1.0, 0.0);   // направление прядей (в пространстве камеры)
+float sqTZ = 0.0;        // Т-зона: лоб, спинка и кончик носа, подбородок
+float sqLipM = 0.0;      // губы
+float sqSkinM = 1.0;     // «чистая» кожа: светлая и насыщенная (седые и смешанные пиксели у висков — не кожа)
+float sqShineM = 0.0;    // где волосам можно бликовать: макушка и затылок; виски и бакенбарды — нет (иначе «седина»)
+float sqEll(vec3 p, vec3 c, vec3 r) { vec3 d = (p - c) / r; return 1.0 - smoothstep(0.3, 1.0, dot(d, d)); }
+float lipMask(vec3 p) {
+  float dx = (p.x - 0.005) / 0.20;
+  float dz = p.y + 0.59;
+  float b = dz > 0.0 ? 0.075 : 0.09;
+  float rho = pow(pow(abs(dx), 3.0) + pow(abs(dz / b), 3.0), 1.0 / 3.0);
+  return 1.0 - smoothstep(0.85, 1.25, rho);
+}
+float underEyeMask(vec3 p, vec2 c) {
+  float dx = (p.x - c.x) / 0.15;
+  float dz = (p.y - (c.y - 0.06)) / 0.08;
+  float rho = pow(pow(abs(dx), 2.5) + pow(abs(dz), 2.5), 0.4);
+  float lid = c.y - 0.0284 + 0.02 * pow((p.x - c.x) / 0.075, 2.0);   // линия нижнего века
+  return (1.0 - smoothstep(0.72, 1.12, rho)) * (1.0 - smoothstep(lid - 0.014, lid - 0.002, p.y));
+}
+float lipCore(vec3 p) {   // только сами губы, без кожи вокруг
+  float dx = (p.x - 0.005) / 0.20;
+  float dz = p.y + 0.59;
+  float b = dz > 0.0 ? 0.075 : 0.09;
+  float rho = pow(pow(abs(dx), 3.0) + pow(abs(dz / b), 3.0), 1.0 / 3.0);
+  return (1.0 - smoothstep(0.55, 0.85, rho)) * step(0.3, p.z);
+}
+float faceMask(vec3 p, vec3 n, vec2 fuv) {
+  if (p.z < 0.3 || p.y > -0.02 || p.y < -0.84 || abs(p.x) > 0.41) return 0.0;   // вне фото-зон
+  float m = max(lipMask(p), max(underEyeMask(p, vec2(-0.2238, -0.1116)), underEyeMask(p, vec2(0.2228, -0.1132))));
+  // центр лица с фото: нос ниже носоупоров и зона вокруг рта — там снимок чистый и даёт живую кожу (поры, щетину)
+  float c = max(sqEll(p, vec3(0.017, -0.35, 0.8), vec3(0.13, 0.16, 0.34)), sqEll(p, vec3(0.01, -0.57, 0.7), vec3(0.27, 0.2, 0.36)));
+  c *= smoothstep(0.2, 0.5, n.z) * (1.0 - smoothstep(0.86, 0.95, fuv.y));   // не тянем фото на боковые грани и за край снимка
+  return max(m, c * uPhotoCenter) * step(0.3, p.z);
+}
+`;
+
+// Кожа: тёплый прямой свет с мягким терминатором (красный канал заворачивает за границу света дальше),
+// а на волосах — два блика вдоль прядей (модель Kajiya–Kay): белый узкий и широкий цветной.
+const SKIN_LIGHTS = THREE.ShaderChunk.lights_physical_pars_fragment
+  .replace('vec3 irradiance = dotNL * directLight.color;', `vec3 irradiance = dotNL * directLight.color;
+	vec3 sqWrap = saturate( ( vec3( dot( geometryNormal, directLight.direction ) ) + uSkinWrap ) / ( 1.0 + uSkinWrap ) ) * directLight.color;`)
+  .replace('reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );',
+    `reflectedLight.directDiffuse += sqWrap * uSkinKeyTint * BRDF_Lambert( material.diffuseColor );
+	if ( sqShineM > 0.001 && uHairShine > 0.0 ) {
+		vec3 sqH = normalize( directLight.direction + geometryViewDir );
+		vec3 sqT1 = normalize( sqHairT + geometryNormal * 0.12 );
+		vec3 sqT2 = normalize( sqHairT - geometryNormal * 0.18 );
+		float sqD1 = dot( sqT1, sqH ), sqD2 = dot( sqT2, sqH );
+		float sqK1 = pow( sqrt( max( 0.0, 1.0 - sqD1 * sqD1 ) ), 90.0 );
+		float sqK2 = pow( sqrt( max( 0.0, 1.0 - sqD2 * sqD2 ) ), 32.0 );
+		float sqWr = saturate( ( dot( geometryNormal, directLight.direction ) + 0.25 ) / 1.25 );
+		// блик — на тёмных и средних прядях; светлые пиксели у висков (смесь кожи и волос) не бликуют — иначе «седина»
+		float sqStrand = smoothstep( 0.015, 0.1, sqLum ) * ( 1.0 - smoothstep( 0.17, 0.3, sqLum ) );
+		float sqFront = smoothstep( -0.1, 0.35, dot( directLight.direction, geometryViewDir ) );   // только свет спереди
+		vec3 sqSpec = sqK1 * vec3( 0.16 ) + sqK2 * material.diffuseColor * 1.3;
+		reflectedLight.directSpecular += directLight.color * sqWr * sqShineM * uHairShine * sqStrand * sqFront * sqSpec;
+	}`);
+
+// Рот: чем глубже, тем темнее (свет туда почти не попадает).
+const MOUTH_FRAG = /* glsl */`
+uniform float uMouthOpen;
+varying vec3 vMouthP;
+float mouthOcc(vec3 p) {
+  float depth = smoothstep(0.34, 0.8, p.z);
+  float side = 1.0 - 0.45 * smoothstep(0.1, 0.24, abs(p.x));
+  return mix(0.035, 1.0, pow(depth, 1.7)) * side * mix(0.55, 1.0, smoothstep(0.0, 0.7, uMouthOpen));
+}
+`;
+
+// Глаза: белки светлее, радужка ярче с тёмным ободком, блик-отражение софтбокса на роговице.
+// Центр и радиусы — из текстуры глаза (зрачок r≈0.041, край радужки r≈0.098 в UV).
+const EYE_FRAG = /* glsl */`
+uniform float uScleraWhite;
+uniform float uEyeGlow;
+uniform float uCatch;
+uniform float uIris;
+uniform float uLimbus;
+const vec2 SQ_EYE_C = vec2(0.5013, 0.4996);
+float sqCatch(vec3 r, vec3 l, vec2 size) {
+  vec3 u = normalize(cross(vec3(0.0, 1.0, 0.0), l));
+  vec3 w = cross(l, u);
+  vec2 q = vec2(dot(r, u), dot(r, w)) / size;
+  // скруглённый прямоугольник: так бликует софтбокс, а не точечная лампа
+  vec2 a = abs(q);
+  float d = length(max(a - vec2(0.55), 0.0)) + min(max(a.x - 0.55, a.y - 0.55), 0.0);
+  return (1.0 - smoothstep(0.22, 0.5, d)) * step(0.0, dot(r, l));   // мягкий край, без «пиксельной» ступеньки
+}
+`;
+
+// Стёкла и прозрачные носоупоры: почти невидимы в лоб, отражают по краям и в бликах (Френель).
+const LENS_FRAG = /* glsl */`
+uniform vec2 uLensA;
+`;
+
+// Мягкая тень от оправы и пирсинга: 16 точек Пуассона с поворотом на каждый пиксель — полутень как от софтбокса,
+// без «лесенки» стандартного PCF. Тени отбрасывают только очки и пирсинг, поэтому кожа не затеняет сама себя
+// (светотень лица уже есть в текстуре).
+const SOFT_SHADOW_GLSL = /* glsl */`
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+float sqSoftShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord ) {
+  shadowCoord.xyz /= shadowCoord.w;
+  shadowCoord.z += shadowBias;
+  if ( shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0 || shadowCoord.z > 1.0 ) return 1.0;
+  const vec2 PD[16] = vec2[16](
+    vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725), vec2(-0.09418410, -0.92938870), vec2(0.34495938, 0.29387760),
+    vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464), vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379),
+    vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420), vec2(-0.26496911, -0.41893023), vec2(0.79197514, 0.19090188),
+    vec2(-0.24188840, 0.99706507), vec2(-0.81409955, 0.91437590), vec2(0.19984126, 0.78641367), vec2(0.14383161, -0.14100790));
+  float a = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ) * 6.2831853;
+  mat2 R = mat2( cos( a ), sin( a ), -sin( a ), cos( a ) );
+  vec2 ts = shadowRadius / shadowMapSize;
+  float s = 0.0;
+  for ( int k = 0; k < 16; k++ ) s += texture2DCompare( shadowMap, shadowCoord.xy + R * PD[ k ] * ts, shadowCoord.z );
+  return mix( 1.0, s / 16.0, shadowIntensity );
+}
+#endif
+`;
+const withSoftShadow = (fs) => fs
+  .replace('#include <shadowmap_pars_fragment>', '#include <shadowmap_pars_fragment>\n' + SOFT_SHADOW_GLSL)
+  .replace('#include <lights_fragment_begin>', THREE.ShaderChunk.lights_fragment_begin
+    .replace('getShadow( directionalShadowMap[ i ]', 'sqSoftShadow( directionalShadowMap[ i ]'));
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const damp = (dt, k) => 1 - Math.exp(-dt * k);
+const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+const vibrate = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (_) { /* noop */ } };
+
+// Студийное окружение для отражений: светлый верх, тёмный низ и три софтбокса.
+// Даёт металлу оправы контраст, а глазам — живые блики.
+function studioEnvironment(renderer) {
+  const scene = new THREE.Scene();
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(20, 64, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: 'varying vec3 vD; void main() { vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec3 vD;
+      void main() {
+        float y = vD.y;
+        vec3 top = vec3(0.92, 0.9, 0.87), hor = vec3(0.42, 0.4, 0.38), bot = vec3(0.13, 0.12, 0.11);
+        vec3 c = y > 0.0 ? mix(hor, top, smoothstep(0.0, 0.85, y)) : mix(hor, bot, smoothstep(0.0, 0.45, -y));
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  }));
+  scene.add(sky);
+  const panel = (w, h, x, y, z, intensity, tint) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(tint).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); scene.add(m);
+  };
+  panel(7, 5, -7, 6, 9, 6, 0xfff4e8);    // ключевой софтбокс слева сверху
+  panel(2, 9, 10, 1, 4, 2.2, 0xeaf0ff);  // заполняющий стрип справа
+  panel(10, 2, 0, 9, -7, 3.5, 0xffffff); // контровой сверху-сзади
+  const pm = new THREE.PMREMGenerator(renderer);
+  const tex = pm.fromScene(scene, 0.03).texture;
+  pm.dispose();
+  scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  return tex;
+}
+
+// Окружение «для ювелирки» — только для металла: тёмный пол, светлый верх и узкие яркие стрипы.
+// Контраст отражений и даёт металлу живой блеск (без него серебро выглядит матовым пластиком).
+function jewelryEnvironment(renderer) {
+  const scene = new THREE.Scene();
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(20, 64, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: 'varying vec3 vD; void main() { vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec3 vD;
+      void main() {
+        float y = vD.y;
+        vec3 top = vec3(0.95, 0.95, 0.97), mid = vec3(0.55, 0.56, 0.58), hor = vec3(0.1, 0.1, 0.11), bot = vec3(0.02, 0.02, 0.025);
+        vec3 c = y > 0.0 ? (y > 0.35 ? mix(mid, top, smoothstep(0.35, 0.9, y)) : mix(hor, mid, smoothstep(0.0, 0.35, y)))
+                         : mix(hor, bot, smoothstep(0.0, 0.3, -y));
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  }));
+  scene.add(sky);
+  const panel = (w, h, x, y, z, intensity) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffffff).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); scene.add(m);
+  };
+  panel(6, 4, -6, 7, 8, 9);      // большой софтбокс сверху-слева
+  panel(1.2, 10, 9, 1, 5, 7);    // узкий стрип справа
+  panel(1.2, 10, -10, 0, 2, 4);  // стрип слева
+  panel(12, 1.2, 0, 10, -5, 6);  // стрип сверху-сзади
+  panel(10, 0.8, 0, -4, 9, 2.5); // тонкий стрип снизу-спереди — подсветка нижних краёв оправы
+  const pm = new THREE.PMREMGenerator(renderer);
+  const tex = pm.fromScene(scene, 0.015).texture;
+  pm.dispose();
+  scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  return tex;
+}
+
+export class Head extends EventTarget {
+  constructor(container, opts = {}) {
+    super();
+    this.container = container;
+    this.opts = { modelUrl: 'assets/head.glb', faceUrl: opts.lipsUrl || 'assets/face.jpg', reducedMotion: false, ...opts };
+    this.rm = !!this.opts.reducedMotion;
+    this.mode = 'hero';
+    this.onTick = null;       // начало кадра: (dt, now)
+    this.onFrame = null;      // всё посчитано, сейчас будет отрисовка — здесь страница узнаёт, где линзы
+    this.loaded = false;
+
+    const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    r.toneMapping = LOOK.toneMapping;
+    r.toneMappingExposure = LOOK.exposure;
+    this.canvas = r.domElement;
+    this.canvas.style.touchAction = 'none';
+    container.appendChild(this.canvas);
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(26, 1, 0.1, 60);
+    this.scene.environment = studioEnvironment(r);
+    this.metalEnv = jewelryEnvironment(r);
+    const dl = ([c, i, p]) => { const l = new THREE.DirectionalLight(c, i); l.position.set(...p); return l; };
+    this.lights = {
+      hemi: new THREE.HemisphereLight(...LOOK.hemi),
+      key: dl(LOOK.key), fill: dl(LOOK.fill), rim: dl(LOOK.rim), rim2: dl(LOOK.rim2),
+    };
+    this.scene.add(...Object.values(this.lights));
+    for (const l of Object.values(this.lights)) l.layers.enableAll();   // свет нужен и слою очков
+    if (LOOK.shadows > 0) {
+      r.shadowMap.enabled = true;
+      r.shadowMap.type = THREE.PCFShadowMap;
+      const k = this.lights.key;
+      k.castShadow = true;
+      k.shadow.mapSize.set(1024, 1024);
+      Object.assign(k.shadow.camera, { left: -1.15, right: 1.15, top: 1.15, bottom: -1.15, near: 1, far: 10 });
+      k.shadow.camera.updateProjectionMatrix();
+      k.shadow.bias = -0.0005;
+      k.shadow.radius = 3.5;                // полутень в текселях карты теней (~1 мм на лице): тонкая оправа даёт мягкую, но читаемую тень
+      k.shadow.intensity = LOOK.shadows;
+    }
+
+    this.pivot = new THREE.Group();
+    this.pivot.position.copy(PIVOT);
+    this.scene.add(this.pivot);
+
+    this.shared = {
+      uSqC: { value: Array.from({ length: NH }, () => new THREE.Vector3()) },
+      uSqD: { value: Array.from({ length: NH }, () => new THREE.Vector3()) },
+      uSqE: { value: Array.from({ length: NH }, () => new THREE.Vector3()) },
+      uSqS: { value: new Array(NH).fill(SIG_MIN) },
+      uSqW: { value: new Array(NH).fill(SIG_MIN * 2) },
+      uSqA: { value: new Array(NH).fill(0) },
+    };
+    const S = LOOK.skin;
+    this.skinU = {
+      uSkinKeyTint: { value: new THREE.Vector3(...S.keyTint) },
+      uSkinAmbTint: { value: new THREE.Vector3(...S.ambTint) },
+      uSkinWrap: { value: new THREE.Vector3(...S.wrap) },
+      uHairTone: { value: S.hair },
+      uSkinSat: { value: S.sat },
+      uSkinTint: { value: new THREE.Vector3(...S.tint) },
+      uSkinGlow: { value: S.glow },
+      uSkinSheen: { value: S.sheen },
+      uBlush: { value: S.blush },
+      uLips: { value: S.lips },
+      uHairShine: { value: S.hairShine },
+      uRimColor: { value: new THREE.Color(0x3a5bff) },
+      uRimK: { value: S.rim },
+      uPhotoCenter: { value: S.photo ?? 1 },
+    };
+    this.mouthU = { uMouthOpen: { value: 0 } };
+    const E = LOOK.eyes;
+    this.eyeU = { uScleraWhite: { value: E.white }, uEyeGlow: { value: E.glow }, uCatch: { value: E.catch }, uIris: { value: E.iris }, uLimbus: { value: E.limbus } };
+    this.handles = Array.from({ length: NH }, () => ({
+      active: false, grabbed: false,
+      c: new THREE.Vector3(), t: new THREE.Vector3(), goal: new THREE.Vector3(),
+      d: new THREE.Vector3(), v: new THREE.Vector3(),     // узкий слой
+      e: new THREE.Vector3(), ev: new THREE.Vector3(),    // широкий «желейный» слой
+    }));
+    this.lean = { a: new THREE.Vector3(), v: new THREE.Vector3(), t: new THREE.Vector3() };   // голову «ведёт» за щипком
+    this.drags = new Map();
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = { x: 0, y: 0, has: false, lastMove: performance.now() };
+    this.lookOverride = null;
+    this.rot = { yaw: 0, pitch: 0 };
+    this.mouth = 0; this.mouthTarget = 0;
+    this.blink = { next: 1.4, t: -1, double: false };
+    this.squint = 0; this.winkT = { L: 0, R: 0 }; this.winkV = { L: 0, R: 0 };
+    this.pop = { s: this.rm ? 1 : 0.001, v: 0 };
+    this.sq = { s: 1, v: 0 };
+    this.sacc = { x: 0, y: 0, next: 0 };
+    this.glasses = { node: null, home: new THREE.Vector3(), homeQ: new THREE.Quaternion(), offset: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(),
+      world: new THREE.Vector3(), grabbed: false, holdUntil: 0, off: false, announced: false, selfReturn: false };
+    this.blind = 0;                   // 0 — очки на носу, 1 — мир в тумане
+    this.ov = null;                   // отдельный холст для снятых очков (см. _ensureOverlay)
+    this.glassMeshes = []; this.bodyMeshes = []; this.lensHull = [];
+    this.layout = null; this.rect = null; this.headBox = null; this.sil = null; this.aspect = 0;
+    this.clock = new THREE.Clock();
+    this._v = Array.from({ length: 8 }, () => new THREE.Vector3());
+    this._n2 = new THREE.Vector2();
+    this._a = new THREE.Vector3();
+    this._q = new THREE.Quaternion();
+    this._q2 = new THREE.Quaternion();
+    this._e = new THREE.Euler();
+    this._headInv = new THREE.Matrix4();
+    this._plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -2.0);
+    // Гироскоп: зрительный контакт с посетителем при наклоне телефона
+    this.tiltGain = 1.6;              // >1 — живее; отрицательное значение — голова «смотрит» по наклону, а не на зрителя
+    this.tilt = { on: false, has: false, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0,
+      target: new THREE.Vector3(0, 0.05, 2), announced: false };
+    this._tq = new THREE.Quaternion(); this._tq2 = new THREE.Quaternion(); this._te = new THREE.Euler();
+    this._tq1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);   // экран смотрит на зрителя, а не в небо
+    this._tz = new THREE.Vector3(0, 0, 1); this._tu = new THREE.Vector3(); this._tt = new THREE.Vector3();
+
+    this._bind();
+    this._ro = new ResizeObserver(() => this.frame());
+    this._ro.observe(container);
+    this.frame();
+  }
+
+  // ---------- загрузка ----------
+  async load(onProgress) {
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    const [gltf, faceTex] = await Promise.all([
+      new Promise((res, rej) => loader.load(this.opts.modelUrl, res, (e) => {
+        if (e.total && onProgress) onProgress(e.loaded / e.total);
+      }, rej)),
+      new THREE.TextureLoader().loadAsync(this.opts.faceUrl).catch((e) => { console.warn('Фото лица не загрузилось — голова будет без накладки', e); return null; }),
+    ]);
+    if (faceTex) {
+      faceTex.colorSpace = THREE.SRGBColorSpace;
+      faceTex.flipY = false;               // UV из glTF: начало координат сверху
+      faceTex.anisotropy = 4;
+      this.faceU = { uFaceMap: { value: faceTex } };
+    }
+
+    this.model = gltf.scene;
+    this.model.position.copy(PIVOT).multiplyScalar(-1);
+    this.pivot.add(this.model);
+    this.root = this.model.getObjectByName('HeadRoot') || this.model;
+    this.glasses.node = this.model.getObjectByName('Glasses');
+    if (this.glasses.node) { this.glasses.home.copy(this.glasses.node.position); this.glasses.homeQ.copy(this.glasses.node.quaternion); }
+    this.eyes = ['Eye_L', 'Eye_R'].map((n) => this.model.getObjectByName(n)).filter(Boolean);
+    this.lensHull = this._measureLensHulls();
+
+    this.meshes = []; this.pickables = [];
+    this.morphs = { JawOpen: [], Blink_L: [], Blink_R: [] };
+    this.model.traverse((o) => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false;
+      const base = this._baseName(o);
+      o.userData.base = base;
+      o.material = this._setupMaterial(o);
+      if (LOOK.shadows > 0) {
+        const mn = o.material.name || '';
+        if (/Silver|Steel|Acetate/.test(mn)) { o.castShadow = true; o.customDepthMaterial = this._depthMaterial(o); }
+        if (/^(Head_Skin|Material_0_Patch|Eye_[LR])/.test(mn)) o.receiveShadow = true;
+      }
+      this.meshes.push(o);
+      // слои: 1 — очки, 2 — всё остальное (нужно слою очков только как «заслонка» по глубине)
+      o.userData.dw = o.material.depthWrite;
+      if (this._isGlasses(o)) { o.layers.enable(1); this.glassMeshes.push(o); }
+      else if (!/^EyeShadow/.test(base)) { o.layers.enable(2); this.bodyMeshes.push(o); }
+      if (!/^EyeShadow/.test(base)) this.pickables.push(o);
+      if (o.morphTargetDictionary) {
+        for (const k of Object.keys(this.morphs)) {
+          const i = o.morphTargetDictionary[k];
+          if (i !== undefined) this.morphs[k].push([o, i]);
+        }
+      }
+    });
+    this.scene.updateMatrixWorld(true);
+    this._updateMatrices();
+    this.headBox = this._measureHead();
+    this.sil = this._measureSilhouette(this.headBox);
+    this.aspect = this.sil ? this.sil.ar : this.headBox.h / this.headBox.w;
+    this.frame();
+    this.renderer.compile(this.scene, this.camera);
+    this.loaded = true;
+    this.clock.getDelta();
+    this._loop();
+    // слой для снятых очков готовим заранее, в спокойный момент — чтобы не было рывка, когда их стянут с носа.
+    // На слабых устройствах (мало памяти, режим экономии трафика) — только когда очки действительно взяли.
+    const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.connection && navigator.connection.saveData);
+    if (!weak) setTimeout(() => this._ensureOverlay(), 2200);
+    return this;
+  }
+
+  // Рамка геометрии головы (без очков и пирсинга): на её центр смотрит камера
+  _measureHead() {
+    const box = new THREE.Box3(), tmp = new THREE.Box3();
+    for (const o of this.meshes || []) {
+      if (this._isGlasses(o) || /^(EyeShadow|Piercing)/.test(o.userData.base || '')) continue;
+      o.geometry.computeBoundingBox();
+      tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+      box.union(tmp);
+    }
+    if (box.isEmpty()) return DEFAULT_BOX;
+    const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    return { cx: c.x, cy: c.y, w: sz.x, h: sz.y };
+  }
+
+  // Силуэт головы в покое, каким его видит камера: крайние точки (уши, макушка, подбородок) и их глубина.
+  // Рамка геометрии для этого не годится: в ней запас под раскрытый рот, а уши стоят дальше плоскости лица
+  // и в перспективе выходят у́же. По силуэту голова занимает на главной ровно отведённое ей место.
+  _measureSilhouette(B) {
+    const z0 = 7.5;                      // типичное расстояние камеры на главной; крайние точки от него почти не зависят
+    const v = new THREE.Vector3(), S = {};
+    let r = -Infinity, l = Infinity, t = -Infinity, b = Infinity;
+    for (const o of this.meshes || []) {
+      if (this._isGlasses(o) || /^(EyeShadow|Piercing)/.test(o.userData.base || '')) continue;
+      const pos = o.geometry.getAttribute('position');
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        const d = z0 - v.z;
+        if (d <= 0.1) continue;
+        const ax = (v.x - B.cx) / d, ay = (v.y - B.cy) / d;
+        if (ax > r) { r = ax; S.xr = v.x; S.zr = v.z; }
+        if (ax < l) { l = ax; S.xl = v.x; S.zl = v.z; }
+        if (ay > t) { t = ay; S.yt = v.y; S.zt = v.z; }
+        if (ay < b) { b = ay; S.yb = v.y; S.zb = v.z; }
+      }
+    }
+    if (!(r > l) || !(t > b)) return null;
+    S.w = S.xr - S.xl;                   // от уха до уха
+    S.zx = (S.zr + S.zl) / 2;            // на какой глубине стоят уши
+    S.ar = (t - b) / (r - l);            // видимые пропорции: высота к ширине
+    return S;
+  }
+
+  // Контур каждой линзы в координатах узла Glasses: выпуклая оболочка её вершин (алгоритм Эндрю),
+  // чуть ужатая к центру — граница резкого и размытого прячется под ободком оправы.
+  _measureLensHulls() {
+    const g = this.glasses.node;
+    if (!g) return [];
+    let src = g.getObjectByName('Glasses_Lenses') || null;
+    if (src && !src.isMesh) { let m = null; src.traverse((o) => { if (o.isMesh && !m) m = o; }); src = m; }
+    if (!src || !src.isMesh) return [];
+    g.updateWorldMatrix(true, true);
+    const rel = new THREE.Matrix4().copy(g.matrixWorld).invert().multiply(src.matrixWorld);
+    const pos = src.geometry.getAttribute('position');
+    const sides = [[], []];
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(rel); sides[v.x < 0 ? 0 : 1].push(v.clone()); }
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    return sides.filter((pts) => pts.length > 2).map((pts) => {
+      pts.sort((a, b) => a.x - b.x || a.y - b.y);
+      const lower = [], upper = [];
+      for (const p of pts) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p); }
+      for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
+      let hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+      const step = Math.ceil(hull.length / 40);
+      if (step > 1) hull = hull.filter((_, i) => i % step === 0);
+      const c = hull.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / hull.length);
+      return hull.map((p) => p.clone().sub(c).multiplyScalar(0.965).add(c));
+    });
+  }
+
+  // Контуры линз на экране (CSS-пиксели окна) — по ним в размытии страницы вырезаются «окна»
+  lensOutlines() {
+    const g = this.glasses.node;
+    if (!g || !this.lensHull.length) return [];
+    const r = this.canvas.getBoundingClientRect(), cam = this.camera, v = this._v[5], out = [];
+    for (const hull of this.lensHull) {
+      const poly = [];
+      for (const p of hull) {
+        v.copy(p).applyMatrix4(g.matrixWorld).project(cam);
+        if (!(v.z > -1 && v.z < 1)) { poly.length = 0; break; }
+        poly.push([r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]);
+      }
+      if (poly.length > 2) out.push(poly);
+    }
+    return out;
+  }
+
+  // ---------- снятые очки: отдельный холст поверх страницы ----------
+  // Когда очки сняты, страница размыта. Чтобы сами очки оставались резкими и их можно было унести в любой угол
+  // экрана (в каталоге и кейсе голова живёт в маленьком кружке), они рисуются вторым холстом во всё окно —
+  // поверх размытия. На основном холсте в это время от очков остаётся только тень на лице.
+  _ensureOverlay() {
+    if (this.ov || this._ovFailed || !this.loaded || !this.glassMeshes.length) return this.ov;
+    try {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      r.outputColorSpace = THREE.SRGBColorSpace;
+      r.toneMapping = LOOK.toneMapping;
+      r.toneMappingExposure = LOOK.exposure;
+      r.setClearColor(0x000000, 0);
+      r.autoClear = false;
+      const c = r.domElement;
+      c.className = 'glasses-layer';
+      c.setAttribute('aria-hidden', 'true');
+      c.style.display = 'none';
+      document.body.appendChild(c);
+      this.ov = { r, c, cam: new THREE.PerspectiveCamera(), env: studioEnvironment(r), metalEnv: jewelryEnvironment(r), w: 0, h: 0, on: false };
+      for (const o of this.bodyMeshes) o.userData.depthOnly = this._depthOnly(o);
+      this._renderOverlay(true);       // прогрев: шейдеры собираются сейчас, а не в момент, когда очки сняли
+    } catch (e) {
+      console.warn('Слой для снятых очков недоступен — очки останутся на основном холсте', e);
+      this._ovFailed = true; this.ov = null;
+    }
+    return this.ov;
+  }
+
+  // Материал «только глубина» для головы на слое очков: дужка, зашедшая за ухо, должна остаться закрытой
+  _depthOnly(mesh) {
+    const m = new THREE.MeshBasicMaterial({ colorWrite: false });
+    const u = mesh.userData.sqU, shared = this.shared;
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, shared, u);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\n' + SQUISH_GLSL)
+        .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>
+          { vec3 hp = (uObjToHead * vec4(transformed, 1.0)).xyz; mat3 J; vec3 dsp = squishField(hp, J);
+            transformed = (uHeadToObj * vec4(hp + dsp, 1.0)).xyz; }`);
+    };
+    m.customProgramCacheKey = () => 'squish-depthonly';
+    return m;
+  }
+
+  _setOverlay(on) {
+    const ov = this.ov;
+    if (!ov || ov.on === on) return;
+    ov.on = on;
+    ov.c.style.display = on ? '' : 'none';
+    for (const o of this.glassMeshes) { o.material.colorWrite = !on; o.material.depthWrite = on ? false : o.userData.dw; }
+  }
+
+  _renderOverlay(warm = false) {
+    const ov = this.ov;
+    if (!ov) return;
+    const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
+    if (ov.w !== W || ov.h !== H) { ov.w = W; ov.h = H; ov.r.setSize(W, H, false); }
+    // та же камера, но кадр — всё окно: очки стоят ровно там же, где стояли бы на основном холсте
+    const src = this.camera, cam = ov.cam, v = src.view;
+    const cr = this.canvas.getBoundingClientRect();
+    cam.position.copy(src.position); cam.quaternion.copy(src.quaternion);
+    cam.fov = src.fov; cam.aspect = src.aspect; cam.near = src.near; cam.far = src.far;
+    cam.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX - cr.left, v.offsetY - cr.top, W, H);
+    const r = ov.r, key = this.lights.key, cast = key.castShadow, env = this.scene.environment;
+    key.castShadow = false;
+    this.scene.environment = ov.env;
+    r.clear();
+    // 1) голова — только в буфер глубины
+    cam.layers.set(2);
+    for (const o of this.bodyMeshes) { o.userData.mat = o.material; o.material = o.userData.depthOnly; }
+    r.render(this.scene, cam);
+    for (const o of this.bodyMeshes) o.material = o.userData.mat;
+    // 2) сами очки
+    cam.layers.set(1);
+    for (const o of this.glassMeshes) { const m = o.material; m.colorWrite = true; m.depthWrite = o.userData.dw; if (m.userData.metal) m.envMap = ov.metalEnv; }
+    r.render(this.scene, cam);
+    for (const o of this.glassMeshes) {
+      const m = o.material;
+      if (m.userData.metal) m.envMap = this.metalEnv;
+      if (!warm) { m.colorWrite = false; m.depthWrite = false; }
+    }
+    this.scene.environment = env;
+    key.castShadow = cast;
+  }
+
+  _baseName(o) {
+    let n = o;
+    while (n.parent && n.parent !== this.root && n.parent !== this.glasses.node && n.parent !== this.model) n = n.parent;
+    return (n.name || '').replace(/\d+$/, '');
+  }
+
+  _isGlasses(o) {
+    for (let n = o; n; n = n.parent) if (n === this.glasses.node) return true;
+    return false;
+  }
+
+  _setupMaterial(mesh) {
+    const src = mesh.material;
+    const mn = src.name || '';
+    const S = LOOK.skin;
+    let m = src.clone();
+    const f = { skin: false, face: false, mouth: false, lens: null, eye: false };
+    if (/^(Head_Skin|Material_0_Patch)/.test(mn)) {
+      f.skin = true;
+      f.face = !!this.faceU && !!mesh.geometry.getAttribute('uv1');
+      m.color.set(0xffffff); m.roughness = S.rough; m.metalness = 0; m.envMapIntensity = S.env;
+      m.emissive = new THREE.Color(0x000000); m.emissiveMap = null;
+    } else if (/^(MouthInterior|MouthCavity|Mouth_GumsTongue)/.test(mn)) {
+      f.mouth = true;
+      m.color.set(0xffffff); m.roughness = 0.42; m.metalness = 0; m.envMapIntensity = 0.3;
+    } else if (/^Mouth_Teeth/.test(mn)) {
+      f.mouth = true;
+      m.color.set(0xe2dccd); m.roughness = 0.32; m.metalness = 0; m.envMapIntensity = 0.45;
+    } else if (/^Eye_[LR]/.test(mn)) {
+      m.color.set(0xffffff); m.roughness = 0.1; m.metalness = 0; m.envMapIntensity = 0.9;
+      m.emissive = new THREE.Color(0x000000); m.emissiveMap = null;
+      f.eye = true;
+    } else if (/^EyeShadow/.test(mn)) {
+      m.transparent = true; m.depthWrite = false; m.roughness = 1; m.envMapIntensity = 0; mesh.renderOrder = 2;
+      m.opacity = LOOK.eyes.shadow;
+    } else if (/Lens/.test(mn)) {
+      m = new THREE.MeshStandardMaterial({ color: 0x000000, metalness: 0, roughness: 0.05, transparent: true, envMapIntensity: 1.5, depthWrite: false });
+      m.name = mn; mesh.renderOrder = 3; f.lens = new THREE.Vector2(0.03, 0.42);
+    } else if (/PadClear/.test(mn)) {
+      m = new THREE.MeshStandardMaterial({ color: 0x8e9092, metalness: 0, roughness: 0.12, transparent: true, envMapIntensity: 1.3, depthWrite: false });
+      m.name = mn; mesh.renderOrder = 3; f.lens = new THREE.Vector2(0.14, 0.62);
+    } else if (/Acetate/.test(mn)) {
+      m.color.set(0x1b1b1f); m.metalness = 0; m.roughness = 0.3;
+    } else if (/Silver|Steel/.test(mn)) {
+      const M = LOOK.metal;
+      m.color.set(M.color); m.metalness = 1; m.roughness = M.rough; m.envMap = this.metalEnv; m.envMapIntensity = M.env;
+      m.userData.metal = true;
+    }
+    m.vertexColors = !!mesh.geometry.getAttribute('color') && /^(Head_Skin|Material_0_Patch|Mouth)/.test(mn);
+    if (f.face) mesh.geometry.setAttribute('aFaceUv', mesh.geometry.getAttribute('uv1'));
+    this._patch(m, mesh, f);
+    return m;
+  }
+
+  _depthMaterial(mesh) {
+    const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+    const u = mesh.userData.sqU, shared = this.shared;
+    dm.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, shared, u);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\n' + SQUISH_GLSL)
+        .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>
+          { vec3 hp = (uObjToHead * vec4(transformed, 1.0)).xyz; mat3 J; vec3 dsp = squishField(hp, J);
+            transformed = (uHeadToObj * vec4(hp + dsp, 1.0)).xyz; }`);
+    };
+    dm.customProgramCacheKey = () => 'squish-depth';
+    return dm;
+  }
+
+  _patch(m, mesh, f) {
+    const u = { uObjToHead: { value: new THREE.Matrix4() }, uHeadToObj: { value: new THREE.Matrix4() } };
+    mesh.userData.sqU = u;
+    const shared = this.shared;
+    const lensU = f.lens ? { uLensA: { value: f.lens } } : null;
+    m.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, shared, u,
+        f.skin ? this.skinU : {}, f.face ? this.faceU : {}, f.mouth ? this.mouthU : {}, lensU || {}, f.eye ? this.eyeU : {});
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\n' + SQUISH_GLSL + (f.skin ? FACE_VERT : '') + (f.mouth ? 'varying vec3 vMouthP;\n' : ''))
+        .replace('#include <defaultnormal_vertex>', '')
+        .replace('#include <normal_vertex>', '')
+        .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>
+          ${f.skin ? `
+          // точка и нормаль «в покое» в координатах головы — маски лица от них не зависят от того,
+          // как упакована модель (например, сжата meshopt с квантованием координат)
+          vRest = (uObjToHead * vec4(position, 1.0)).xyz;
+          vRestN = normalize(mat3(uObjToHead) * objectNormal);
+          ${f.face ? 'vFaceUv = aFaceUv;' : ''}
+          {
+            // пряди зачёсаны назад: направление «назад и чуть вверх», спроецированное на поверхность
+            vec3 sqTo = vec3(0.0, 0.15, -1.0);
+            vec3 sqTt = sqTo - vRestN * dot(sqTo, vRestN);
+            vHairT = normalize((modelViewMatrix * vec4(mat3(uHeadToObj) * sqTt, 0.0)).xyz + 1e-5);
+          }` : ''}
+          {
+            vec3 hp = (uObjToHead * vec4(transformed, 1.0)).xyz;
+            ${f.mouth ? 'vMouthP = hp;' : ''}
+            mat3 J;
+            vec3 dsp = squishField(hp, J);
+            transformed = (uHeadToObj * vec4(hp + dsp, 1.0)).xyz;
+            vec3 nh = mat3(uObjToHead) * objectNormal;
+            nh = transpose(inverse(J)) * nh;
+            objectNormal = normalize(mat3(uHeadToObj) * nh);
+          }
+          #include <defaultnormal_vertex>
+          #include <normal_vertex>`);
+      let fs = shader.fragmentShader;
+      if (f.skin || f.eye) fs = withSoftShadow(fs);
+      if (f.skin) {
+        fs = fs
+          .replace('#include <common>', '#include <common>\n' + FACE_FRAG)
+          .replace('#include <lights_physical_pars_fragment>', SKIN_LIGHTS)
+          .replace('#include <color_fragment>', `#include <color_fragment>
+            ${f.face ? `{
+              float sqM = faceMask(vRest, normalize(vRestN), vFaceUv);
+              diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uFaceMap, vFaceUv).rgb, sqM);
+            }` : ''}
+            {
+              vec3 p = vRest;
+              float sqL = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+              sqLum = sqL;
+              {
+                float mx = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)), mn = min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b));
+                sqSkinM = smoothstep(0.24, 0.38, sqL) * smoothstep(0.14, 0.28, (mx - mn) / max(mx, 1e-3));
+              }
+              // зоны: лицо ниже линии роста волос, волосы (тёмное вне лица), губы, Т-зона, «кровяные» зоны
+              float sqFace = step(0.25, p.z) * (1.0 - smoothstep(0.58, 0.66, p.y)) * (1.0 - smoothstep(0.46, 0.52, abs(p.x)));
+              sqHairM = (1.0 - smoothstep(0.07, 0.2, sqL)) * (1.0 - sqFace);
+              float sqSide = smoothstep(0.36, 0.5, abs(p.x)) * (1.0 - smoothstep(0.3, 0.55, p.y)) * smoothstep(-0.5, -0.2, p.z);
+              sqShineM = smoothstep(0.7, 0.95, sqHairM) * (1.0 - sqSide);
+              sqLipM = lipCore(p);
+              float sqCheek = max(sqEll(p, vec3(0.34, -0.37, 0.56), vec3(0.17, 0.14, 0.22)), sqEll(p, vec3(-0.34, -0.37, 0.56), vec3(0.17, 0.14, 0.22)));
+              float sqNose = sqEll(p, vec3(0.017, -0.33, 0.8), vec3(0.085, 0.075, 0.14));
+              float sqEar = max(sqEll(p, vec3(0.66, -0.15, -0.12), vec3(0.14, 0.3, 0.3)), sqEll(p, vec3(-0.66, -0.15, -0.12), vec3(0.14, 0.3, 0.3)));
+              sqTZ = clamp(sqEll(p, vec3(0.0, 0.33, 0.62), vec3(0.3, 0.27, 0.3)) + sqEll(p, vec3(0.017, -0.12, 0.74), vec3(0.06, 0.26, 0.16))
+                         + sqNose + sqEll(p, vec3(0.02, -0.86, 0.5), vec3(0.14, 0.1, 0.22)), 0.0, 1.0) * (1.0 - sqHairM);
+              diffuseColor.rgb = mix(vec3(sqL), diffuseColor.rgb, uSkinSat) * uSkinTint;
+              diffuseColor.rgb *= mix(uHairTone, 1.0, smoothstep(0.05, 0.2, sqL));   // волосы и брови — темнее
+              // живые зоны: щёки, кончик носа и уши краснее — там кровь ближе к поверхности
+              float sqBl = clamp(sqCheek * 0.5 + sqNose * 0.45 + sqEar * 0.6, 0.0, 1.0) * uBlush * (1.0 - sqHairM);
+              diffuseColor.rgb *= mix(vec3(1.0), vec3(1.0, 0.9, 0.885), sqBl);
+              // губы: насыщеннее и чуть розовее
+              float sqLl = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+              diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(sqLl), diffuseColor.rgb, 1.12) * vec3(1.02, 0.97, 0.98), sqLipM * uLips);
+            }`)
+          .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+            reflectedLight.indirectDiffuse *= uSkinAmbTint;   // холодная заливка теней
+            #ifdef USE_ENVMAP
+            {
+              // бархатистый блик: отражение студии с шероховатостью кожи — сильнее в Т-зоне, на губах и под скользящим углом
+              float sqRg = mix(0.54, 0.44, sqTZ);
+              vec3 sqRad = getIBLRadiance(geometryViewDir, geometryNormal, sqRg) / max(envMapIntensity, 1e-3);
+              float sqNoV = saturate(dot(geometryNormal, geometryViewDir));
+              float sqF = min(0.028 + 0.972 * pow(1.0 - sqNoV, 5.0), 0.14);   // без белёсого ореола по краю
+              reflectedLight.indirectSpecular += sqRad * sqF * uSkinSheen * sqSkinM * mix(0.45, 0.8, sqTZ)
+                * mix(1.0 - sqLipM, 1.0 + 1.5 * sqLipM, uLips) * smoothstep(-0.6, 0.2, geometryNormal.y);
+            }
+            #endif`)
+          .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+            // волосы и брови (тёмные участки текстуры) — матовые, без пластиковых бликов
+            roughnessFactor = mix(0.9, roughnessFactor, smoothstep(0.05, 0.2, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))));
+            roughnessFactor = mix(roughnessFactor, 0.47, sqTZ * min(uSkinSheen * 2.0, 1.0));   // Т-зона чуть блестит
+            roughnessFactor = mix(roughnessFactor, 0.3, sqLipM * uLips);                       // губы влажные`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+            totalEmissiveRadiance += diffuseColor.rgb * uSkinGlow;
+            sqHairT = normalize(vHairT - normal * dot(vHairT, normal) + 1e-5);
+            {
+              // край силуэта ловит цвет фона: голова «сидит» в цветной сцене
+              // фон — позади и по бокам: цвет ловят грани, повёрнутые вбок, а не подбородок снизу
+              float sqNv = saturate(dot(normal, normalize(vViewPosition)));
+              float sqSide = smoothstep(0.25, 0.75, abs(normal.x) / max(length(normal.xy), 1e-3)) * smoothstep(-0.5, 0.1, normal.y);
+              totalEmissiveRadiance += uRimColor * uRimK * pow(1.0 - sqNv, 4.0) * sqSide * sqSkinM;
+            }`);
+      }
+      if (f.mouth) {
+        fs = fs
+          .replace('#include <common>', '#include <common>\n' + MOUTH_FRAG)
+          .replace('#include <opaque_fragment>', 'outgoingLight *= mouthOcc(vMouthP);\n#include <opaque_fragment>');
+      }
+      if (f.eye) {
+        fs = fs
+          .replace('#include <common>', '#include <common>\n' + EYE_FRAG)
+          .replace('#include <color_fragment>', `#include <color_fragment>
+            {
+              float sqR = distance(vMapUv, SQ_EYE_C);
+              // белок в текстуре пыльно-розовый: высветляем всё за краем радужки, сохраняя лёгкий рисунок
+              float sqL = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+              float sqW = smoothstep(0.15, 0.25, sqL) * smoothstep(0.098, 0.106, sqR) * uScleraWhite;
+              vec3 sqWhite = vec3(0.84, 0.82, 0.79) * clamp(sqL / 0.3, 0.8, 1.1);
+              diffuseColor.rgb = mix(diffuseColor.rgb, sqWhite, sqW);
+              // радужка ярче и насыщеннее, по краю — тёмный лимбальный ободок (делает взгляд живым и «молодым»)
+              float sqIr = smoothstep(0.038, 0.047, sqR) * (1.0 - smoothstep(0.088, 0.1, sqR));
+              float sqLb = smoothstep(0.084, 0.096, sqR) * (1.0 - smoothstep(0.099, 0.108, sqR));
+              vec3 sqC = diffuseColor.rgb;
+              float sqCl = dot(sqC, vec3(0.2126, 0.7152, 0.0722));
+              sqC = mix(vec3(sqCl), sqC, 1.0 + 0.55 * uIris * sqIr) * (1.0 + 0.32 * uIris * sqIr);
+              diffuseColor.rgb = sqC * (1.0 - 0.45 * uLimbus * sqLb);
+            }`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+            totalEmissiveRadiance += diffuseColor.rgb * uEyeGlow;`)
+          .replace('#include <opaque_fragment>', `{
+            // блик-отражение: большой софтбокс сверху-слева и узкий стрип справа
+            vec3 sqRf = reflect(-normalize(vViewPosition), normalize(normal));
+            float sqK = sqCatch(sqRf, normalize(vec3(-0.24, 0.22, 0.94)), vec2(0.13, 0.1))
+                      + 0.3 * sqCatch(sqRf, normalize(vec3(0.62, 0.12, 0.77)), vec2(0.05, 0.13));
+            outgoingLight += vec3(1.0, 0.985, 0.96) * sqK * uCatch;
+          }
+          #include <opaque_fragment>`);
+      }
+      if (f.lens) {
+        fs = fs
+          .replace('#include <common>', '#include <common>\n' + LENS_FRAG)
+          .replace('#include <opaque_fragment>', `{
+            float sqF = pow(1.0 - saturate(abs(dot(normalize(normal), normalize(vViewPosition)))), 4.0);
+            float sqH = saturate((dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) - 0.35) * 0.9);
+            diffuseColor.a = saturate(mix(uLensA.x, uLensA.y, sqF) + sqH);
+          }
+          #include <opaque_fragment>`);
+      }
+      shader.fragmentShader = fs;
+    };
+    const key = `squish${f.skin ? '-skin' : ''}${f.face ? '-face' : ''}${f.mouth ? '-mouth' : ''}${f.lens ? '-lens' : ''}${f.eye ? '-eye' : ''}`;
+    m.customProgramCacheKey = () => key;
+    m.needsUpdate = true;
+  }
+
+  // ---------- кадрирование ----------
+  // На главном экране голову ставит приложение: setLayout({ cx, cy, width }) в CSS-пикселях —
+  // центр головы и её ширина (по ушам). В каталоге и кейсе сцена сжимается в кружок в углу, и голова вписана в него.
+  // Пока сцена едет в угол или обратно, голова летит по прямой между этими двумя положениями и плавно меняет размер.
+  frame() {
+    const w = Math.max(1, this.container.clientWidth), h = Math.max(1, this.container.clientHeight);
+    const resized = w !== this._fw || h !== this._fh;
+    if (resized) { this._fw = w; this._fh = h; this.renderer.setSize(w, h, false); }   // смена размера очищает холст — без нужды не трогаем
+    const cam = this.camera;
+    cam.aspect = w / h;
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+    const B = this.headBox || DEFAULT_BOX;
+    const L = this.layout && this.layout.width > 0 ? this.layout : null;
+    const fit = (cw, ch) => Math.min((CORNER_FIT * ch) / FIT_H, (CORNER_FIT * cw) / FIT_W);   // пикселей на единицу головы, когда она вписана в кружок cw×ch
+    // t: 0 — сцена во весь экран (главная), 1 — сжалась в кружок
+    const C = L && this.cornerRect ? this.cornerRect() : null;
+    const vw = document.documentElement.clientWidth || w;
+    let t = this.mode === 'corner' || !L ? 1 : 0;
+    if (C && C.width > 0 && vw > C.width + 1) t = clamp((vw - w) / (vw - C.width), 0, 1);
+    const f = h / (2 * tan);            // пикселей на единицу длины на расстоянии 1 от камеры
+    // Главная. Куда поставить ось камеры (hx, hy) и какой взять масштаб hk (пикселей на единицу в плоскости лица),
+    // чтобы силуэт от уха до уха занял ровно L.width пикселей, а его середина встала в точку (L.cx, L.cy)
+    const S = this.sil;
+    let hx = 0, hy = 0, hk = 1, hh = 0;
+    if (L) {
+      if (S) {
+        const z = S.zx + (f * S.w) / L.width;
+        const right = (S.xr - B.cx) / (z - S.zr), left = (B.cx - S.xl) / (z - S.zl);
+        const top = (S.yt - B.cy) / (z - S.zt), bot = (B.cy - S.yb) / (z - S.zb);
+        hx = L.cx - (f * (right - left)) / 2; hy = L.cy + (f * (top - bot)) / 2;
+        hk = f / z; hh = f * (top + bot);
+      } else { hx = L.cx; hy = L.cy; hk = L.width / B.w; hh = L.width * (B.h / B.w); }
+    }
+    let px, py, k;
+    if (t > 0.999) {
+      k = fit(w, h);
+      px = w / 2 + B.cx * k; py = h / 2 - (B.cy - 0.02) * k;
+    } else if (t < 0.001) {
+      px = hx; py = hy; k = hk;
+    } else {
+      const cr = this.container.getBoundingClientRect();
+      const kc = fit(C.width, C.height);
+      const ex = C.left + C.width / 2 + B.cx * kc, ey = C.top + C.height / 2 - (B.cy - 0.02) * kc;
+      px = hx + (ex - hx) * t - cr.left; py = hy + (ey - hy) * t - cr.top; k = hk + (kc - hk) * t;
+    }
+    cam.position.set(B.cx, B.cy, f / k);
+    cam.lookAt(B.cx, B.cy, 0);
+    cam.setViewOffset(w, h, Math.round(w / 2 - px), Math.round(h / 2 - py), w, h);
+    if (this.mode !== 'corner' && L) {
+      this.rect = { x: L.cx - L.width / 2, y: L.cy - hh / 2, w: L.width, h: hh };     // место головы на главной (для раскладки работ вокруг неё)
+    } else this.rect = null;
+    cam.updateProjectionMatrix();
+    this._plane.constant = -2.0;
+    // Холст после смены размера пуст. ResizeObserver срабатывает уже после кадра анимации,
+    // поэтому рисуем сразу — иначе голова мигала бы, пока сцена едет в угол и обратно.
+    if (resized && this.loaded) this.renderer.render(this.scene, this.camera);
+  }
+
+  setLayout(l) { this.layout = l; if (this.mode !== 'corner') this.frame(); }
+  setMode(mode) { this.mode = mode; this.frame(); }
+  setMouth(v) { this.mouthTarget = clamp(v, 0, 1); }
+  lookAtClient(x, y) { this.lookOverride = { x, y }; }
+  clearLook() { this.lookOverride = null; }
+  wink(side = 'R') { this.winkT[side] = 0.32; }
+  boing(a = 0.06) { this.sq.v -= a * 14; }
+  // Цвет сцены: мягкий контровой свет цвета фона — голова «сидит» в сцене, а не наклеена поверх
+  setSceneColor(hex) {
+    const l = this.lights && this.lights.rim2;
+    if (!l) return;
+    this._sceneTo = new THREE.Color(hex);
+    if (!this._sceneFrom) { l.color.copy(this._sceneTo); l.intensity = LOOK.sceneRim; this.skinU.uRimColor.value.copy(this._sceneTo); }
+  }
+
+  // ---------- гироскоп (телефон) ----------
+  enableTilt() {
+    if (this.tilt.on) return;
+    this.tilt.on = true;
+    const reset = () => { this.tilt.base = null; };
+    window.addEventListener('deviceorientation', (e) => this._tiltEvent(e));
+    window.addEventListener('orientationchange', reset);
+    if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', reset);
+    document.addEventListener('visibilitychange', reset);
+  }
+
+  _tiltEvent(e) {
+    if (e.alpha == null && e.beta == null && e.gamma == null) return;   // ноутбук без датчиков
+    const d = THREE.MathUtils.DEG2RAD;
+    const orient = (((screen.orientation && screen.orientation.angle) ?? window.orientation) || 0) * d;
+    const q = this._tq.setFromEuler(this._te.set((e.beta || 0) * d, (e.alpha || 0) * d, -(e.gamma || 0) * d, 'YXZ'));
+    q.multiply(this._tq1).multiply(this._tq2.setFromAxisAngle(this._tz, -orient));
+    const t = this.tilt;
+    t.q.copy(q);
+    if (!t.base) { t.base = q.clone(); t.last.copy(q); t.has = true; return; }
+    if (t.last.angleTo(q) > 0.03) {                     // ~1,7°: заметное движение, а не дрожание рук
+      t.last.copy(q); t.lastMove = performance.now();
+      if (!t.announced && t.base.angleTo(q) > 0.2) { t.announced = true; this._emit('tiltstart', {}); }
+    }
+  }
+
+  _updateTilt(dt) {
+    const t = this.tilt;
+    if (!t.has || !t.base) return;
+    t.base.slerp(t.q, damp(dt, 0.2));                   // нейтраль за ~5 с подстраивается под новую позу
+    // где зритель в координатах экрана: u = q⁻¹ · base · (0, 0, 1)
+    const u = this._tu.set(0, 0, 1).applyQuaternion(t.base).applyQuaternion(this._tq2.copy(t.q).invert());
+    const G = this.tiltGain;
+    const yaw = clamp(Math.atan2(u.x, u.z) * G, -0.9, 0.9);
+    const pitch = clamp(Math.atan2(u.y, Math.hypot(u.x, u.z)) * G, -0.7, 0.7);
+    t.target.lerp(this._tt.set(Math.tan(yaw) * 2, 0.05 + Math.tan(pitch) * 2, 2), damp(dt, 10));
+  }
+
+  // ---------- ввод ----------
+  _bind() {
+    this.canvas.addEventListener('pointerdown', (e) => this._down(e));
+    window.addEventListener('pointermove', (e) => this._move(e), { passive: true });
+    window.addEventListener('pointerup', (e) => this._up(e));
+    window.addEventListener('pointercancel', (e) => this._up(e));
+    document.addEventListener('visibilitychange', () => {
+      if (!this.loaded) return;
+      if (document.hidden) this.renderer.setAnimationLoop(null); else { this.clock.getDelta(); this._loop(); }
+    });
+  }
+
+  _ndc(x, y) {
+    const r = this.canvas.getBoundingClientRect();
+    return this._n2.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+  }
+
+  _toHead(worldPoint, out) { return out.copy(worldPoint).applyMatrix4(this._headInv); }
+
+  _down(e) {
+    if (!this.loaded || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    this.raycaster.setFromCamera(this._ndc(e.clientX, e.clientY), this.camera);
+    const hit = this.raycaster.intersectObjects(this.pickables, false)[0];
+    if (!hit) return;
+    e.preventDefault();
+    const camDir = this.camera.getWorldDirection(new THREE.Vector3());
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir.clone().negate(), hit.point);
+    const glasses = this._isGlasses(hit.object);
+    const local = this._toHead(hit.point, new THREE.Vector3());
+    const drag = { plane, x0: e.clientX, y0: e.clientY, px: e.clientX, py: e.clientY, t0: performance.now(), moved: 0, glasses, local,
+      touch: e.pointerType !== 'mouse', region: glasses ? 'glasses' : this._region(local, hit.object) };
+    if (glasses) {
+      drag.gl = this.glasses.node.worldToLocal(hit.point.clone());   // за какое место очков взялись
+      this._ensureOverlay();
+      this.glasses.grabbed = true;
+      this.glasses.target.copy(this.glasses.offset);
+    } else {
+      const h = this._allocHandle();
+      h.c.copy(local); h.t.set(0, 0, 0); h.goal.set(0, 0, 0);
+      h.d.set(0, 0, 0); h.v.set(0, 0, 0); h.e.set(0, 0, 0); h.ev.set(0, 0, 0);
+      h.grabbed = true; h.active = true;
+      drag.handle = h;
+      const nW = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : camDir.clone().negate();
+      drag.normal = nW.transformDirection(this._headInv);
+      h.v.copy(drag.normal).multiplyScalar(-0.35);     // лёгкое «продавливание» пальцем в момент захвата
+    }
+    if (drag.touch) vibrate(6);
+    this.drags.set(e.pointerId, drag);
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* noop */ }
+    this.canvas.style.cursor = 'grabbing';
+    this._emit('grab', { region: drag.region });
+  }
+
+  _move(e) {
+    this.pointer.x = e.clientX; this.pointer.y = e.clientY; this.pointer.has = true;
+    this.pointer.lastMove = performance.now();
+    const drag = this.drags.get(e.pointerId);
+    if (!drag) { this._hover(e); return; }
+    drag.px = e.clientX; drag.py = e.clientY;
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0));
+  }
+
+  // Цель щипка пересчитывается каждый кадр: голова поворачивается, а точка остаётся под курсором
+  _dragTo(drag) {
+    this.raycaster.setFromCamera(this._ndc(drag.px, drag.py), this.camera);
+    const p = this.raycaster.ray.intersectPlane(drag.plane, this._v[0]);
+    if (!p) return;
+    if (drag.glasses) {
+      // Очки можно унести куда угодно. Точка, за которую их взяли, остаётся под курсором,
+      // как бы ни поворачивались голова и сами очки.
+      const g = this.glasses, node = g.node;
+      node.updateWorldMatrix(true, false);
+      const rel = node.localToWorld(this._v[1].copy(drag.gl)).sub(node.getWorldPosition(this._v[6]));
+      const want = node.parent.worldToLocal(this._v[7].copy(p).sub(rel));
+      g.target.copy(want).sub(g.home);
+      if (g.target.length() > 40) g.target.setLength(40);
+    } else {
+      const local = this._toHead(p, this._v[1]);
+      const t = local.sub(drag.handle.c);
+      if (t.length() > 3) t.setLength(3);
+      drag.handle.t.copy(t);
+    }
+  }
+
+  _up(e) {
+    const drag = this.drags.get(e.pointerId);
+    if (!drag) return;
+    this.drags.delete(e.pointerId);
+    const quick = drag.moved < 6 && performance.now() - drag.t0 < 350;
+    if (drag.glasses) {
+      const g = this.glasses;
+      g.grabbed = false;
+      if (g.offset.length() > 0.3) {
+        // очки повисают там, где их отпустили (в координатах экрана), потом голова наденет их сама
+        g.node.getWorldPosition(g.world);
+        g.holdUntil = performance.now() + GLASSES_HOLD; g.selfReturn = true;
+        if (!g.announced) { g.announced = true; this._emit('glassesoff', {}); }
+      } else if (quick) this._emit('poke', { region: 'glasses' });
+    } else {
+      const h = drag.handle;
+      h.grabbed = false;
+      if (quick) {
+        h.v.copy(drag.normal).multiplyScalar(-1.25);     // тычок: ямка, которая пружинит обратно
+        h.ev.copy(drag.normal).multiplyScalar(-0.5);
+        this.boing(0.035);
+        if (drag.touch) vibrate(8);
+        this._emit('poke', { region: drag.region });
+      } else {
+        const s = this._v[0].copy(h.d).add(h.e).length();
+        this.sq.v -= Math.min(0.9, s * 0.9);             // отпустил — голова «пружинит» целиком
+        if (drag.touch && s > 0.2) vibrate(s > 0.6 ? [14, 50, 8] : 10);
+        this._emit('release', { region: drag.region, stretch: s });
+      }
+    }
+    this.canvas.style.cursor = 'grab';
+  }
+
+  _hover(e) {
+    if (!this.loaded) return;
+    if (e.target !== this.canvas) { if (this._hovering) { this._hovering = false; this.canvas.style.cursor = ''; } return; }
+    const now = performance.now();
+    if (now - (this._lastHover || 0) < 70) return;
+    this._lastHover = now;
+    this.raycaster.setFromCamera(this._ndc(e.clientX, e.clientY), this.camera);
+    this._hovering = this.raycaster.intersectObjects(this.pickables, false).length > 0;
+    this.canvas.style.cursor = this._hovering ? 'grab' : '';
+  }
+
+  _allocHandle() {
+    let best = this.handles.find((h) => !h.active);
+    if (!best) {
+      const mag = (h) => h.d.lengthSq() + h.e.lengthSq();
+      best = this.handles.filter((h) => !h.grabbed).sort((a, b) => mag(a) - mag(b))[0] || this.handles[0];
+    }
+    return best;
+  }
+
+  _region(p, obj) {
+    const base = obj?.userData?.base || '';
+    if (/^Eye_/.test(base)) return 'eye';
+    if (/^Piercing_EarCuff/.test(base)) return 'ear';
+    if (/^Piercing_Septum/.test(base)) return 'nose';
+    const ax = Math.abs(p.x);
+    if (p.y > 0.3 || p.z < -0.05) return 'hair';
+    if (ax > 0.6 && p.y > -0.45 && p.y < 0.2) return 'ear';
+    if (p.y < -0.74) return 'chin';
+    if (p.y < -0.48 && ax < 0.24 && p.z > 0.55) return 'mouth';
+    if (p.y < -0.18 && p.y > -0.48 && ax < 0.14 && p.z > 0.7) return 'nose';
+    if (p.y > -0.24 && p.y < 0.04 && ax > 0.08 && ax < 0.36 && p.z > 0.45) return 'eye';
+    if (p.y >= 0.04 && p.z > 0.35) return 'forehead';
+    return 'cheek';
+  }
+
+  _emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
+
+  // ---------- кадр ----------
+  _loop() { this.renderer.setAnimationLoop(() => this._tick()); }
+
+  _tick() {
+    const dt = Math.min(this.clock.getDelta(), 1 / 30);
+    const now = performance.now();
+    if (this.onTick) this.onTick(dt, now);
+    this._updatePop(dt);
+    this._updateTilt(dt);
+    this._updateLook(dt, now);
+    this._updateBlink(dt);
+    this._updateMouth(dt);
+    if (this.drags.size) {
+      this.root.updateWorldMatrix(true, false);
+      this._headInv.copy(this.root.matrixWorld).invert();
+      for (const d of this.drags.values()) this._dragTo(d);
+    }
+    this._updateGlasses(dt, now);
+    this._updateHandles(dt);
+    if (this._sceneTo) {
+      const l = this.lights.rim2;
+      this._sceneFrom = true;
+      l.color.lerp(this._sceneTo, damp(dt, 3));
+      l.intensity += (LOOK.sceneRim - l.intensity) * damp(dt, 3);
+      this.skinU.uRimColor.value.lerp(this._sceneTo, damp(dt, 3));
+    }
+    this._updateMatrices();
+    if (this.ov) this._setOverlay(this.glasses.offset.length() > 0.03 || this.blind > 0.004);
+    if (this.onFrame) this.onFrame();
+    this.renderer.render(this.scene, this.camera);
+    if (this.ov && this.ov.on) this._renderOverlay();
+  }
+
+  _updateMatrices() {
+    this.scene.updateMatrixWorld();
+    this._headInv.copy(this.root.matrixWorld).invert();
+    for (const o of this.meshes) {
+      const u = o.userData.sqU;
+      u.uObjToHead.value.multiplyMatrices(this._headInv, o.matrixWorld);
+      u.uHeadToObj.value.copy(u.uObjToHead.value).invert();
+    }
+  }
+
+  _updatePop(dt) {
+    const p = this.pop, s = this.sq;
+    const steps = 2, h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      p.v += ((1 - p.s) * 120 - p.v * (this.rm ? 22 : 11)) * h; p.s += p.v * h;
+      s.v += ((1 - s.s) * 150 - s.v * (this.rm ? 25 : 6.5)) * h; s.s += s.v * h;
+    }
+    const sy = clamp(s.s, 0.7, 1.35), sx = 1 / Math.sqrt(sy);
+    this.pivot.scale.set(p.s * sx, p.s * sy, p.s * sx);
+  }
+
+  _lookTarget(out) {
+    const fingerRecent = this.pointer.has && (this.drags.size > 0 || performance.now() - this.pointer.lastMove < 1200);
+    if (!this.lookOverride && this.tilt.has && !fingerRecent) return out.copy(this.tilt.target);
+    const src = this.lookOverride || (this.pointer.has ? this.pointer : null);
+    if (!src) return out.set(0, 0.05, this.camera.position.z);
+    this.raycaster.setFromCamera(this._ndc(src.x, src.y), this.camera);
+    if (!this.raycaster.ray.intersectPlane(this._plane, out)) out.set(0, 0, 2);
+    return out;
+  }
+
+  _updateLook(dt, now) {
+    const t = this._lookTarget(this._v[2]);
+    const idle = !this.lookOverride && now - Math.max(this.pointer.lastMove, this.tilt.lastMove) > 2500;
+    const tz = Math.max(0.8, t.z);
+    let yaw = clamp(Math.atan2(t.x, tz) * 0.65, -0.52, 0.52);
+    let pitch = clamp(-Math.atan2(t.y - 0.05, tz) * 0.5, -0.3, 0.28);
+    if (idle && !this.rm) { yaw += Math.sin(now * 0.0006) * 0.07; pitch += Math.sin(now * 0.00043) * 0.035; }
+    // глаза успевают первыми, голова догоняет чуть позже — как у живого человека
+    const k = this.drags.size ? 1.5 : (this.rm ? 3 : 4.5);
+    this.rot.yaw += (yaw - this.rot.yaw) * damp(dt, k);
+    this.rot.pitch += (pitch - this.rot.pitch) * damp(dt, k);
+    this._q.setFromEuler(this._e.set(this.rot.pitch, this.rot.yaw, 0, 'YXZ'));
+    const la = this.lean.a, ang = la.length();
+    if (ang > 1e-6) this._q.multiply(this._q2.setFromAxisAngle(this._v[4].copy(la).divideScalar(ang), ang));
+    this.pivot.quaternion.copy(this._q);
+    if (!this.eyes.length) return;
+    this.pivot.updateMatrixWorld(true);
+    const inv = this._headInv.copy(this.root.matrixWorld).invert();
+    if (idle && !this.rm && now > this.sacc.next) {
+      this.sacc.x = rand(-0.07, 0.07); this.sacc.y = rand(-0.03, 0.02); this.sacc.next = now + rand(500, 1600);
+    } else if (!idle) { this.sacc.x = 0; this.sacc.y = 0; }
+    // Оба глаза смотрят в одну далёкую точку на линии «переносица → цель»:
+    // взгляд следует за курсором, но зрачки не съезжают к носу, когда курсор рядом с лицом.
+    const mid = this._v[4].set(0, 0, 0);
+    for (const eye of this.eyes) mid.add(eye.position);
+    mid.multiplyScalar(1 / this.eyes.length);
+    const far = this._v[3].copy(t).applyMatrix4(inv).sub(mid).normalize().multiplyScalar(EYE_FAR).add(mid);
+    for (const eye of this.eyes) {
+      const v = this._v[1].copy(far).sub(eye.position);
+      // ограничения как у живых глаз: вверх совсем чуть-чуть (иначе радужка уходит под веко и глаза «закатываются»),
+      // вниз и в стороны умеренно — остальное добирает поворот головы
+      const ey = clamp(Math.atan2(v.x, v.z) + this.sacc.x, -EYE_YAW, EYE_YAW);
+      const ep = clamp(Math.atan2(v.y, Math.hypot(v.x, v.z)) + this.sacc.y, -EYE_DOWN, EYE_UP);
+      this.gazePitch = ep;
+      this._q.setFromEuler(this._e.set(-ep, ey, 0, 'YXZ'));
+      eye.quaternion.slerp(this._q, damp(dt, this.rm ? 10 : 20));
+    }
+  }
+
+  _setMorph(name, v) { for (const [o, i] of this.morphs[name]) o.morphTargetInfluences[i] = v; }
+
+  _updateBlink(dt) {
+    const b = this.blink;
+    let v = 0;
+    if (b.t < 0) { b.next -= dt; if (b.next <= 0) b.t = 0; }
+    if (b.t >= 0) {
+      b.t += dt;
+      const tc = 0.075, to = 0.12;
+      v = b.t < tc ? b.t / tc : 1 - (b.t - tc) / to;
+      if (b.t >= tc + to) {
+        b.t = -1; v = 0;
+        if (!b.double && Math.random() < 0.18) { b.double = true; b.next = 0.12; }
+        else { b.double = false; b.next = rand(2.2, 5.8); }
+      }
+    }
+    v = clamp(v, 0, 1);
+    const sqT = this.glasses.off ? 0.38 : 0;
+    this.squint += (sqT - this.squint) * damp(dt, 6);
+    for (const s of ['L', 'R']) {
+      this.winkT[s] = Math.max(0, this.winkT[s] - dt);
+      this.winkV[s] += ((this.winkT[s] > 0 ? 1 : 0) - this.winkV[s]) * damp(dt, 28);
+    }
+    // веки следуют за взглядом вниз — как у живого человека
+    const lidDown = 0.35 * smoothstep(0.02, EYE_DOWN, -(this.gazePitch || 0));
+    this._setMorph('Blink_L', Math.max(v, this.squint, this.winkV.L, lidDown));
+    this._setMorph('Blink_R', Math.max(v, this.squint, this.winkV.R, lidDown));
+  }
+
+  _updateMouth(dt) {
+    const up = this.mouthTarget > this.mouth;
+    this.mouth += (this.mouthTarget - this.mouth) * damp(dt, up ? 30 : 16);
+    const m = clamp(this.mouth, 0, 1);
+    this._setMorph('JawOpen', m);
+    this.mouthU.uMouthOpen.value = m;
+  }
+
+  _updateGlasses(dt, now) {
+    const g = this.glasses;
+    if (!g.node) return;
+    const parent = g.node.parent;
+    const held = !g.grabbed && now < g.holdUntil;
+    let target;
+    if (g.grabbed) target = g.target;
+    else if (held) {
+      // висят там, где их отпустили: голова вертится, очки — нет
+      parent.updateWorldMatrix(true, false);
+      target = parent.worldToLocal(this._v[3].copy(g.world)).sub(g.home);
+    } else target = this._v[3].set(0, 0, 0);
+    let k, c;
+    if (g.grabbed) { k = 320; c = 2 * Math.sqrt(k); }
+    else if (held) { k = 120; c = 2 * Math.sqrt(k); }
+    else {
+      // обратно на нос: издалека — плавно и без проскока сквозь голову, у самого лица — с лёгкой пружинкой
+      k = 46;
+      const near = 1 - smoothstep(0.25, 1.0, g.offset.length());
+      c = 2 * Math.sqrt(k) * (this.rm ? 1 : 1 - 0.56 * near);
+    }
+    const steps = 3, h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      this._a.copy(target).sub(g.offset).multiplyScalar(k).addScaledVector(g.vel, -c);
+      g.vel.addScaledVector(this._a, h);
+      g.offset.addScaledVector(g.vel, h);
+    }
+    g.node.position.copy(g.home).add(g.offset);
+    const dist = g.offset.length();
+    // у лица очки сидят как на голове, вдали — разворачиваются «лицом» к зрителю, где бы на экране ни оказались
+    const far = smoothstep(0.3, 1.1, dist);
+    if (far > 0) {
+      const dir = this._v[5].copy(this.camera.position).sub(g.node.getWorldPosition(this._v[4])).normalize();
+      this._q2.setFromUnitVectors(this._v[6].set(0, 0, 1), dir);
+      parent.getWorldQuaternion(this._q).invert().multiply(this._q2).multiply(g.homeQ);
+      this._q2.copy(g.homeQ).slerp(this._q, far);
+    } else this._q2.copy(g.homeQ);
+    g.node.quaternion.slerp(this._q2, damp(dt, 12));
+    if (g.selfReturn && !g.grabbed && now >= g.holdUntil) { g.selfReturn = false; if (dist > 0.3) this._emit('glassesreturn', {}); }
+    if (g.grabbed) g.selfReturn = false;
+    // «Близорукость»: чем дальше очки от глаз, тем сильнее размыт мир. Туман наплывает и уходит мягко,
+    // а не дёргается вслед за пружиной очков.
+    const tgt = smoothstep(0.14, 0.75, dist);
+    this.blind += (tgt - this.blind) * damp(dt, tgt > this.blind ? 3.2 : 6);
+    if (tgt === 0 && this.blind < 0.002) this.blind = 0;
+    g.off = dist > 0.22;
+    // стянули с носа, ещё не отпустив — голова уже возмущается
+    if (g.grabbed && !g.announced && dist > 0.45) { g.announced = true; this._emit('glassesoff', {}); }
+    if (!g.grabbed && !g.off && g.announced) { g.announced = false; this._emit('glasseson', {}); }
+  }
+
+  // Физика щипков. Каждый щипок — две пружины:
+  //  d — узкий слой, держит точку под пальцем (упругий, с лёгкой оттяжкой);
+  //  e — широкий желейный слой: догоняет с запаздыванием и дольше колышется после отпускания.
+  // Сила натяжения нелинейная (tanh): чем дальше тянешь, тем сильнее резина сопротивляется.
+  // Голова целиком наклоняется вслед за щипком (момент силы вокруг шеи) и раскачивается, когда отпускаешь.
+  _updateHandles(dt) {
+    const steps = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / steps;
+    const rm = this.rm;
+    const leanT = this.lean.t.set(0, 0, 0);
+    for (let i = 0; i < NH; i++) {
+      const hd = this.handles[i];
+      if (hd.active) {
+        if (hd.grabbed) {
+          const L = hd.t.length();
+          hd.goal.copy(hd.t).multiplyScalar(L > 1e-6 ? (R_MAX * Math.tanh(L / R_MAX)) / L : 0);
+        } else hd.goal.set(0, 0, 0);
+        let kE, cE, kD, cD;
+        if (hd.grabbed) { kE = 40; cE = 2 * 0.42 * Math.sqrt(40); kD = 240; cD = 2 * 0.62 * Math.sqrt(240); }
+        else if (rm) { kE = 40; cE = 2 * Math.sqrt(40); kD = 90; cD = 2 * Math.sqrt(90); }
+        else { kE = 36; cE = 2 * 0.26 * Math.sqrt(36); kD = 110; cD = 2 * 0.3 * Math.sqrt(110); }
+        const eGoal = this._v[6], dGoal = this._v[7];
+        for (let s = 0; s < steps; s++) {
+          eGoal.copy(hd.goal).multiplyScalar(hd.grabbed ? JELLY : 0);
+          this._a.copy(eGoal).sub(hd.e).multiplyScalar(kE).addScaledVector(hd.ev, -cE);
+          hd.ev.addScaledVector(this._a, h); hd.e.addScaledVector(hd.ev, h);
+          if (hd.grabbed) dGoal.copy(hd.goal).sub(hd.e); else dGoal.set(0, 0, 0);   // вместе слои держат точку под пальцем
+          this._a.copy(dGoal).sub(hd.d).multiplyScalar(kD).addScaledVector(hd.v, -cD);
+          hd.v.addScaledVector(this._a, h); hd.d.addScaledVector(hd.v, h);
+        }
+        const cap = R_MAX * 1.3;
+        if (hd.d.length() > cap) hd.d.setLength(cap);
+        if (hd.e.length() > cap) hd.e.setLength(cap);
+        if (hd.grabbed) {
+          // момент силы относительно шеи: (точка − шея) × смещение
+          const r = this._v[5].copy(hd.c).sub(PIVOT);
+          leanT.add(r.cross(this._v[6].copy(hd.d).add(hd.e)));
+        }
+        if (!hd.grabbed && hd.d.lengthSq() + hd.e.lengthSq() < 1e-6 && hd.v.lengthSq() + hd.ev.lengthSq() < 1e-4) {
+          hd.active = false; hd.d.set(0, 0, 0); hd.v.set(0, 0, 0); hd.e.set(0, 0, 0); hd.ev.set(0, 0, 0);
+        }
+      }
+      const LD = hd.d.length(), LE = hd.e.length();
+      const sD = Math.max(SIG_MIN, LD / 1.2);
+      this.shared.uSqC.value[i].copy(hd.c);
+      this.shared.uSqD.value[i].copy(hd.d);
+      this.shared.uSqE.value[i].copy(hd.e);
+      this.shared.uSqS.value[i] = sD;                                  // шире с растяжением: поле не складывается само в себя
+      this.shared.uSqW.value[i] = Math.max(sD * 2.1, LE / 1.2);
+      this.shared.uSqA.value[i] = 0.07 * smoothstep(0, 0.5, LD);
+    }
+    // наклон головы вслед за щипком (пружина с лёгким раскачиванием)
+    const ln = this.lean;
+    leanT.multiplyScalar(rm ? 0.1 : 0.22);
+    if (leanT.length() > 0.3) leanT.setLength(0.3);
+    const kL = this.drags.size ? 60 : 48, cL = rm ? 2 * Math.sqrt(kL) : 2 * (this.drags.size ? 0.5 : 0.2) * Math.sqrt(kL);
+    for (let s = 0; s < steps; s++) {
+      this._a.copy(leanT).sub(ln.a).multiplyScalar(kL).addScaledVector(ln.v, -cL);
+      ln.v.addScaledVector(this._a, h); ln.a.addScaledVector(ln.v, h);
+    }
+  }
+}

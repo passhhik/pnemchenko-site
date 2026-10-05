@@ -1,458 +1,82 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pavel Nemchenko — Product Designer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
-  <!-- Bootstrap for FAQ accordion only -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Павел Немченко — продуктовый дизайнер</title>
+  <meta name="description" content="Портфолио Павла Немченко: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.">
+  <meta name="theme-color" content="#FFFFFF">
+  <!-- карточка ссылки в мессенджерах и соцсетях; адрес картинки должен быть полным — поменяйте домен, если он другой -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Павел Немченко — продуктовый дизайнер">
+  <meta property="og:description" content="Портфолио: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.">
+  <meta property="og:image" content="https://pnemchenko.ru/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" href="assets/favicon.png" type="image/png" sizes="96x96">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/narrow-cyrillic-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="content/site.json" as="fetch" crossorigin>
+  <link rel="preload" href="content/projects.json" as="fetch" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- 3D-голова подгружается после интерфейса; её модули начинаем качать заранее -->
+  <link rel="modulepreload" href="vendor/three/three.module.js">
+  <link rel="modulepreload" href="js/head.js">
+  <link rel="modulepreload" href="vendor/three/addons/loaders/GLTFLoader.js">
+  <link rel="modulepreload" href="vendor/three/addons/utils/BufferGeometryUtils.js">
+  <link rel="modulepreload" href="vendor/three/addons/libs/meshopt_decoder.module.js">
+  <link rel="preload" href="assets/head.glb" as="fetch" type="model/gltf-binary" crossorigin>
+  <link rel="preload" href="assets/face.jpg" as="image" crossorigin>
 </head>
-<body>
+<body data-view="hero" data-tone="light">
+  <a class="skip-link" href="#/work" data-t="skip">Сразу к работам</a>
 
-  <!-- ░░░ HEADER ░░░ -->
-  <header class="header" id="header">
-    <div class="header__inner container-fluid">
-      <a class="header__logo" href="#">PN</a>
-      <nav class="header__nav">
-        <ul>
-          <li><a href="#projects">Work</a></li>
-          <li><a href="#skills">Skills</a></li>
-          <li><a href="#video">Process</a></li>
-          <li><a href="#faq">FAQ</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
-      </nav>
-      <a class="header__cta" href="#contact">Hire me</a>
-      <button class="header__burger" id="burger" aria-label="Menu">
-        <span></span><span></span>
-      </button>
-    </div>
-    <!-- mobile menu -->
-    <nav class="mobile-nav" id="mobileNav">
-      <ul>
-        <li><a href="#projects" class="mobile-nav__link">Work</a></li>
-        <li><a href="#skills" class="mobile-nav__link">Skills</a></li>
-        <li><a href="#video" class="mobile-nav__link">Process</a></li>
-        <li><a href="#faq" class="mobile-nav__link">FAQ</a></li>
-        <li><a href="#contact" class="mobile-nav__link">Contact</a></li>
-      </ul>
+  <!-- фон «в стиле проекта»: два слоя для плавной смены -->
+  <div class="bg" data-bg aria-hidden="true"><div class="bg-layer"></div><div class="bg-layer"></div></div>
+
+  <header class="topbar" data-topbar>
+    <div class="topbar-side" data-lang></div>
+    <a class="logo" href="#/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
+    <nav class="topnav" aria-label="Основное меню">
+      <a class="btn" data-cv href="assets/cv.pdf" download>CV</a>
+      <a class="btn" href="#/work" data-t="allWork">Все работы</a>
+      <button class="btn btn--toggle" type="button" data-sound aria-pressed="false"><span data-t="sound">Звук</span></button>
     </nav>
   </header>
 
-  <main>
+  <!-- работы из папок летят под головой: огибают её сзади, а не закрывают лицо -->
+  <div class="burst" data-burst aria-hidden="true"></div>
+  <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
 
-    <!-- ░░░ HERO ░░░ -->
-    <section class="hero" id="home">
-      <div class="hero__bg">
-        <img src="https://images.unsplash.com/photo-1551650975-87deedd944c3?w=1600&auto=format&fit=crop&q=80" alt="design workspace" class="hero__bg-img" />
-        <div class="hero__overlay"></div>
-      </div>
-      <div class="hero__content">
-        <div class="hero__tag">
-          <span class="dot"></span> Available for work
-        </div>
-        <h1 class="hero__name">
-          Pavel<br />
-          <em>Nemchenko</em>
-        </h1>
-        <div class="hero__meta">
-          <p class="hero__role">Product Designer</p>
-          <p class="hero__value">I design products people actually want to use —<br class="br-desk"/> turning business problems into clean, purposeful experiences.</p>
-          <a href="#projects" class="btn-primary">View projects <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-        </div>
-      </div>
-      <div class="hero__scroll">
-        <span>Scroll</span>
-        <div class="hero__scroll-line"></div>
-      </div>
+  <div class="loader" data-loader role="status">
+    <span data-t="loader">Собираю лицо</span>
+    <span class="loader-pct" data-loader-pct>0%</span>
+  </div>
+
+  <main id="main">
+    <section class="hero" data-screen="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title" class="visually-hidden" tabindex="-1"><span data-name>Павел Немченко</span> — <span data-role>продуктовый дизайнер</span></h1>
+      <nav class="folders" data-folders aria-label="Разделы портфолио"></nav>
     </section>
 
-    <!-- ░░░ MARQUEE ░░░ -->
-    <div class="marquee">
-      <div class="marquee__track">
-        <span>UX Research</span><span class="sep">✦</span>
-        <span>Product Thinking</span><span class="sep">✦</span>
-        <span>Interface Design</span><span class="sep">✦</span>
-        <span>Design Systems</span><span class="sep">✦</span>
-        <span>Prototyping</span><span class="sep">✦</span>
-        <span>User Testing</span><span class="sep">✦</span>
-        <span>UX Research</span><span class="sep">✦</span>
-        <span>Product Thinking</span><span class="sep">✦</span>
-        <span>Interface Design</span><span class="sep">✦</span>
-        <span>Design Systems</span><span class="sep">✦</span>
-        <span>Prototyping</span><span class="sep">✦</span>
-        <span>User Testing</span><span class="sep">✦</span>
-      </div>
-    </div>
-
-    <!-- ░░░ PROJECTS ░░░ -->
-    <section class="projects" id="projects">
-      <div class="projects__header">
-        <span class="label">/ Selected work</span>
-        <h2 class="section-title">Case studies that<br /><em>move the needle.</em></h2>
-      </div>
-
-      <div class="projects__grid">
-
-        <article class="card card--featured">
-          <div class="card__img-wrap">
-            <img src="https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=900&auto=format&fit=crop&q=80" alt="FinTrack App" class="card__img" />
-            <div class="card__img-cover"></div>
-          </div>
-          <div class="card__body">
-            <div class="card__meta">
-              <span class="card__tag">FinTech · 2024</span>
-              <span class="card__role">Solo Designer</span>
-            </div>
-            <h3 class="card__title">FinTrack — Personal Finance App</h3>
-            <p class="card__desc">Redesigned the onboarding and budgeting flow of a B2C fintech product. Reduced drop-off rate and clarified the value proposition.</p>
-            <div class="card__result">
-              <div class="card__result-item"><strong>−42%</strong><span>drop-off rate</span></div>
-              <div class="card__result-item"><strong>+31%</strong><span>retention</span></div>
-            </div>
-            <a href="#" class="card__link">View case study <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="card__img-wrap">
-            <img src="https://images.unsplash.com/photo-1542744095-291d1f67b221?w=700&auto=format&fit=crop&q=80" alt="SaaS Dashboard" class="card__img" />
-            <div class="card__img-cover"></div>
-          </div>
-          <div class="card__body">
-            <div class="card__meta">
-              <span class="card__tag">SaaS · 2023</span>
-              <span class="card__role">UX Lead</span>
-            </div>
-            <h3 class="card__title">Orion — B2B Analytics Dashboard</h3>
-            <p class="card__desc">End-to-end design of a data visualization platform for enterprise clients. Built design system from scratch.</p>
-            <div class="card__result">
-              <div class="card__result-item"><strong>3×</strong><span>faster reporting</span></div>
-              <div class="card__result-item"><strong>NPS +58</strong><span>user score</span></div>
-            </div>
-            <a href="#" class="card__link">View case study <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="card__img-wrap">
-            <img src="https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=700&auto=format&fit=crop&q=80" alt="E-commerce redesign" class="card__img" />
-            <div class="card__img-cover"></div>
-          </div>
-          <div class="card__body">
-            <div class="card__meta">
-              <span class="card__tag">E-commerce · 2023</span>
-              <span class="card__role">Product Designer</span>
-            </div>
-            <h3 class="card__title">Volta — Checkout Redesign</h3>
-            <p class="card__desc">Streamlined a multi-step checkout experience for a mid-size e-commerce store. Identified friction points through user interviews.</p>
-            <div class="card__result">
-              <div class="card__result-item"><strong>+19%</strong><span>conversion</span></div>
-              <div class="card__result-item"><strong>−2 steps</strong><span>checkout flow</span></div>
-            </div>
-            <a href="#" class="card__link">View case study <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          </div>
-        </article>
-
-        <article class="card card--dark">
-          <div class="card__img-wrap">
-            <img src="https://images.unsplash.com/photo-1558655146-d09347e92766?w=700&auto=format&fit=crop&q=80" alt="Design System" class="card__img" />
-            <div class="card__img-cover"></div>
-          </div>
-          <div class="card__body">
-            <div class="card__meta">
-              <span class="card__tag">Design System · 2022</span>
-              <span class="card__role">System Designer</span>
-            </div>
-            <h3 class="card__title">Nova DS — Component Library</h3>
-            <p class="card__desc">Built a scalable design system for a product team of 12. Covered tokens, components, documentation and handoff flows.</p>
-            <div class="card__result">
-              <div class="card__result-item"><strong>120+</strong><span>components</span></div>
-              <div class="card__result-item"><strong>40%</strong><span>less dev time</span></div>
-            </div>
-            <a href="#" class="card__link">View case study <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          </div>
-        </article>
-
-      </div>
-    </section>
-
-    <!-- ░░░ SKILLS / TOOLS / EXPERIENCE TABLE ░░░ -->
-    <section class="skills" id="skills">
-      <div class="skills__header">
-        <span class="label">/ Skills & tools</span>
-        <h2 class="section-title">What I bring<br /><em>to the table.</em></h2>
-      </div>
-
-      <div class="skills__table-wrap">
-        <table class="skills__table">
-          <thead>
-            <tr>
-              <th>Area</th>
-              <th>Skills</th>
-              <th>Tools</th>
-              <th>Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="skills__area">UX Design</td>
-              <td>User research, journey mapping, information architecture, usability testing, wireframing</td>
-              <td>Figma, Maze, Hotjar, Notion</td>
-              <td><div class="skills__bar"><div class="skills__bar-fill" style="--w:90%"></div></div></td>
-            </tr>
-            <tr>
-              <td class="skills__area">UI Design</td>
-              <td>Visual design, design systems, responsive layouts, micro-interactions, accessibility</td>
-              <td>Figma, Framer, Zeplin, Storybook</td>
-              <td><div class="skills__bar"><div class="skills__bar-fill" style="--w:85%"></div></div></td>
-            </tr>
-            <tr>
-              <td class="skills__area">Product Thinking</td>
-              <td>Problem framing, jobs-to-be-done, OKRs, prioritization, stakeholder alignment</td>
-              <td>Miro, FigJam, Linear, Jira</td>
-              <td><div class="skills__bar"><div class="skills__bar-fill" style="--w:80%"></div></div></td>
-            </tr>
-            <tr>
-              <td class="skills__area">Prototyping</td>
-              <td>Interactive prototypes, motion design, user flows, design handoff</td>
-              <td>Figma, Framer, Principle, Lottie</td>
-              <td><div class="skills__bar"><div class="skills__bar-fill" style="--w:88%"></div></div></td>
-            </tr>
-            <tr>
-              <td class="skills__area">Front-end basics</td>
-              <td>HTML, CSS, basic JavaScript — enough to speak dev fluently</td>
-              <td>VS Code, Chrome DevTools, Git</td>
-              <td><div class="skills__bar"><div class="skills__bar-fill" style="--w:60%"></div></div></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="exp-row">
-        <div class="exp-item">
-          <span class="exp-num">3+</span>
-          <span class="exp-label">Years of experience</span>
-        </div>
-        <div class="exp-item">
-          <span class="exp-num">20+</span>
-          <span class="exp-label">Products designed</span>
-        </div>
-        <div class="exp-item">
-          <span class="exp-num">8</span>
-          <span class="exp-label">Industries covered</span>
-        </div>
-        <div class="exp-item">
-          <span class="exp-num">100%</span>
-          <span class="exp-label">Remote-friendly</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ░░░ VIDEO ░░░ -->
-    <section class="video-section" id="video">
-      <div class="video-section__inner">
-        <div class="video-section__text">
-          <span class="label">/ Design process</span>
-          <h2 class="section-title">See how I think<br /><em>through problems.</em></h2>
-          <p class="video-section__desc">My process is rooted in understanding people — their goals, frustrations, and mental models. Watch a short walkthrough of how I approach a design challenge from discovery to delivery.</p>
-        </div>
-        <div class="video-section__player">
-          <div class="video-wrap">
-            <iframe
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title="Pavel Nemchenko — Design Process"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen
-            ></iframe>
-          </div>
-          <p class="video-section__caption">Case study walkthrough · FinTrack onboarding redesign</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ░░░ FAQ — Bootstrap Accordion ░░░ -->
-    <section class="faq" id="faq">
-      <div class="faq__inner">
-        <div class="faq__header">
-          <span class="label">/ FAQ</span>
-          <h2 class="section-title">Common<br /><em>questions.</em></h2>
-        </div>
-
-        <div class="accordion faq__accordion" id="faqAccordion">
-
-          <div class="accordion-item faq__item">
-            <h2 class="accordion-header">
-              <button class="accordion-button faq__btn" type="button" data-bs-toggle="collapse" data-bs-target="#faq1" aria-expanded="true" aria-controls="faq1">
-                What does your design process look like?
-              </button>
-            </h2>
-            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
-              <div class="accordion-body faq__body">
-                I follow a discover → define → design → test loop. Every project starts with stakeholder interviews and user research, followed by problem framing, ideation, high-fidelity design, and iterative testing. I document everything so the team stays aligned.
-              </div>
-            </div>
-          </div>
-
-          <div class="accordion-item faq__item">
-            <h2 class="accordion-header">
-              <button class="accordion-button collapsed faq__btn" type="button" data-bs-toggle="collapse" data-bs-target="#faq2" aria-expanded="false" aria-controls="faq2">
-                Are you open to full-time positions?
-              </button>
-            </h2>
-            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-              <div class="accordion-body faq__body">
-                Yes — I'm actively looking for a full-time product design role at a product-led company. I'm especially interested in teams that value design as a strategic function, not just execution.
-              </div>
-            </div>
-          </div>
-
-          <div class="accordion-item faq__item">
-            <h2 class="accordion-header">
-              <button class="accordion-button collapsed faq__btn" type="button" data-bs-toggle="collapse" data-bs-target="#faq3" aria-expanded="false" aria-controls="faq3">
-                Can you work with an existing design system?
-              </button>
-            </h2>
-            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-              <div class="accordion-body faq__body">
-                Absolutely. I've worked with Material Design, custom Figma component libraries, and token-based systems. I'm comfortable both extending an existing DS and building one from scratch when needed.
-              </div>
-            </div>
-          </div>
-
-          <div class="accordion-item faq__item">
-            <h2 class="accordion-header">
-              <button class="accordion-button collapsed faq__btn" type="button" data-bs-toggle="collapse" data-bs-target="#faq4" aria-expanded="false" aria-controls="faq4">
-                Do you collaborate closely with developers?
-              </button>
-            </h2>
-            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-              <div class="accordion-body faq__body">
-                Yes — I see dev partnership as core to good design. I produce clean Figma handoffs with annotated specs, defined states, and responsive breakpoints. I can read and write basic HTML/CSS so communication is never a bottleneck.
-              </div>
-            </div>
-          </div>
-
-          <div class="accordion-item faq__item">
-            <h2 class="accordion-header">
-              <button class="accordion-button collapsed faq__btn" type="button" data-bs-toggle="collapse" data-bs-target="#faq5" aria-expanded="false" aria-controls="faq5">
-                What industries have you worked in?
-              </button>
-            </h2>
-            <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-              <div class="accordion-body faq__body">
-                FinTech, B2B SaaS, e-commerce, health tech, and edtech. I adapt quickly to new domains — my value is in the process and thinking, not domain-specific knowledge alone.
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-    <!-- ░░░ CONTACT ░░░ -->
-    <section class="contact" id="contact">
-      <div class="contact__inner">
-        <div class="contact__left">
-          <span class="label">/ Get in touch</span>
-          <h2 class="section-title">Let's build<br /><em>something great.</em></h2>
-          <p class="contact__sub">Whether you have a role, a project, or just want to say hi — my inbox is open.</p>
-          <div class="contact__links">
-            <a href="mailto:pavel@example.com" class="contact__link">pavel@example.com</a>
-            <a href="#" class="contact__link">Behance ↗</a>
-            <a href="#" class="contact__link">LinkedIn ↗</a>
-            <a href="#" class="contact__link">Telegram ↗</a>
-          </div>
-        </div>
-
-        <form class="contact__form" id="contactForm" novalidate>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="fname">Full name</label>
-              <input type="text" id="fname" name="name" placeholder="Alex Johnson" required />
-            </div>
-            <div class="form-group">
-              <label for="femail">Email</label>
-              <input type="email" id="femail" name="email" placeholder="alex@company.com" required />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="fmsg">Message</label>
-            <textarea id="fmsg" name="message" rows="5" placeholder="Tell me about the role or project..." required></textarea>
-          </div>
-
-          <div class="form-group form-group--radios">
-            <label class="form-label-main">I'm reaching out about:</label>
-            <div class="radio-group">
-              <label class="radio-label">
-                <input type="radio" name="intent" value="job" checked />
-                <span class="radio-custom"></span>Full-time role
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="intent" value="freelance" />
-                <span class="radio-custom"></span>Freelance project
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="intent" value="collab" />
-                <span class="radio-custom"></span>Collaboration
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="intent" value="other" />
-                <span class="radio-custom"></span>Just saying hi
-              </label>
-            </div>
-          </div>
-
-          <div class="form-group form-group--check">
-            <label class="checkbox-label">
-              <input type="checkbox" id="consent" name="consent" required />
-              <span class="checkbox-custom"></span>
-              I agree that Pavel may contact me at the email provided above.
-            </label>
-          </div>
-
-          <button type="submit" class="btn-primary btn-submit">
-            Send message
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <p class="form-success" id="formSuccess">✓ Message sent! I'll get back to you shortly.</p>
-        </form>
-      </div>
-    </section>
-
+    <section class="catalog" data-screen="work" hidden aria-labelledby="work-title"></section>
+    <article class="case" data-screen="case" hidden></article>
   </main>
 
-  <!-- ░░░ FOOTER ░░░ -->
-  <footer class="footer">
-    <div class="footer__inner">
-      <div class="footer__left">
-        <span class="footer__logo">PN</span>
-        <p class="footer__copy">© 2025 Pavel Nemchenko.<br />Designed with intent.</p>
-      </div>
-      <div class="footer__center">
-        <p class="footer__tagline">Making products people actually use.</p>
-      </div>
-      <nav class="footer__nav">
-        <a href="#projects">Work</a>
-        <a href="#skills">Skills</a>
-        <a href="#contact">Contact</a>
-        <a href="#">Resume ↗</a>
-      </nav>
-    </div>
-    <div class="footer__bar">
-      <span>Product Designer · UX · Systems · Strategy</span>
-      <span>Available for opportunities</span>
-    </div>
+  <footer class="site-footer">
+    <span>© <span data-year>2026</span> <span data-name>Павел Немченко</span></span>
+    <a data-email href="#" hidden></a>
+    <a data-cv href="assets/cv.pdf" download data-t="downloadCv">Скачать резюме</a>
   </footer>
 
-  <!-- Bootstrap JS (for accordion) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="script.js"></script>
+  <div class="veil" data-veil aria-hidden="true" hidden></div>
+
+  <div class="subs" data-subs aria-hidden="true"></div>
+  <p class="visually-hidden" data-subs-sr aria-live="polite"></p>
+
+  <noscript><p class="noscript">Включите JavaScript, чтобы увидеть портфолио и поговорить с головой.</p></noscript>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
