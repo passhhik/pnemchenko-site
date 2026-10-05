@@ -50,12 +50,12 @@
 
   <!-- работы из папок летят под головой: огибают её сзади, а не закрывают лицо -->
   <div class="burst" data-burst aria-hidden="true"></div>
+  <div class="eyes" data-eyes aria-hidden="true" hidden><i></i><i></i></div>
   <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
 
-  <div class="loader" data-loader role="status">
-    <span data-t="loader">Собираю лицо</span>
-    <span class="loader-pct" data-loader-pct>0%</span>
-  </div>
+  <!-- загрузка без процентов: пока 3D-голова качается, на её месте — пара глаз (место им задаёт js/app.js),
+       а когда модель готова, голова собирается по частям -->
+  <div class="loader" data-loader role="status"><span class="visually-hidden" data-t="loader">Собираю лицо</span></div>
 
   <main id="main">
     <section class="hero" data-screen="hero" aria-labelledby="hero-title">

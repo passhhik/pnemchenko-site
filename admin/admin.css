@@ -37,6 +37,7 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .bar-title{ font-size:1.2em; font-weight:400; }
 .bar-folder{ display:flex; align-items:center; gap:8px; color:var(--mute); font-size:.92em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bar-folder button{ border:0; padding:0; background:none; color:#000; text-decoration:underline; text-underline-offset:.18em; cursor:pointer; }
+.bar-folder .sep{ flex:none; width:1px; height:1.1em; background:var(--line); }
 .status{ color:var(--mute); font-size:.92em; white-space:nowrap; }
 .status.is-dirty{ color:var(--warn); }
 .langs,.seg{ display:inline-flex; padding:2px; border-radius:999px; background:var(--soft); }
@@ -176,6 +177,20 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .prev-wrap{ position:relative; flex:1; min-height:0; overflow:hidden; }
 .prev-frame{ position:absolute; border:0; background:#fff; }
 .prev-wrap.is-phone .prev-frame{ border-radius:26px; box-shadow:0 0 0 8px #000, 0 20px 40px rgba(0,0,0,.2); }
+
+/* ---------- подключение сайта ---------- */
+.dlg{ width:min(560px, calc(100vw - 32px)); max-height:calc(100vh - 32px); padding:0; border:0; border-radius:18px; background:#fff; color:#000; box-shadow:0 24px 60px rgba(0,0,0,.28); overflow:auto; }
+.dlg::backdrop{ background:rgba(0,0,0,.42); }
+.dlg-card{ padding:24px 24px 20px; }
+.dlg-card h2{ font:400 1.7em/1.05 var(--font); letter-spacing:-.01em; }
+.dlg-card p{ margin-top:10px; text-wrap:pretty; }
+.dlg-card a{ color:inherit; text-underline-offset:.18em; }
+.dlg-card code{ font:inherit; padding:0 .25em; border-radius:5px; background:var(--soft); }
+.dlg-steps{ margin:12px 0 16px; padding-left:1.3em; color:#000; font-size:.94em; }
+.dlg-steps li{ margin-bottom:5px; padding-left:.2em; text-wrap:pretty; }
+.dlg-card .f{ margin-bottom:12px; }
+.dlg-card .error{ margin-top:10px; }
+.dlg-card .row{ margin-top:18px; }
 
 .toast{ position:fixed; left:50%; bottom:22px; z-index:40; transform:translateX(-50%); display:flex; align-items:center; gap:14px; max-width:calc(100vw - 32px); padding:10px 16px; border-radius:999px; background:#000; color:#fff; box-shadow:0 10px 30px rgba(0,0,0,.25); }
 .toast button{ border:0; padding:0; background:none; color:#fff; text-decoration:underline; text-underline-offset:.18em; cursor:pointer; }

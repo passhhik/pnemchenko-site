@@ -6,6 +6,7 @@
 import * as THREE from '../vendor/three/three.module.js';
 import { GLTFLoader } from '../vendor/three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from '../vendor/three/addons/libs/meshopt_decoder.module.js';
+import { makeBrain } from './brain.js';
 
 const NH = 4;                    // одновременных «щипков» (мультитач)
 const SIG_MIN = 0.22;            // радиус щипка в покое, в единицах головы (ширина головы ≈ 1.5)
@@ -21,6 +22,15 @@ const GLASSES_HOLD = 4200;       // сколько очки висят там, �
 // Плевок: где голова «берётся» сама за себя (координаты головы) и радиус щипка — две щеки и губы
 const SPIT_AT = [[0.33, -0.52, 0.5, 0.2], [-0.33, -0.52, 0.5, 0.2], [0.005, -0.6, 0.8, 0.14]];
 const SPIT_MOUTH = [0.005, -0.6, 0.92];   // откуда вылетает плевок
+// Очки сдвинуты с носа дальше этого — значит, сняты: рисуются поверх головы целиком (не проваливаются в лицо)
+const GLASSES_ON_TOP = 0.06;
+// Сборка головы при загрузке: когда какая часть появляется, секунды от начала. Сначала глаза, потом рот изнутри
+// (дёсны с языком, зубы — и дважды клацают), очки, пирсинг, мозг со стикерами — и в конце снизу вверх «нарастает» кожа.
+const INTRO = { eyes: 0, gums: 0.5, teeth: 0.78, clack: [1.14, 1.36], glasses: 1.6, septum: 2.0, cuff: 2.22, brain: 2.5, skin: 3.4, skinDur: 1.15 };
+// Зубы в модели — с корнями; без кожи корни торчат из дёсен. Пока идёт сборка, от зубов оставляем коронки:
+// [z не глубже, y не выше, y не ниже] в координатах головы (в покое).
+const TEETH_CLIP = [0.43, -0.42, -0.7];
+const GUMS_TOP = -0.41;
 
 // Все параметры «света и кожи» в одном месте. Два пресета; сравнить можно параметром адреса:
 // http://localhost:8765/?look=cinema — прежний «киношный» вариант.
@@ -147,6 +157,7 @@ uniform float uHairShine;
 uniform vec3 uRimColor;
 uniform float uRimK;
 uniform float uPhotoCenter;
+uniform float uReveal;
 varying vec2 vFaceUv;
 varying vec3 vRest;
 varying vec3 vRestN;
@@ -216,7 +227,9 @@ const SKIN_LIGHTS = THREE.ShaderChunk.lights_physical_pars_fragment
 // Рот: чем глубже, тем темнее (свет туда почти не попадает).
 const MOUTH_FRAG = /* glsl */`
 uniform float uMouthOpen;
+uniform float uReveal;
 varying vec3 vMouthP;
+varying vec3 vMouthR;
 float mouthOcc(vec3 p) {
   float depth = smoothstep(0.34, 0.8, p.z);
   float side = 1.0 - 0.45 * smoothstep(0.1, 0.24, abs(p.x));
@@ -420,8 +433,9 @@ export class Head extends EventTarget {
       uRimColor: { value: new THREE.Color(0x3a5bff) },
       uRimK: { value: S.rim },
       uPhotoCenter: { value: S.photo ?? 1 },
+      uReveal: { value: 10 },          // до какой высоты (в координатах головы) кожа уже «наросла»; 10 — вся на месте
     };
-    this.mouthU = { uMouthOpen: { value: 0 } };
+    this.mouthU = { uMouthOpen: { value: 0 }, uReveal: this.skinU.uReveal };
     const E = LOOK.eyes;
     this.eyeU = { uScleraWhite: { value: E.white }, uEyeGlow: { value: E.glow }, uCatch: { value: E.catch }, uIris: { value: E.iris }, uLimbus: { value: E.limbus } };
     this.handles = Array.from({ length: NH }, () => ({
@@ -442,7 +456,8 @@ export class Head extends EventTarget {
     this.pop = { s: this.rm ? 1 : 0.001, v: 0 };
     this.sq = { s: 1, v: 0 };
     this.sacc = { x: 0, y: 0, next: 0 };
-    this.glasses = { node: null, home: new THREE.Vector3(), homeQ: new THREE.Quaternion(), offset: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(),
+    this.glasses = { node: null, home: new THREE.Vector3(), homeQ: new THREE.Quaternion(), homeS: new THREE.Vector3(1, 1, 1), cen: new THREE.Vector3(), pop: 1, popDone: 1,
+      offset: new THREE.Vector3(), vel: new THREE.Vector3(), target: new THREE.Vector3(),
       world: new THREE.Vector3(), grabbed: false, holdUntil: 0, off: false, announced: false, selfReturn: false };
     this.blind = 0;                   // 0 — очки на носу, 1 — мир в тумане
     this.ov = null;                   // отдельный холст для снятых очков (см. _ensureOverlay)
@@ -461,6 +476,10 @@ export class Head extends EventTarget {
     this.tiltGain = 1.6;              // >1 — живее; отрицательное значение — голова «смотрит» по наклону, а не на зрителя
     this.tilt = { on: false, has: false, n: 0, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0,
       target: new THREE.Vector3(0, 0.05, 2), announced: false };
+    // сборка при загрузке (см. INTRO): пока она идёт, голова смотрит прямо в экран и не откликается на касания
+    this.intro = { on: false, t: 0, rate: 1, parts: [], jaw: 0 };
+    this.ready = new Promise((res) => { this._ready = res; });     // голова собрана и готова разговаривать
+    this.eyeShadows = [];
     // плевок: фаза (t < 0 — покой), три «своих» щипка (щёки, губы) и пружины рывка головы
     this.spitS = { t: -1, wind: 0.46, fired: false, big: false, h: [null, null, null], p: 0, pv: 0, z: 0, zv: 0, jaw: 0, squint: 0 };
     this._tq = new THREE.Quaternion(); this._tq2 = new THREE.Quaternion(); this._te = new THREE.Euler();
@@ -474,7 +493,9 @@ export class Head extends EventTarget {
   }
 
   // ---------- загрузка ----------
-  async load(onProgress) {
+  // intro — показать сборку головы по частям; eyes — глаза на странице уже нарисованы заглушкой и «выскакивать» не должны;
+  // rate — темп сборки (1 — обычный)
+  async load(onProgress, { intro = true, eyes = false, rate = 1 } = {}) {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
     const [gltf, faceTex] = await Promise.all([
@@ -495,7 +516,7 @@ export class Head extends EventTarget {
     this.pivot.add(this.model);
     this.root = this.model.getObjectByName('HeadRoot') || this.model;
     this.glasses.node = this.model.getObjectByName('Glasses');
-    if (this.glasses.node) { this.glasses.home.copy(this.glasses.node.position); this.glasses.homeQ.copy(this.glasses.node.quaternion); }
+    if (this.glasses.node) { this.glasses.home.copy(this.glasses.node.position); this.glasses.homeQ.copy(this.glasses.node.quaternion); this.glasses.homeS.copy(this.glasses.node.scale); }
     this.eyes = ['Eye_L', 'Eye_R'].map((n) => this.model.getObjectByName(n)).filter(Boolean);
     this.lensHull = this._measureLensHulls();
 
@@ -517,7 +538,7 @@ export class Head extends EventTarget {
       o.userData.dw = o.material.depthWrite;
       if (this._isGlasses(o)) { o.layers.enable(1); this.glassMeshes.push(o); }
       else if (!/^EyeShadow/.test(base)) { o.layers.enable(2); this.bodyMeshes.push(o); }
-      if (!/^EyeShadow/.test(base)) this.pickables.push(o);
+      if (!/^EyeShadow/.test(base)) this.pickables.push(o); else this.eyeShadows.push(o);
       if (o.morphTargetDictionary) {
         for (const k of Object.keys(this.morphs)) {
           const i = o.morphTargetDictionary[k];
@@ -531,9 +552,12 @@ export class Head extends EventTarget {
     this.sil = this._measureSilhouette(this.headBox);
     this.aspect = this.sil ? this.sil.ar : this.headBox.h / this.headBox.w;
     this.frame();
-    this.renderer.compile(this.scene, this.camera);
+    const assemble = intro && !this.rm && this.mode !== 'corner';
+    if (assemble) { this.brain = makeBrain(); this.root.add(this.brain); this.scene.updateMatrixWorld(true); }
+    this.renderer.compile(this.scene, this.camera);      // шейдеры собираются сейчас, пока всё видимо, — сборка пойдёт без рывков
     this.loaded = true;
     this.clock.getDelta();
+    if (assemble) { this.intro.rate = rate; this._startIntro(eyes); } else this._ready();
     this._loop();
     // слой для снятых очков готовим заранее, в спокойный момент — чтобы не было рывка, когда их стянут с носа.
     // На слабых устройствах (мало памяти, режим экономии трафика) — только когда очки действительно взяли.
@@ -658,7 +682,7 @@ export class Head extends EventTarget {
     return this.ov;
   }
 
-  // Материал «только глубина» для головы на слое очков: дужка, зашедшая за ухо, должна остаться закрытой
+  // Материал «только глубина» для головы на слое очков: пока очки на носу, дужка за ухом должна остаться закрытой
   _depthOnly(mesh) {
     const m = new THREE.MeshBasicMaterial({ colorWrite: false });
     const u = mesh.userData.sqU, shared = this.shared;
@@ -697,11 +721,14 @@ export class Head extends EventTarget {
     key.castShadow = false;
     this.scene.environment = ov.env;
     r.clear();
-    // 1) голова — только в буфер глубины
-    cam.layers.set(2);
-    for (const o of this.bodyMeshes) { o.userData.mat = o.material; o.material = o.userData.depthOnly; }
-    r.render(this.scene, cam);
-    for (const o of this.bodyMeshes) o.material = o.userData.mat;
+    // 1) голова — только в буфер глубины: пока очки на носу, она закрывает дужки за ушами. Стоит очки стянуть —
+    //    голову на этом слое не рисуем вовсе, и очки идут поверх неё целиком: перед лицом они не проваливаются в нос и щёки.
+    if (warm || this.glasses.offset.length() <= GLASSES_ON_TOP) {
+      cam.layers.set(2);
+      for (const o of this.bodyMeshes) { o.userData.mat = o.material; o.material = o.userData.depthOnly; }
+      r.render(this.scene, cam);
+      for (const o of this.bodyMeshes) o.material = o.userData.mat;
+    }
     // 2) сами очки
     cam.layers.set(1);
     for (const o of this.glassMeshes) { const m = o.material; m.colorWrite = true; m.depthWrite = o.userData.dw; if (m.userData.metal) m.envMap = ov.metalEnv; }
@@ -731,7 +758,7 @@ export class Head extends EventTarget {
     const mn = src.name || '';
     const S = LOOK.skin;
     let m = src.clone();
-    const f = { skin: false, face: false, mouth: false, lens: null, eye: false };
+    const f = { skin: false, face: false, mouth: false, lips: false, teeth: false, lens: null, eye: false };
     if (/^(Head_Skin|Material_0_Patch)/.test(mn)) {
       f.skin = true;
       f.face = !!this.faceU && !!mesh.geometry.getAttribute('uv1');
@@ -739,9 +766,10 @@ export class Head extends EventTarget {
       m.emissive = new THREE.Color(0x000000); m.emissiveMap = null;
     } else if (/^(MouthInterior|MouthCavity|Mouth_GumsTongue)/.test(mn)) {
       f.mouth = true;
+      f.lips = !/Gums/.test(mn);          // изнанка губ и «мешок» рта — часть лица: при сборке появляются вместе с кожей
       m.color.set(0xffffff); m.roughness = 0.42; m.metalness = 0; m.envMapIntensity = 0.3;
     } else if (/^Mouth_Teeth/.test(mn)) {
-      f.mouth = true;
+      f.mouth = true; f.teeth = true;
       m.color.set(0xe2dccd); m.roughness = 0.32; m.metalness = 0; m.envMapIntensity = 0.45;
     } else if (/^Eye_[LR]/.test(mn)) {
       m.color.set(0xffffff); m.roughness = 0.1; m.metalness = 0; m.envMapIntensity = 0.9;
@@ -793,7 +821,7 @@ export class Head extends EventTarget {
       Object.assign(shader.uniforms, shared, u,
         f.skin ? this.skinU : {}, f.face ? this.faceU : {}, f.mouth ? this.mouthU : {}, lensU || {}, f.eye ? this.eyeU : {});
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\n' + SQUISH_GLSL + (f.skin ? FACE_VERT : '') + (f.mouth ? 'varying vec3 vMouthP;\n' : ''))
+        .replace('#include <common>', '#include <common>\n' + SQUISH_GLSL + (f.skin ? FACE_VERT : '') + (f.mouth ? 'varying vec3 vMouthP;\nvarying vec3 vMouthR;\n' : ''))
         .replace('#include <defaultnormal_vertex>', '')
         .replace('#include <normal_vertex>', '')
         .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>
@@ -811,7 +839,7 @@ export class Head extends EventTarget {
           }` : ''}
           {
             vec3 hp = (uObjToHead * vec4(transformed, 1.0)).xyz;
-            ${f.mouth ? 'vMouthP = hp;' : ''}
+            ${f.mouth ? 'vMouthP = hp; vMouthR = (uObjToHead * vec4(position, 1.0)).xyz;' : ''}
             mat3 J;
             vec3 dsp = squishField(hp, J);
             transformed = (uHeadToObj * vec4(hp + dsp, 1.0)).xyz;
@@ -827,7 +855,10 @@ export class Head extends EventTarget {
         fs = fs
           .replace('#include <common>', '#include <common>\n' + FACE_FRAG)
           .replace('#include <lights_physical_pars_fragment>', SKIN_LIGHTS)
-          .replace('#include <color_fragment>', `#include <color_fragment>
+          .replace('#include <color_fragment>', `
+            // сборка при загрузке: кожа «нарастает» снизу вверх, край чуть неровный
+            if (vRest.y > uReveal + 0.03 * sin(vRest.x * 9.0 + vRest.z * 6.0)) discard;
+            #include <color_fragment>
             ${f.face ? `{
               float sqM = faceMask(vRest, normalize(vRestN), vFaceUv);
               diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uFaceMap, vFaceUv).rgb, sqM);
@@ -892,6 +923,13 @@ export class Head extends EventTarget {
       if (f.mouth) {
         fs = fs
           .replace('#include <common>', '#include <common>\n' + MOUTH_FRAG)
+          .replace('#include <color_fragment>', `
+            ${f.lips ? '// сборка при загрузке: изнанка губ нарастает вместе с кожей (см. uReveal)\n            if (vMouthP.y > uReveal + 0.03 * sin(vMouthP.x * 9.0 + vMouthP.z * 6.0)) discard;' : ''}
+            ${f.teeth ? `// пока кожи нет, зубы видны «в покое» только там, где их видно в улыбке: без корней и дальних коренных
+            if (uReveal < 5.0 && (vMouthR.z < ${TEETH_CLIP[0]} || vMouthR.y > ${TEETH_CLIP[1]} || vMouthR.y < ${TEETH_CLIP[2]})) discard;` : ''}
+            ${f.mouth && !f.lips && !f.teeth ? `// у дёсен при сборке срезаем верхние «уголки» — тонкие складки, которые без щёк торчат рожками
+            if (uReveal < 5.0 && vMouthR.y > ${GUMS_TOP}) discard;` : ''}
+            #include <color_fragment>`)
           .replace('#include <opaque_fragment>', 'outgoingLight *= mouthOcc(vMouthP);\n#include <opaque_fragment>');
       }
       if (f.eye) {
@@ -936,7 +974,7 @@ export class Head extends EventTarget {
       }
       shader.fragmentShader = fs;
     };
-    const key = `squish${f.skin ? '-skin' : ''}${f.face ? '-face' : ''}${f.mouth ? '-mouth' : ''}${f.lens ? '-lens' : ''}${f.eye ? '-eye' : ''}`;
+    const key = `squish${f.skin ? '-skin' : ''}${f.face ? '-face' : ''}${f.mouth ? '-mouth' : ''}${f.lips ? '-lips' : ''}${f.teeth ? '-teeth' : ''}${f.mouth && !f.lips && !f.teeth ? '-gums' : ''}${f.lens ? '-lens' : ''}${f.eye ? '-eye' : ''}`;
     m.customProgramCacheKey = () => key;
     m.needsUpdate = true;
   }
@@ -1000,7 +1038,7 @@ export class Head extends EventTarget {
   }
 
   setLayout(l) { this.layout = l; if (this.mode !== 'corner') this.frame(); }
-  setMode(mode) { this.mode = mode; this.frame(); }
+  setMode(mode) { this.mode = mode; if (mode === 'corner' && this.intro.on) this._endIntro(); this.frame(); }
   setMouth(v) { this.mouthTarget = clamp(v, 0, 1); }
   lookAtClient(x, y) { this.lookOverride = { x, y }; }
   clearLook() { this.lookOverride = null; }
@@ -1051,6 +1089,82 @@ export class Head extends EventTarget {
     const yaw = clamp(Math.atan2(u.x, u.z) * G, -0.9, 0.9);
     const pitch = clamp(Math.atan2(u.y, Math.hypot(u.x, u.z)) * G, -0.7, 0.7);
     t.target.lerp(this._tt.set(Math.tan(yaw) * 2, 0.05 + Math.tan(pitch) * 2, 2), damp(dt, 10));
+  }
+
+  // ---------- сборка при загрузке ----------
+  // Модель уже скачана целиком, но показывается по частям (см. INTRO): каждая часть «выскакивает» из своей середины
+  // на пружинке, кожа в конце «нарастает» снизу вверх и прячет мозг. Пока идёт сборка, голова не откликается.
+  _startIntro(eyesShown) {
+    const I = this.intro, model = this.model;
+    const named = (n) => model.getObjectByName(n);
+    const cenOf = (node) => node.parent.worldToLocal(new THREE.Box3().setFromObject(node).getCenter(new THREE.Vector3()));
+    const part = (name, at, nodes, o = {}) => {
+      const list = nodes.filter(Boolean).map((node) => ({ node, pos: node.position.clone(), scale: node.scale.clone(), cen: cenOf(node) }));
+      for (const q of list) q.node.visible = false;
+      I.parts.push({ name, at, list, s: o.instant ? 1 : 0.001, v: 0, k: o.k || 260, z: o.z || 0.42, shown: false });
+    };
+    part('eyes', INTRO.eyes, [named('Eye_L')], { instant: eyesShown });
+    part('eyes', INTRO.eyes + (eyesShown ? 0 : 0.12), [named('Eye_R')], { instant: eyesShown });
+    part('gums', INTRO.gums, [named('Gums_Tongue')]);
+    part('teeth', INTRO.teeth, [named('Teeth_Upper')]);
+    part('teeth', INTRO.teeth + 0.09, [named('Teeth_Lower')]);
+    if (this.glasses.node) { this.glasses.cen.copy(cenOf(this.glasses.node)); part('glasses', INTRO.glasses, [this.glasses.node]); }
+    part('septum', INTRO.septum, [named('Piercing_Septum')], { k: 320, z: 0.3 });
+    part('cuff', INTRO.cuff, [named('Piercing_EarCuff')], { k: 320, z: 0.3 });
+    part('brain', INTRO.brain, [this.brain], { k: 150, z: 0.3 });           // мозг — желе: выскакивает и колышется дольше
+    this.skinU.uReveal.value = -10;
+    for (const o of this.eyeShadows) o.material.opacity = 0;
+    this.pop.s = 1; this.pop.v = 0;                  // голова не «выпрыгивает» целиком — она собирается
+    I.on = true; I.t = 0;
+  }
+
+  // dt — шаг для пружинок (не больше 1/30 с), real — сколько времени прошло на самом деле: расписание сборки идёт
+  // по настоящим часам, чтобы на слабом устройстве с редкими кадрами она не растягивалась
+  _updateIntro(dt, real = dt) {
+    const I = this.intro;
+    if (!I.on) return;
+    I.t += real * I.rate;
+    const h = dt / 2;
+    for (const p of I.parts) {
+      if (I.t < p.at) continue;
+      if (!p.shown) { p.shown = true; for (const q of p.list) q.node.visible = true; this._emit('introstep', { part: p.name }); }
+      if (p.s === 1 && p.v === 0) { if (p.done) continue; p.done = true; }
+      else {
+        const c = 2 * p.z * Math.sqrt(p.k);
+        for (let i = 0; i < 2; i++) { p.v += ((1 - p.s) * p.k - p.v * c) * h; p.s += p.v * h; }
+        if (Math.abs(1 - p.s) < 0.002 && Math.abs(p.v) < 0.03) { p.s = 1; p.v = 0; }
+      }
+      const s = Math.max(0.001, p.s);
+      if (p.name === 'glasses') { this.glasses.pop = s; continue; }
+      for (const q of p.list) { q.node.scale.copy(q.scale).multiplyScalar(s); q.node.position.copy(q.pos).sub(q.cen).multiplyScalar(s).add(q.cen); }
+    }
+    // кожа: край «сборки» поднимается от подбородка к макушке
+    const B = this.headBox || DEFAULT_BOX, k = smoothstep(INTRO.skin, INTRO.skin + INTRO.skinDur, I.t);
+    const y = B.cy - B.h / 2 - 0.15 + (B.h + 0.35) * k;
+    this.skinU.uReveal.value = k > 0 ? y : -10;
+    // рот приоткрыт, чтобы было видно зубы; они дважды клацают, а к приходу кожи рот закрывается
+    let bite = 0;
+    for (const c of INTRO.clack) bite = Math.max(bite, 1 - smoothstep(0.03, 0.09, Math.abs(I.t - c)));
+    I.jaw = 0.5 * smoothstep(INTRO.gums, INTRO.gums + 0.25, I.t) * (1 - smoothstep(INTRO.skin - 0.45, INTRO.skin - 0.05, I.t)) * (1 - 0.92 * bite);
+    for (const o of this.eyeShadows) o.material.opacity = LOOK.eyes.shadow * smoothstep(-0.3, 0.1, y);
+    if (k > 0 && !I.skin) { I.skin = true; this._emit('introstep', { part: 'skin' }); }
+    if (I.t >= INTRO.skin + INTRO.skinDur + 0.1) this._endIntro();
+  }
+
+  _endIntro() {
+    const I = this.intro;
+    if (!I.on) return;
+    I.on = false;
+    for (const p of I.parts) for (const q of p.list) { q.node.visible = true; q.node.scale.copy(q.scale); q.node.position.copy(q.pos); }
+    I.parts.length = 0;
+    this.glasses.pop = 1;
+    I.jaw = 0;
+    this.skinU.uReveal.value = 10;
+    for (const o of this.eyeShadows) o.material.opacity = LOOK.eyes.shadow;
+    // мозг остаётся под кожей только на словах: он больше не виден, убираем его из сцены
+    if (this.brain) { this.root.remove(this.brain); this.brain.userData.dispose(); this.brain = null; }
+    this._ready();
+    this._emit('introend', {});
   }
 
   // ---------- плевок ----------
@@ -1150,7 +1264,7 @@ export class Head extends EventTarget {
   _toHead(worldPoint, out) { return out.copy(worldPoint).applyMatrix4(this._headInv); }
 
   _down(e) {
-    if (!this.loaded || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (!this.loaded || this.intro.on || (e.pointerType === 'mouse' && e.button !== 0)) return;
     this.raycaster.setFromCamera(this._ndc(e.clientX, e.clientY), this.camera);
     const hit = this.raycaster.intersectObjects(this.pickables, false)[0];
     if (!hit) return;
@@ -1252,7 +1366,7 @@ export class Head extends EventTarget {
   }
 
   _hover(e) {
-    if (!this.loaded) return;
+    if (!this.loaded || this.intro.on) return;
     if (e.target !== this.canvas) { if (this._hovering) { this._hovering = false; this.canvas.style.cursor = ''; } return; }
     const now = performance.now();
     if (now - (this._lastHover || 0) < 70) return;
@@ -1293,10 +1407,11 @@ export class Head extends EventTarget {
   _loop() { this.renderer.setAnimationLoop(() => this._tick()); }
 
   _tick() {
-    const dt = Math.min(this.clock.getDelta(), 1 / 30);
+    const real = this.clock.getDelta(), dt = Math.min(real, 1 / 30);
     const now = performance.now();
     if (this.onTick) this.onTick(dt, now);
     this._updatePop(dt);
+    this._updateIntro(dt, Math.min(real, 0.12));
     this._updateTilt(dt);
     this._updateSpit(dt);
     this._updateLook(dt, now);
@@ -1345,6 +1460,7 @@ export class Head extends EventTarget {
   }
 
   _lookTarget(out) {
+    if (this.intro.on) return out.set(0, 0.05, this.camera.position.z);      // пока собирается — взгляд прямо в экран
     const fingerRecent = this.pointer.has && (this.drags.size > 0 || performance.now() - this.pointer.lastMove < 1200);
     if (!this.lookOverride && this.tilt.has && !fingerRecent) return out.copy(this.tilt.target);
     const src = this.lookOverride || (this.pointer.has ? this.pointer : null);
@@ -1356,7 +1472,7 @@ export class Head extends EventTarget {
 
   _updateLook(dt, now) {
     const t = this._lookTarget(this._v[2]);
-    const idle = !this.lookOverride && now - Math.max(this.pointer.lastMove, this.tilt.lastMove) > 2500;
+    const idle = !this.intro.on && !this.lookOverride && now - Math.max(this.pointer.lastMove, this.tilt.lastMove) > 2500;
     const tz = Math.max(0.8, t.z);
     let yaw = clamp(Math.atan2(t.x, tz) * 0.65, -0.52, 0.52);
     let pitch = clamp(-Math.atan2(t.y - 0.05, tz) * 0.5, -0.3, 0.28);
@@ -1423,7 +1539,7 @@ export class Head extends EventTarget {
   }
 
   _updateMouth(dt) {
-    const tgt = Math.max(this.mouthTarget, this.spitS.jaw);
+    const tgt = Math.max(this.mouthTarget, this.spitS.jaw, this.intro.jaw);
     const up = tgt > this.mouth;
     this.mouth += (tgt - this.mouth) * damp(dt, up ? 30 : 16);
     const m = clamp(this.mouth, 0, 1);
@@ -1459,6 +1575,11 @@ export class Head extends EventTarget {
       g.offset.addScaledVector(g.vel, h);
     }
     g.node.position.copy(g.home).add(g.offset);
+    if (g.pop !== g.popDone) {                       // сборка при загрузке: очки «выскакивают» из своей середины
+      g.popDone = g.pop;
+      g.node.scale.copy(g.homeS).multiplyScalar(g.pop);
+    }
+    if (g.pop !== 1) g.node.position.copy(g.home).sub(g.cen).multiplyScalar(g.pop).add(g.cen).add(g.offset);
     const dist = g.offset.length();
     // у лица очки сидят как на голове, вдали — разворачиваются «лицом» к зрителю, где бы на экране ни оказались
     const far = smoothstep(0.3, 1.1, dist);
@@ -1477,6 +1598,12 @@ export class Head extends EventTarget {
     this.blind += (tgt - this.blind) * damp(dt, tgt > this.blind ? 3.2 : 6);
     if (tgt === 0 && this.blind < 0.002) this.blind = 0;
     g.off = dist > 0.22;
+    // если отдельного слоя для очков нет (слабое устройство), снятые очки рисуются поверх головы прямо на основном холсте
+    const onTop = dist > GLASSES_ON_TOP && !(this.ov && this.ov.on);
+    if (onTop !== !!g.onTop) {
+      g.onTop = onTop;
+      for (const o of this.glassMeshes) { o.material.depthTest = !onTop; if (o.userData.ro === undefined) o.userData.ro = o.renderOrder; o.renderOrder = onTop ? 6 : o.userData.ro; }
+    }
     // стянули с носа, ещё не отпустив — голова уже возмущается
     if (g.grabbed && !g.announced && dist > 0.45) { g.announced = true; this._emit('glassesoff', {}); }
     if (!g.grabbed && !g.off && g.announced) { g.announced = false; this._emit('glasseson', {}); }

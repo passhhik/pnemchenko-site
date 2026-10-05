@@ -12,6 +12,7 @@ export const LINES = {
     folder_identity: 'Айдентика и брендинг: знаки, упаковка, фирменные системы.',
     drag_folder_1: 'Эй, я их по порядку раскладывал.',
     drag_folder_2: 'Клади куда хочешь. Это теперь и твой рабочий стол.',
+    drag_folder_far: 'Эй, не убирай её далеко — другие не увидят мои кэээйсы!',
     drag_face: 'Э! Мне так не видно.',
     cv: 'Резюме уже скачивается. Там всё то же, только без головы.',
     sound_on: 'О, звук. Теперь меня ещё и слышно.',
@@ -23,6 +24,9 @@ export const LINES = {
     filter_marketing: 'Кампании и плакаты. Тут я особенно громкий.',
     filter_identity: 'Айдентика. Где каждый пиксель — чьё-то «а давайте ещё вариант».',
     empty: 'Тут пока пусто. Даже я удивлён.',
+    idle_hey_1: 'Эй, ты тут?',
+    idle_hey_2: 'Куда делся?',
+    idle_hey_3: 'Ау! Я вообще-то работы показываю.',
     idle_1: 'Я всё ещё тут. И всё ещё без тела.',
     idle_2: 'Можно меня потянуть. Я разрешаю.',
     idle_3: 'Очки, кстати, снимаются. Но лучше не надо.',
@@ -74,6 +78,7 @@ export const LINES = {
     folder_identity: 'Identity and branding: marks, packaging, brand systems.',
     drag_folder_1: 'Hey, I had those in order.',
     drag_folder_2: 'Put it wherever. It’s your desktop now too.',
+    drag_folder_far: 'Hey, not too far — nobody will see my caaases!',
     drag_face: 'Hey! I can’t see like this.',
     cv: 'The CV is downloading. Same story, minus the head.',
     sound_on: 'Oh, sound. Now you can hear me too.',
@@ -85,6 +90,9 @@ export const LINES = {
     filter_marketing: 'Campaigns and posters. This is where I get loud.',
     filter_identity: 'Identity. Where every pixel is someone’s “let’s try one more option”.',
     empty: 'Nothing here yet. Even I’m surprised.',
+    idle_hey_1: 'Hey, you there?',
+    idle_hey_2: 'Where did you go?',
+    idle_hey_3: 'Hello? I’m showing work here.',
     idle_1: 'Still here. Still no body.',
     idle_2: 'You can pull me. I allow it.',
     idle_3: 'The glasses come off, by the way. Better not, though.',
@@ -133,6 +141,10 @@ export const REACTIONS = {
   eye: ['grab_eye_1'], glasses: ['grab_glasses_1'],
   stretch: ['stretch_big_1', 'stretch_big_2'], poke: ['poke_1', 'poke_2', 'poke_3'],
   glassesOff: ['glasses_off_1', 'glasses_off_2'],
-  dragFolder: ['drag_folder_1', 'drag_folder_2'],
-  idle: ['idle_1', 'idle_2', 'idle_4', 'idle_3'],
+  dragFolder: ['drag_folder_1', 'drag_folder_2', 'drag_folder_far'],
+  // посетитель затих: голова окликает его (и подмигивает — см. WINKS) и между делом подсказывает, что тут можно делать
+  idle: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_4', 'idle_hey_3', 'idle_3', 'idle_1'],
 };
+
+// На каких репликах голова подмигивает, глядя прямо в экран
+export const WINKS = new Set(['idle_hey_1', 'idle_hey_2', 'idle_hey_3', 'hello_back']);

@@ -1,10 +1,12 @@
-// Субтитры под головой: реплика появляется по словам, рот двигается в такт, потом текст гаснет.
+// Субтитры под головой: реплика печатается по буквам, рот двигается в такт, потом текст гаснет.
 import { VOWELS } from './voice.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SHORT = /^[А-Яа-яЁё]{1,2}$/;        // предлоги, союзы, частицы, местоимения в одну-две буквы
-// Абзац реплики. Каждое слово — отдельный <span class="w"> (они появляются по одному), предложение — <span class="s">:
+const CPS = 24;                             // скорость печати без записи голоса, букв в секунду
+// Абзац реплики. Слово — <span class="w"> (не рвётся при переносе), внутри — буквы <span class="c">: они проявляются
+// по одной, место под всю реплику занято сразу, поэтому текст не прыгает. Предложение — <span class="s">:
 // на главной строка переносится между предложениями, а не посреди фразы. \n в тексте — перенос строки.
 // Типографика: тире не уезжает в начало строки, короткое слово не остаётся в конце — они склеены с соседом.
 export function buildLine(text) {
@@ -28,7 +30,17 @@ export function buildLine(text) {
     const s = document.createElement('span');
     const space = isSpace(w);
     s.className = space ? 'ws' : 'w';
-    s.textContent = w;
+    if (space) s.textContent = w;
+    else {
+      for (const ch of w) {
+        // знак ударения и прочие «надстрочные» остаются при своей букве
+        if (/\p{M}/u.test(ch) && s.lastChild) { s.lastChild.textContent += ch; continue; }
+        const c = document.createElement('span');
+        c.className = 'c';
+        c.textContent = ch;
+        s.appendChild(c);
+      }
+    }
     if (space) (sent || p).appendChild(s);
     else {
       if (!sent) { sent = document.createElement('span'); sent.className = 's'; p.appendChild(sent); }
@@ -44,6 +56,7 @@ export class Subtitles {
   constructor({ el, srEl, voice, lines, fmt, reducedMotion }) {
     this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion;
     this.token = 0; this.last = 0; this.busyUntil = 0; this.readUntil = 0;
+    this.onLine = null;       // (id) — реплика начала звучать: страница может добавить к ней жест (подмигивание)
   }
 
   text(id) { return this.fmt(this.lines[id] ?? id); }
@@ -89,6 +102,7 @@ export class Subtitles {
 
   async _line(id, alive, more) {
     const text = this.text(id);
+    if (this.onLine) this.onLine(id);
     this.srEl.textContent = text.replace(/\n/g, ' ');
     const { p, spans } = buildLine(text);
     this.el.innerHTML = '';
@@ -97,23 +111,33 @@ export class Subtitles {
     let audio = null;
     if (this.voice.has(id)) audio = await this.voice.play(id);
     if (!alive()) return;
-    const cps = audio ? Math.max(10, text.length / Math.max(0.4, audio.duration - 0.15)) : 17;
-    this.busyUntil = performance.now() + (text.length / cps) * 1000 + 600;
+    // Расписание: когда появляется каждая буква (мс от начала реплики). На знаках препинания — пауза, как в живой речи.
+    // Печатаем по часам, а не «буква — таймер — буква»: так скорость не плывёт, когда браузер занят отрисовкой головы.
+    const step = 1000 / CPS, plan = [];
+    let total = 0;
+    for (const s of spans) {
+      if (s.className.startsWith('ws')) { total += step; continue; }
+      for (const c of s.children) {
+        const ch = c.textContent;
+        plan.push({ c, at: total, vowel: VOWELS.test(ch) });
+        total += step * (/[.!?…]/.test(ch) ? 5 : /[,:;—]/.test(ch) ? 2.5 : 1);
+      }
+    }
+    // с записью голоса текст идёт в её темпе и заканчивается вместе с ней
+    const k = audio && total > 0 ? Math.min(2.4, Math.max(0.3, (Math.max(0.4, audio.duration - 0.15) * 1000) / total)) : 1;
+    total *= k;
+    const t0 = performance.now();
+    this.busyUntil = t0 + total + 600;
     this._speaking(true);
     if (this.rm) spans.forEach((s) => s.classList.add('is-on'));
     else {
-      for (let k = 0; k < spans.length; k++) {
+      for (let i = 0; i < plan.length;) {
+        const now = performance.now() - t0;
+        let vowel = false;
+        while (i < plan.length && plan[i].at * k <= now) { plan[i].c.classList.add('is-on'); vowel = vowel || plan[i].vowel; i++; }
+        if (vowel && !audio) this.voice.vowel();
+        await sleep(i < plan.length ? Math.max(4, plan[i].at * k - (performance.now() - t0)) : Math.max(0, total - (performance.now() - t0)));
         if (!alive()) return;
-        const s = spans[k];
-        s.classList.add('is-on');
-        if (s.className.startsWith('ws')) continue;
-        const word = s.textContent;
-        for (let c = 0; c < word.length; c++) {
-          if (!audio && VOWELS.test(word[c])) this.voice.vowel();
-          const pause = /[.!?…]/.test(word[c]) ? 6 : /[,:;—]/.test(word[c]) ? 3 : 1;
-          await sleep((1000 / cps) * pause);
-          if (!alive()) return;
-        }
       }
     }
     if (audio) await audio.done;

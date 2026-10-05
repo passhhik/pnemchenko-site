@@ -5,7 +5,7 @@ import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
 import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, isStack } from './content.js';
-import { LINES, REACTIONS } from './lines.js';
+import { LINES, REACTIONS, WINKS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
 import { createCatalog } from './arc.js';
@@ -36,7 +36,7 @@ export function track(event, props = {}) {
 const els = {
   topbar: $('[data-topbar]'), logo: $('[data-logo]'), mark: $('[data-logo-mark]'), nav: $('.topnav'), lang: $('[data-lang]'),
   sound: $('[data-sound]'), allWork: $('.topnav [href="#/work"]'),
-  stage: $('#stage'), loader: $('[data-loader]'), pct: $('[data-loader-pct]'),
+  stage: $('#stage'), loader: $('[data-loader]'), eyes: $('[data-eyes]'),
   folders: $('[data-folders]'), burst: $('[data-burst]'), subs: $('[data-subs]'), veil: $('[data-veil]'),
   views: { hero: $('[data-screen="hero"]'), work: $('[data-screen="work"]'), case: $('[data-screen="case"]') },
 };
@@ -421,9 +421,10 @@ function bindFolder(el) {
     const all = session.get('folders', {});
     all[el.dataset.section] = at;
     session.set('folders', all);
-    // положили папку на лицо — голова возмущается
-    const r = head && head.rect;
+    // положили папку на лицо — голова возмущается; унесли к самому краю экрана — просит не прятать кейсы
+    const r = head && head.rect, W = window.innerWidth, H = window.innerHeight;
     if (r && x > r.x + r.w * 0.12 && x < r.x + r.w * 0.88 && y > r.y + r.h * 0.1 && y < r.y + r.h * 0.9) say('drag_face', { force: true });
+    else if (x < W * 0.1 || x > W * 0.9 || y < H * 0.12 || y > H * 0.88) say('drag_folder_far', { force: true });
     else say(REACTIONS.dragFolder, { pick: true });
     track('folder_drag', { section: el.dataset.section });
   };
@@ -517,6 +518,7 @@ function show(next, opts = {}) {
     switchT = setTimeout(() => document.body.classList.remove('is-switching'), 800);
   }
   document.body.dataset.view = next;
+  if (next !== 'hero') els.eyes.hidden = true;
   if (tiltTip && next !== 'hero') tiltTip.hidden = true;
   els.stage.classList.toggle('is-corner', next !== 'hero');
   for (const [k, el] of Object.entries(els.views)) el.hidden = k !== next;
@@ -621,6 +623,8 @@ function wireHead() {
   head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); say('glasses_self', { force: true }); });
   head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; head.wink('R'); });
   head.addEventListener('spit', (e) => onSpit(e.detail));
+  // сборка при загрузке: настоящие глаза встали на место — заглушка больше не нужна
+  head.addEventListener('introstep', (e) => { if (e.detail.part === 'eyes') els.eyes.hidden = true; });
   head.onTick = (dt) => { voice.tick(dt); };
   head.onFrame = updateVeil;
 
@@ -659,7 +663,7 @@ function wireHead() {
 }
 
 // ---------- приветствие и бездействие ----------
-let lastActivity = performance.now(), idleCount = 0;
+let lastActivity = performance.now();
 function greet() {
   if (greeted) return;
   greeted = true;
@@ -674,13 +678,40 @@ function greet() {
   }, reduced ? 0 : 500);
 }
 function activity() { lastActivity = performance.now(); }
-['pointermove', 'pointerdown', 'pointerup', 'keydown', 'scroll', 'touchstart'].forEach((ev) => window.addEventListener(ev, activity, { passive: true }));
+// движение мыши сюда попадает отфильтрованным — см. ниже, где считается бездействие для плевков
+['pointerdown', 'pointerup', 'keydown', 'scroll', 'touchstart'].forEach((ev) => window.addEventListener(ev, activity, { passive: true }));
+// Посетитель затих на главной — голова окликает его («Эй, ты тут?») и подмигивает. Тишина считается с последнего
+// действия посетителя или с конца последней реплики головы: договорила, подождала — и только потом окликает.
+// Первый раз — через несколько секунд, дальше реже и не больше трёх реплик за одно затишье: потом она молчит
+// (а если ждать совсем долго — начнёт плеваться).
+const idle = { i: 0, n: 0, mark: 0, at: 0 };      // следующая реплика; сколько сказано за это затишье; когда оно началось; когда говорила
+const spokeUntil = () => (subs ? Math.max(subs.busyUntil, subs.readUntil) : 0);      // до какого момента голова говорит (и её дочитывают)
 setInterval(() => {
-  if (view !== 'hero' || !greeted || openId || dragging || spit.state !== 'off' || idleCount >= REACTIONS.idle.length) return;
+  if (view !== 'hero' || !greeted || openId || dragging || spit.state !== 'off') return;
   if (head && head.drags.size) { activity(); return; }
-  const last = Math.max(lastActivity, head ? head.tilt.lastMove : 0);
-  if (performance.now() - last > 14000) { say(REACTIONS.idle[idleCount++], { force: true }); activity(); }
-}, 1000);
+  const now = performance.now(), last = Math.max(lastActivity, head ? head.tilt.lastMove : 0);
+  if (last > idle.mark) { idle.mark = last; idle.n = 0; }                 // посетитель шевельнулся — затишье считаем заново
+  if (idle.n >= 3 || speaking()) return;
+  // первая реплика должна успеть до плевков: при проверочных 5 секундах — через 3, на боевом сайте — через 7.
+  // Когда весь список уже прозвучал, голова окликает реже (вдвое, втрое…), чтобы не надоедать
+  const round = 1 + Math.floor(idle.i / REACTIONS.idle.length);
+  const wait = idle.n ? 13000 : Math.min(7, Math.max(2.5, SPIT_AFTER * 0.6)) * 1000 * round;
+  if (now - (idle.n ? idle.at : Math.max(last, spokeUntil())) < wait) return;
+  say(REACTIONS.idle[idle.i++ % REACTIONS.idle.length], { force: true });
+  idle.n++; idle.at = now;
+}, 500);
+// На некоторых репликах (см. WINKS в js/lines.js) голова смотрит прямо в экран и подмигивает
+let winkT = 0;
+function winkAtViewer() {
+  if (!head || reduced) return;
+  if (view === 'hero' && head.rect && !openId && spit.state === 'off') {
+    const r = head.rect;
+    head.lookAtClient(r.x + r.w / 2, r.y + r.h * 0.42);
+    clearTimeout(winkT);
+    winkT = setTimeout(() => { if (head && !openId && spit.state === 'off') head.clearLook(); }, 1700);
+  }
+  setTimeout(() => { if (head) head.wink(Math.random() < 0.5 ? 'L' : 'R'); }, 420);
+}
 
 // ---------- пасхалка: посетитель «залип» — голова заплёвывает экран ----------
 // Если долго ничего не трогать, голова начинает плевать в экран: плевки остаются на «стекле» в случайных местах,
@@ -702,13 +733,15 @@ window.addEventListener('pointermove', (e) => {
   // браузер шлёт «движение» и когда под неподвижным курсором что-то поменялось — считаем только настоящий сдвиг
   if (Math.hypot(e.clientX - spit.px, e.clientY - spit.py) < 4) return;
   spit.px = e.clientX; spit.py = e.clientY;
+  activity();
   userInput();
 }, { passive: true });
 document.addEventListener('visibilitychange', () => { spit.input = performance.now(); });      // считаем только время, когда вкладка на виду
 setInterval(() => {
   if (spit.state !== 'off' || !head || !head.loaded || !booted || reduced || document.hidden) return;
   if (head.drags.size || dragging || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
-  if (performance.now() - spit.input > SPIT_AFTER * 1000 && !speaking()) startSpit();
+  // отсчёт — с последнего действия посетителя или с конца последней реплики: голова не плюёт, едва договорив
+  if (performance.now() - Math.max(spit.input, spokeUntil()) > SPIT_AFTER * 1000 && !speaking()) startSpit();
 }, 250);
 
 async function startSpit() {
@@ -825,6 +858,7 @@ async function boot() {
     lines: { ...LINES.ru, ...(LINES[content.lang] || {}) },
     fmt: (s) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ''),
   });
+  subs.onLine = (id) => { if (WINKS.has(id)) winkAtViewer(); };
   if (debug) window.__subs = subs;
   knownSizes();
   applyContent();
@@ -847,13 +881,17 @@ async function boot() {
     if (window.parent !== window) window.parent.postMessage({ type: 'ph:ready' }, location.origin);
     return;
   }
+  // Загрузка без процентов: пока качаются 3D-движок и модель, на месте головы — пара глаз (место им задаёт layout).
+  // Когда модель готова, голова собирается по частям (head.js, INTRO) и только потом здоровается.
+  els.eyes.hidden = view !== 'hero';
   try {
     const { Head } = await import('./head.js');
     head = new Head(els.stage, { reducedMotion: reduced });
     wireHead();
     head.setMode(view === 'hero' ? 'hero' : 'corner');
     layout();
-    await head.load((p) => { els.pct.textContent = Math.round(p * 100) + '%'; });
+    // тому, кто здесь уже был, сборку показываем быстрее: он её видел
+    await head.load(null, { intro: view === 'hero', eyes: !els.eyes.hidden, rate: store.get('seen', false) ? 1.4 : 1 });
   } catch (e) {
     // нет WebGL, не скачался модуль или модель — сайт остаётся рабочим, просто без головы
     console.warn('3D-голова недоступна', e);
@@ -861,10 +899,11 @@ async function boot() {
     head = null;
   }
   layout();
-  els.loader.classList.add('is-done');
-  setTimeout(() => { els.loader.hidden = true; }, 600);
+  if (!head || !head.intro.on) els.eyes.hidden = true;
+  els.loader.hidden = true;
   preloadArtifacts();
   await voice.init();
+  if (head) await head.ready;                // голова собралась
   booted = true;
   spit.input = performance.now();      // бездействие считаем с момента, когда сайт готов, а не пока он грузился
   if (view === 'hero') greet();

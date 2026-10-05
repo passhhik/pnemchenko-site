@@ -1,6 +1,9 @@
-// Админка портфолио. Работает в браузере, без сервера: читает и сохраняет content/*.json и картинки
-// прямо в папке сайта на компьютере (Chrome, Edge). В других браузерах изменения скачиваются архивом.
+// Админка портфолио. Работает в браузере, без сервера. Содержимое (content/*.json и картинки) она умеет:
+// — публиковать на сайт: одним коммитом в репозиторий на GitHub (см. github.js), сайт пересобирается сам;
+// — читать и сохранять прямо в папке сайта на компьютере (Chrome, Edge);
+// — отдавать архивом, если нет ни того ни другого.
 import { toneOf, contrastOf } from '../js/theme.js';
+import { gh, gitSha, GhError, DEFAULT_REPO } from './github.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -33,6 +36,9 @@ const MAKE = { metric: () => ({ v: '', l: '' }), step: () => ({ title: '', text:
 
 const st = {
   site: null, projects: [], saved: '', dir: null, mtime: {},
+  src: 'server',               // откуда открыто содержимое: 'dir' — папка, 'github' — репозиторий сайта, 'server' — копия рядом с админкой
+  unpub: false,                // (папка + сайт) в папке лежит не то, что на сайте
+  busy: false, pubNote: '', pubAt: '', pubSha: '',     // публикация: идёт ли, что написать в статусе, когда и какой коммит
   pending: new Map(),          // новые файлы, ещё не записанные в папку: путь → Blob
   urls: new Map(),             // путь → адрес для показа в админке и в предпросмотре
   idx: 0, tab: 'main', lang: 'ru', device: 'desktop', view: 'case',
@@ -144,14 +150,41 @@ async function loadFromDir(dir) {
     throw new Error('В этой папке нет файлов сайта. Выберите папку, в которой лежит index.html и папка content.');
   }
   st.mtime = { site: sf.lastModified, projects: pf.lastModified };
+  st.src = 'dir'; st.unpub = false;
   init(JSON.parse(await sf.text()), JSON.parse(await pf.text()).projects || []);
   idb.set('dir', dir);
+  if (gh.on) syncCheck();
 }
 async function loadFromServer() {
   const get = (u) => fetch(u, { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error(`Не открывается ${u}`); return r.json(); });
   const [site, data] = await Promise.all([get('../content/site.json'), get('../content/projects.json')]);
-  st.dir = null;
+  st.dir = null; st.src = 'server';
   init(site, data.projects || []);
+}
+// Содержимое берётся прямо из репозитория сайта — самое свежее, даже если страницы сайта ещё пересобираются
+const SITE_JSON = 'content/site.json', PROJ_JSON = 'content/projects.json';
+async function loadFromGitHub() {
+  const snap = await gh.snapshot();
+  const a = snap.files.get(SITE_JSON), b = snap.files.get(PROJ_JSON);
+  if (!a || !b) throw new GhError(`В «${gh.name}» нет файлов ${SITE_JSON} и ${PROJ_JSON} — похоже, это не репозиторий сайта.`);
+  const [site, data] = await Promise.all([gh.readJSON(a), gh.readJSON(b)]);
+  st.dir = null; st.src = 'github'; st.unpub = false;
+  gh.base = { site: a, projects: b };
+  init(site, data.projects || []);
+}
+// Папка и сайт подключены вместе: совпадает ли содержимое в папке с тем, что сейчас на сайте
+async function syncCheck() {
+  try {
+    const bytes = async (path) => new Uint8Array(await (await fsRead(path)).arrayBuffer());
+    const [a, b, snap] = await Promise.all([bytes(SITE_JSON).then(gitSha), bytes(PROJ_JSON).then(gitSha), gh.snapshot()]);
+    const cur = { site: snap.files.get(SITE_JSON), projects: snap.files.get(PROJ_JSON) }, known = gh.base;
+    if (a === cur.site && b === cur.projects) { gh.base = cur; st.unpub = false; }
+    else {
+      st.unpub = true;
+      if (!known || known.site !== cur.site || known.projects !== cur.projects) toast('В папке и на сайте разное содержимое. Перед публикацией убедитесь, что в папке нужная версия');
+    }
+    renderBar();
+  } catch (_) { /* нет связи — разницу увидим при публикации */ }
 }
 
 // ---------- картинки ----------
@@ -204,6 +237,8 @@ function hydrate(root) {
   $$('[data-src]', root).forEach(async (el) => {
     const p = el.dataset.src;
     el.src = /^(blob:|https?:|data:)/.test(p) ? p : ((await blobUrl(p)) || `../${p}`);
+    // открыто с сайта: файла может не быть рядом с админкой (его добавили с другого компьютера) — берём из репозитория
+    if (st.src === 'github' && gh.on && isAsset(p)) el.onerror = () => { el.onerror = null; el.src = gh.rawUrl(p); };
   });
 }
 async function addFiles(files, t) {
@@ -385,21 +420,41 @@ function contrastHTML(p) {
 }
 
 // ---------- отрисовка ----------
+const onSite = () => st.src === 'github' && gh.on;         // содержимое открыто с сайта и публикуется туда же
 function renderBar() {
-  $('[data-folder]').innerHTML = st.dir
-    ? `Папка «${esc(st.dir.name)}» <button type="button" data-act="pick-dir">сменить</button>`
-    : (HAS_FS ? 'Без папки: изменения скачиваются архивом <button type="button" data-act="pick-dir">подключить папку</button>' : 'Изменения скачиваются архивом');
+  const link = (act, text) => `<button type="button" data-act="${act}">${text}</button>`;
+  const site = gh.on ? `сайт ${esc(gh.name)} ${link('gh-off', 'отключить')}` : (gh.secure ? link('gh-open', 'подключить сайт') : '');
+  let src;
+  if (st.dir) src = `Папка «${esc(st.dir.name)}» ${link('pick-dir', 'сменить')}`;
+  else if (onSite()) src = '';
+  else src = HAS_FS ? `Без папки: изменения скачиваются архивом ${link('pick-dir', 'подключить папку')}` : 'Изменения скачиваются архивом';
+  $('[data-folder]').innerHTML = [src, site && (src ? site : site.replace(/^с/, 'С'))].filter(Boolean).join('<i class="sep" aria-hidden="true"></i>');
   const langs = (st.site.languages || []).filter((l) => l === 'ru' || l === 'en');
   $('[data-langs]').innerHTML = langs.length > 1 ? langs.map((l) => `<button type="button" data-act="lang" data-lang="${l}" aria-pressed="${l === st.lang}">${l === 'ru' ? 'Русский' : 'English'}</button>`).join('') : '';
   $('[data-langs]').hidden = langs.length < 2;
-  $('[data-act="save"]').textContent = st.dir ? 'Сохранить' : 'Скачать изменения';
+  const save = $('[data-act="save"]'), pub = $('[data-act="publish"]');
+  save.textContent = st.dir ? 'Сохранить' : 'Скачать изменения';
+  save.hidden = onSite();                                  // с сайта сохраняют одной кнопкой — «Опубликовать»
+  save.className = gh.on ? 'btn btn--line' : 'btn';
+  pub.hidden = !gh.on;
+  // «Открыть сайт»: с подключённым сайтом — настоящий сайт в интернете, иначе — копия рядом с админкой
+  const live = gh.on ? gh.siteUrl : '';
+  $('[data-open-site]').href = live && new URL(live).hostname !== location.hostname ? live : '../';
   updateStatus();
 }
 function updateStatus() {
-  const d = dirty(), el = $('[data-status]');
-  el.textContent = d ? 'Есть несохранённые изменения' : (st.savedAt ? `Сохранено в ${st.savedAt}` : 'Изменений нет');
-  el.classList.toggle('is-dirty', d);
-  $('[data-act="save"]').disabled = !d;
+  const d = dirty(), el = $('[data-status]'), both = !!st.dir && gh.on;
+  let text;
+  if (st.pubNote) text = st.pubNote;
+  else if (d) text = onSite() ? 'Есть неопубликованные изменения' : 'Есть несохранённые изменения';
+  else if (both && st.unpub) text = st.savedAt ? `Сохранено в ${st.savedAt}, на сайт не отправлено` : 'На сайте другая версия';
+  else if (st.pubAt) text = st.pubAt;
+  else text = st.savedAt ? `Сохранено в ${st.savedAt}` : 'Изменений нет';
+  el.textContent = text;
+  el.classList.toggle('is-dirty', !st.pubNote && (d || (both && st.unpub)));
+  $('[data-act="save"]').disabled = !d || st.busy;
+  // с папкой кнопка публикации доступна всегда: в папке могло накопиться то, чего нет на сайте
+  $('[data-act="publish"]').disabled = st.busy || (!st.dir && !d);
 }
 function renderSide() {
   $('[data-side]').innerHTML = `
@@ -638,7 +693,8 @@ async function save() {
       const [s2, p2] = await Promise.all([fsRead('content/site.json'), fsRead('content/projects.json')]);
       st.mtime = { site: s2.lastModified, projects: p2.lastModified };
       pruneBackups().catch(() => {});
-      toast('Сохранено в папку сайта');
+      if (gh.on) st.unpub = true;
+      if (!st.busy) toast(gh.on ? 'Сохранено в папку. На сайт правки уйдут по кнопке «Опубликовать»' : 'Сохранено в папку сайта');
     } else {
       const enc = new TextEncoder();
       const files = [{ name: 'content/site.json', data: enc.encode(siteText) }, { name: 'content/projects.json', data: enc.encode(projText) }];
@@ -661,6 +717,79 @@ async function save() {
   renderSide();
   updateStatus();
 }
+// ---------- публикация на сайт ----------
+// Содержимое и новые файлы уходят одним коммитом в репозиторий сайта; GitHub Pages сам пересобирает сайт за минуту-две.
+// С папкой: сначала сохраняем в неё, потом отправляем содержимое и все картинки, на которые оно ссылается
+// (отличающиеся от лежащих на сайте). Без папки — содержимое и файлы, добавленные в этом сеансе.
+const clock = () => { const t = new Date(); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
+function pubNote(text) { st.pubNote = text; updateStatus(); }
+async function publish() {
+  if (st.busy || !gh.on || !st.site) return;
+  st.busy = true;
+  updateStatus();
+  try {
+    if (st.dir && dirty()) { await save(); if (dirty()) return; }        // не сохранилось в папку — на сайт не отправляем
+    tidy();
+    pubNote('Готовлю файлы…');
+    const enc = new TextEncoder();
+    const files = [
+      { path: SITE_JSON, bytes: enc.encode(`${JSON.stringify(st.site, null, 1)}\n`) },
+      { path: PROJ_JSON, bytes: enc.encode(`${JSON.stringify({ projects: st.projects }, null, 1)}\n`) },
+    ];
+    for (const f of files) f.sha = await gitSha(f.bytes);
+    const mine = { site: files[0].sha, projects: files[1].sha };
+    if (st.dir) {
+      for (const path of usedPaths()) {
+        try { files.push({ path, bytes: new Uint8Array(await (await fsRead(path)).arrayBuffer()) }); } catch (_) { /* файла нет в папке — значит, он уже на сайте или ссылка пустая */ }
+      }
+    } else {
+      for (const [path, blob] of st.pending) files.push({ path, blob, bytes: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    const snapWas = snapshot();
+    const res = await gh.commit(files, {
+      message: 'Админка: правки содержимого',
+      onProgress: (n, all) => pubNote(`Отправляю на сайт: ${n} из ${all}`),
+      // на сайте не та версия, от которой мы шли (правили с другого компьютера?) — без спроса не затираем
+      check: (snap) => {
+        const cur = { site: snap.files.get(SITE_JSON), projects: snap.files.get(PROJ_JSON) }, known = gh.base;
+        const same = cur.site === mine.site && cur.projects === mine.projects;
+        const moved = !known || known.site !== cur.site || known.projects !== cur.projects;
+        return same || !moved || window.confirm('На сайте сейчас не та версия содержимого, которую вы открывали или публиковали отсюда: её могли поменять с другого компьютера. Опубликовать вашу версию поверх?');
+      },
+    });
+    if (res.cancelled) { pubNote(''); return; }
+    gh.base = mine;
+    st.unpub = false;
+    if (!st.dir) {
+      // пока файлы уходили, могли добавить новые — они остаются ждать следующей публикации
+      for (const f of files) if (f.blob && st.pending.get(f.path) === f.blob) st.pending.delete(f.path);
+      st.saved = snapWas;
+    }
+    if (!res.changed.length) { pubNote(''); toast('На сайте уже эта версия — отправлять нечего'); return; }
+    st.pubSha = res.sha; st.pubAt = '';
+    pubNote('Отправлено. Сайт пересобирается…');
+    toast('Отправлено. Правки появятся на сайте через минуту-две');
+    watchDeploy(res.sha);
+  } catch (e) {
+    console.error(e);
+    pubNote('');
+    toast(e instanceof GhError ? e.message : `Не опубликовалось: ${e && e.message ? e.message : 'неизвестная ошибка'}. Нажмите «Опубликовать» ещё раз`);
+    if (e instanceof GhError && e.code === 'auth') { gh.forget(); renderBar(); }
+  } finally {
+    st.busy = false;
+    renderSide();
+    updateStatus();
+  }
+}
+// ждём, пока GitHub выложит коммит; работать в админке это не мешает
+async function watchDeploy(sha) {
+  const state = await gh.deployed(sha).catch(() => 'unknown');
+  if (st.pubSha !== sha) return;                 // за это время опубликовали что-то новее — отчитается та публикация
+  if (state === 'done') { st.pubAt = `Опубликовано в ${clock()}`; pubNote(''); toast('Опубликовано: правки уже на сайте'); }
+  else if (state === 'failed') { st.pubAt = ''; pubNote('GitHub не собрал сайт'); toast('GitHub не смог собрать сайт. Причина видна в репозитории на вкладке Actions'); }
+  else { st.pubAt = `Отправлено в ${clock()}`; pubNote(''); toast('Отправлено. Если правок на сайте ещё нет, обновите страницу через пару минут'); }
+}
+
 // в content/backup хранятся последние 12 сохранений
 async function pruneBackups() {
   const dir = await (await st.dir.getDirectoryHandle('content')).getDirectoryHandle('backup');
@@ -737,6 +866,20 @@ const ACT = {
   },
   async 'no-dir'() { try { await loadFromServer(); } catch (e) { gateError('Не получилось открыть содержимое сайта. Админку нужно открывать по адресу сайта, а не как файл с диска.'); } },
   save,
+  publish,
+  // сайт уже подключён, а мы на первом экране — открываем содержимое с сайта; иначе спрашиваем токен
+  async 'gh-open'() {
+    if (gh.on && !st.site) { try { await loadFromGitHub(); } catch (e) { ghGateError(e); } return; }
+    openGhDialog();
+  },
+  'gh-cancel'() { ghDlg.close(); },
+  'gh-off'() {
+    if (st.busy) return;
+    gh.forget();
+    st.unpub = false; st.pubNote = ''; st.pubAt = '';
+    if (st.site) renderBar(); else gateButtons();
+    toast('Сайт отключён, токен удалён из этого браузера');
+  },
   new() { st.projects.unshift(newProject()); st.tab = 'main'; openProject(0); changed('title'); const t = $('[data-path="title"]'); if (t) { t.focus(); t.select(); } },
   open(el) { openProject(Number(el.dataset.i)); },
   'open-site'() { openProject(-1); },
@@ -846,7 +989,7 @@ document.addEventListener('change', (e) => {
   if (el.dataset && el.dataset.kind === 'slug') { const p = cur(); p.slug = uniqueSlug(slugify(el.value) || slugify(txAny(p.title)) || 'project', p); el.value = p.slug; changed('slug'); }
 });
 document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (st.site) save(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (st.site) (onSite() ? publish : save)(); }
   if (e.key === 'Escape' && st.menu) { st.menu = false; renderEdit(); const b = $('[data-act="menu"]'); if (b) b.focus(); }
 });
 window.addEventListener('beforeunload', (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ''; } });
@@ -897,25 +1040,84 @@ document.addEventListener('drop', (e) => {
 });
 document.addEventListener('dragend', () => { drag = null; $$('.is-drop,.is-over').forEach((z) => z.classList.remove('is-drop', 'is-over')); });
 
+// ---------- подключение сайта ----------
+const ghDlg = $('[data-gh-dlg]'), ghForm = $('[data-gh-form]');
+function openGhDialog() {
+  $('[data-gh-error]').hidden = true;
+  $('[data-gh-fields]').hidden = !gh.secure;
+  $('[data-gh-insecure]').hidden = gh.secure;
+  $('[data-gh-submit]').hidden = !gh.secure;
+  ghForm.repo.value = gh.name || DEFAULT_REPO;
+  ghForm.token.value = '';
+  if (ghDlg.showModal) ghDlg.showModal(); else ghDlg.setAttribute('open', '');
+  if (gh.secure) ghForm.token.focus();
+}
+ghForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('[data-gh-submit]'), err = $('[data-gh-error]');
+  if (btn.disabled || !gh.secure) return;
+  btn.disabled = true; btn.textContent = 'Проверяю…'; err.hidden = true;
+  try {
+    await gh.connect(ghForm.token.value, ghForm.repo.value);
+    ghForm.token.value = '';
+    ghDlg.close();
+    await afterConnect();
+  } catch (e2) {
+    err.textContent = e2 instanceof GhError ? e2.message : 'Не получилось подключиться. Попробуйте ещё раз.';
+    err.hidden = false;
+  }
+  btn.disabled = false; btn.textContent = 'Подключить';
+});
+// Подключили сайт. Если правок ещё нет — открываем содержимое прямо с сайта; если есть (или открыта папка) —
+// остаёмся в том же сеансе, просто появляется кнопка «Опубликовать».
+async function afterConnect() {
+  const hint = 'Сайт подключён. Правки уходят на него по кнопке «Опубликовать»';
+  if (!st.site || (st.src === 'server' && !dirty())) {
+    try { await loadFromGitHub(); toast(hint); } catch (e) { ghGateError(e); }
+    return;
+  }
+  if (st.src === 'server') st.src = 'github';
+  renderBar();
+  if (st.dir) syncCheck();
+  toast(hint);
+}
+function ghGateError(e) {
+  const text = e instanceof GhError ? e.message : 'Не получилось открыть содержимое с сайта. Попробуйте ещё раз.';
+  if (e instanceof GhError && e.code === 'auth') gh.forget();
+  if (st.site) toast(text); else { gateError(text); gateButtons(); }
+}
+// первый экран: главная кнопка зависит от того, подключён ли сайт
+function gateButtons() {
+  const b = $('[data-gate-site]');
+  b.textContent = gh.on ? `Открыть с сайта ${gh.name}` : 'Подключить сайт';
+}
+
 // ---------- старт ----------
 function gateError(text) { const el = $('[data-gate-error]'); el.textContent = text; el.hidden = false; }
 async function start() {
+  gh.restore();
+  gateButtons();
   if (!HAS_FS) {
-    $('[data-gate-text]').textContent = 'Этот браузер не умеет сохранять файлы прямо в папку сайта. Откройте админку в Chrome или Edge — либо работайте здесь и скачивайте изменения архивом.';
+    $('[data-gate-text]').textContent = 'Подключите сайт — правки будут публиковаться прямо отсюда. С папкой на компьютере этот браузер работать не умеет (для этого нужен Chrome или Edge), но изменения можно скачивать архивом.';
     $('[data-need-fs]').hidden = true;
-    $('[data-act="no-dir"]').textContent = 'Продолжить здесь';
-    $('[data-act="no-dir"]').className = 'btn';
+    $('[data-act="no-dir"]').textContent = 'Работать без сайта';
+    if (gh.on) { try { await loadFromGitHub(); } catch (e) { ghGateError(e); } }
     return;
   }
   const dir = await idb.get('dir');
-  if (!dir) return;
+  if (!dir) {
+    // папки нет, а сайт подключён — сразу открываем с сайта
+    if (gh.on) { try { await loadFromGitHub(); } catch (e) { ghGateError(e); } }
+    return;
+  }
   try {
     if ((await dir.queryPermission({ mode: 'readwrite' })) === 'granted') { await loadFromDir(dir); return; }
   } catch (_) { /* папку могли удалить или переименовать */ }
   const b = $('[data-act="resume-dir"]');
   b.textContent = `Продолжить с папкой «${dir.name}»`;
   b.hidden = false;
-  $('[data-need-fs]').className = 'btn btn--line';
+  b.className = 'btn';
+  $('[data-gate-site]').className = 'btn btn--line';
   $('[data-need-fs]').textContent = 'Выбрать другую папку';
 }
 start();

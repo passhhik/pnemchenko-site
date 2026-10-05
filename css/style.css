@@ -114,10 +114,24 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 .corner-probe{ position:fixed; visibility:hidden; pointer-events:none; }   /* двойник кружка: по нему голова знает, куда лететь */
 .no-webgl .stage{ display:none; }
 .glasses-layer{ position:fixed; inset:0; z-index:55; width:100%; height:100%; pointer-events:none; }   /* снятые очки рисуются поверх размытия — резкими */
-.loader{ position:fixed; inset:0; z-index:5; display:grid; place-content:center; gap:4px; text-align:center; font-size:clamp(17px, calc(var(--u) * 1.6), 28px); line-height:1.2; pointer-events:none; transition:opacity .5s; }
-.loader-pct{ font-size:.75em; color:var(--mute); }
-.loader.is-done{ opacity:0; }
+/* сюда попадает только сообщение, если содержимое сайта не загрузилось; обычная загрузка — без текста и процентов */
+.loader{ position:fixed; inset:0; z-index:5; display:grid; place-content:center; gap:4px; padding:0 24px; text-align:center; font-size:clamp(17px, calc(var(--u) * 1.6), 28px); line-height:1.2; pointer-events:none; }
 body:not([data-view="hero"]) .loader{ display:none; }
+/* Пока 3D-голова качается, на её месте — пара глаз: посетитель сразу видит, что на него смотрят.
+   Место и размер — доли от рамки головы (--ph-*, их считает раскладка): настоящие глаза встают ровно сюда.
+   Цвета сняты с 3D-глаза, чтобы подмена была незаметной. */
+.eyes{ position:fixed; inset:0; z-index:1; pointer-events:none; --ed:calc(var(--ph-w, 30vw) * .156); }
+.eyes i{ position:absolute; left:calc(var(--ph-x, 35vw) + var(--ph-w, 30vw) * .335); top:calc(var(--ph-y, 20vh) + var(--ph-h, 40vw) * .541); width:var(--ed); height:var(--ed); margin:calc(var(--ed) / -2) 0 0 calc(var(--ed) / -2); border-radius:50%;
+  background:
+    radial-gradient(circle closest-side at 45.5% 46.5%, #fff 0 4.5%, rgba(255,255,255,0) 7%),
+    radial-gradient(circle closest-side, #2e2d2a 0 9.5%, #6e5a3c 15%, #7d7460 22%, #6f7462 30%, #3a342c 36%, #4d423b 38.5%, rgba(77,66,59,0) 40.5%),
+    radial-gradient(circle closest-side, rgba(190,174,168,0) 78%, rgba(190,174,168,.42) 97%, rgba(190,174,168,.2) 100%),
+    radial-gradient(circle at 50% 18%, #fff 0 44%, #f4eeea 57%, #e8e0da 65%, #dad3cd 70%, #c8c1bc 75%, #b6aea9 80%, #a29a96 86%);
+  animation:eye-in .5s var(--spring) both, eye-blink 3.6s 1.4s infinite; }
+.eyes i + i{ left:calc(var(--ph-x, 35vw) + var(--ph-w, 30vw) * .665); animation-delay:.12s, 1.4s; }
+@keyframes eye-in{ from{ transform:scale(0); } to{ transform:scale(1); } }
+@keyframes eye-blink{ 0%,93%,100%{ transform:scaleY(1); } 96.5%{ transform:scaleY(.06); } }
+.no-webgl .eyes,.is-preview .eyes{ display:none; }
 
 /* ---------- главный экран ---------- */
 .hero{ position:fixed; inset:0; z-index:10; pointer-events:none; }
@@ -173,8 +187,10 @@ body:not([data-view="hero"]) .loader{ display:none; }
 /* на главной строка переносится между предложениями, а не посреди фразы (пока предложение помещается целиком) */
 body[data-view="hero"] .subs-line .s{ display:inline-block; max-width:100%; }
 .subs-line.is-out{ opacity:0; }
-.w{ display:inline-block; opacity:0; transform:translateY(.16em); transition:opacity .22s var(--ease), transform .3s var(--ease); white-space:pre; }
-.w.is-on{ opacity:1; transform:none; }
+/* слово не рвётся при переносе; буквы проявляются по одной (место под всю реплику занято сразу) */
+.w{ display:inline-block; white-space:pre; }
+.subs-line .c{ opacity:0; transition:opacity .08s linear; }
+.subs-line .c.is-on,.subs-line .w.is-on .c{ opacity:1; }
 /* в каталоге и кейсе реплики стоят слева от кружка с головой, по его центру */
 body:not([data-view="hero"]) .subs{ left:auto; right:calc(var(--corner-r) + var(--corner) + clamp(12px, calc(var(--u) * 1.8), 36px)); top:auto; bottom:calc(var(--corner-b) + var(--corner) * .5); width:fit-content; max-width:min(calc(var(--u) * 30), calc(100vw - var(--corner) - var(--corner-r) - 60px)); transform:translateY(50%); text-align:left; font-size:clamp(16px, calc(var(--u) * 1.65), 32px); }
 body[data-view="case"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:0 1px 0 rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08); }
@@ -193,7 +209,11 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 /* «без очков»: всё размыто; отверстия — точно по линзам (clip-path задаёт скрипт) */
 .veil{ position:fixed; inset:0; z-index:50; pointer-events:none;
   -webkit-backdrop-filter:blur(calc(var(--blur,0) * 1px)); backdrop-filter:blur(calc(var(--blur,0) * 1px));
+  background-color:rgba(255,255,255,calc(var(--blind,0) * .05));
   box-shadow:inset 0 0 22vmin rgba(0,0,0,calc(var(--blind,0) * .045)); }
+/* мутное стекло: поверх размытия — лёгкое зерно (и чуть «молока» выше). В линзах зерна нет — там отверстия */
+.veil::after{ content:''; position:absolute; inset:0; opacity:calc(var(--blind,0) * .3);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.7 -.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0/220px 220px; }
 
 /* ---------- пасхалка: заплёванный экран (js/spit.js) ----------
    Слой лежит поверх страницы, но под субтитрами: реплики головы остаются читаемыми. Клики пропускает. */

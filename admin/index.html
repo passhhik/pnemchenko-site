@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Админка хранит токен доступа к сайту, поэтому странице разрешено ходить только к себе и к GitHub -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://raw.githubusercontent.com; media-src 'self' blob: https://raw.githubusercontent.com; font-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Админка портфолио</title>
   <link rel="icon" href="../favicon.ico" sizes="48x48">
   <link rel="stylesheet" href="admin.css">
@@ -17,8 +19,9 @@
     <div class="bar-r">
       <span class="langs" data-langs hidden></span>
       <span class="status" data-status role="status"></span>
-      <a class="btn btn--line" href="../" target="_blank" rel="noopener">Открыть сайт</a>
+      <a class="btn btn--line" href="../" target="_blank" rel="noopener" data-open-site>Открыть сайт</a>
       <button class="btn" type="button" data-act="save" disabled>Сохранить</button>
+      <button class="btn" type="button" data-act="publish" hidden>Опубликовать</button>
     </div>
   </header>
 
@@ -26,13 +29,14 @@
   <section class="gate" data-gate>
     <div class="gate-card">
       <h1>Здесь добавляются и настраиваются кейсы</h1>
-      <p data-gate-text>Подключите папку сайта на своём компьютере — админка будет читать и сохранять файлы прямо в ней. Ничего никуда не отправляется.</p>
+      <p data-gate-text>Подключите сайт — правки будут публиковаться прямо отсюда. Или работайте с папкой сайта на компьютере: админка читает и сохраняет файлы прямо в ней.</p>
       <div class="row">
-        <button class="btn" type="button" data-act="pick-dir" data-need-fs>Выбрать папку сайта</button>
-        <button class="btn" type="button" data-act="resume-dir" hidden></button>
+        <button class="btn" type="button" data-act="gh-open" data-gate-site>Подключить сайт</button>
+        <button class="btn btn--line" type="button" data-act="pick-dir" data-need-fs>Выбрать папку сайта</button>
+        <button class="btn btn--line" type="button" data-act="resume-dir" hidden></button>
         <button class="btn btn--line" type="button" data-act="no-dir">Работать без папки</button>
       </div>
-      <p class="hint" data-gate-hint>Без папки изменения скачиваются архивом: его нужно распаковать в папку сайта.</p>
+      <p class="hint" data-gate-hint>Без сайта и папки изменения скачиваются архивом: его нужно распаковать в папку сайта.</p>
       <p class="error" data-gate-error role="alert" hidden></p>
     </div>
   </section>
@@ -51,6 +55,30 @@
       <div class="prev-wrap" data-frame-wrap><iframe class="prev-frame" data-frame title="Предпросмотр сайта"></iframe></div>
     </section>
   </div>
+
+  <!-- подключение сайта: токен доступа к репозиторию на GitHub -->
+  <dialog class="dlg" data-gh-dlg aria-labelledby="gh-title">
+    <form class="dlg-card" data-gh-form novalidate>
+      <h2 id="gh-title">Подключить сайт</h2>
+      <div data-gh-fields>
+        <p>Админка будет отправлять правки в репозиторий сайта на GitHub — через минуту-две они появляются на сайте. Для этого нужен токен доступа. Он хранится только в этом браузере.</p>
+        <ol class="dlg-steps">
+          <li>Откройте на GitHub <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">создание токена</a>: Settings → Developer settings → Fine-grained tokens.</li>
+          <li>Repository access: Only select repositories — выберите репозиторий сайта.</li>
+          <li>Permissions → Repository permissions → Contents: Read and write.</li>
+          <li>Нажмите Generate token, скопируйте токен и вставьте его сюда.</li>
+        </ol>
+        <label class="f"><span>Репозиторий</span><input class="inp" type="text" name="repo" spellcheck="false" autocomplete="off" autocapitalize="off"></label>
+        <label class="f"><span>Токен</span><input class="inp" type="password" name="token" spellcheck="false" autocomplete="off" placeholder="github_pat_…"></label>
+      </div>
+      <p data-gh-insecure hidden>Сейчас админка открыта по незащищённому адресу (http), и токен по дороге могут перехватить. Подключить сайт можно по адресу с https или с этого компьютера: запустите <code>start.command</code> и откройте админку на localhost.</p>
+      <p class="error" data-gh-error role="alert" hidden></p>
+      <div class="row">
+        <button class="btn" type="submit" data-gh-submit>Подключить</button>
+        <button class="btn btn--line" type="button" data-act="gh-cancel">Отмена</button>
+      </div>
+    </form>
+  </dialog>
 
   <input type="file" data-file hidden>
   <div class="toast" data-toast role="status" hidden></div>
