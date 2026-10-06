@@ -83,7 +83,7 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     if (mobile()) {
       if (!state.flat) {
         state.flat = true;
-        for (const li of [state.title, ...state.items]) { li.style.transform = ''; li.style.filter = ''; li.style.zIndex = ''; li.style.opacity = ''; li.classList.remove('is-far'); }
+        for (const li of [state.title, ...state.items]) { li.style.transform = ''; li.style.filter = ''; li.style.zIndex = ''; li.style.opacity = ''; li.classList.remove('is-far', 'is-soft'); li._far = li._blur = li._op = li._z = undefined; }
       }
       follow();
       return;
@@ -104,14 +104,20 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
       const x = Cx - rho * Math.sin(a), y = Cy + rho * Math.cos(a);
       const s = clamp(G ** (-d), 0.45, 2.1);
       const deg = a * 180 / Math.PI;
-      li.classList.toggle('is-far', hidden || d < -1.3 || d > 2.6);      // сильно размытые и совсем дальние папки — фон, а не кнопки
-      li.style.setProperty('--fw', `${fw.toFixed(1)}px`);
+      // Кроме положения, всё остальное пишем в стили, только когда оно и правда изменилось: положение браузер двигает
+      // «бесплатно», а каждая смена размытия или прозрачности заставляет его перерисовывать папку целиком.
+      const set = (key, value, apply) => { if (li[key] !== value) { li[key] = value; apply(value); } };
+      set('_far', hidden || d < -1.3 || d > 2.6, (v) => li.classList.toggle('is-far', v));      // сильно размытые и совсем дальние папки — фон, а не кнопки
+      set('_fw', fw.toFixed(1), (v) => li.style.setProperty('--fw', `${v}px`));
       li.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) rotate(${deg.toFixed(2)}deg) scale(${s.toFixed(3)})`;
       // «глубина резкости»: то, что ближе фокуса, слегка размыто; дальние — чуть-чуть. Заголовок остаётся резким.
+      // Размытие меняется ступенями по 1,5 пикселя, а не на каждом кадре прокрутки.
       const blur = reduced || hidden || isTitle ? 0 : (d < 0 ? Math.max(0, -d - 0.55) * 3.2 : Math.max(0, d - 1.6) * 1.6);
-      li.style.filter = blur > 0.3 ? `blur(${blur.toFixed(1)}px)` : '';
-      li.style.opacity = hidden ? '0' : String(clamp(1 - Math.max(0, -d - 2.2) * 1.4, 0, 1) * clamp(1 - Math.max(0, d - 2.6) * 1.6, 0, 1));
-      li.style.zIndex = String(200 - Math.round(d * 20));
+      const bq = blur > 0.3 ? Math.max(1.5, Math.round(blur / 1.5) * 1.5) : 0;
+      set('_blur', bq, (v) => { li.style.filter = v ? `blur(${v}px)` : ''; li.classList.toggle('is-soft', v > 0); });
+      const op = hidden ? 0 : clamp(1 - Math.max(0, -d - 2.2) * 1.4, 0, 1) * clamp(1 - Math.max(0, d - 2.6) * 1.6, 0, 1);
+      set('_op', (Math.round(op * 20) / 20).toString(), (v) => { li.style.opacity = v; });
+      set('_z', String(200 - Math.round(d * 20)), (v) => { li.style.zIndex = v; });
     };
     place(state.title, -1 - p, true);
     state.items.forEach((li, i) => place(li, i - p, false));

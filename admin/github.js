@@ -1,5 +1,6 @@
-// Публикация на сайт. Сайт лежит в репозитории на GitHub и раздаётся GitHub Pages: любой коммит в основную ветку
-// через минуту-две оказывается на сайте. Админка делает такой коммит сама — через GitHub API, прямо из браузера.
+// Публикация на сайт. Сайт лежит в репозитории на GitHub; хостинг (сейчас Timeweb Cloud, раньше — GitHub Pages) сам забирает
+// оттуда каждый коммит в основную ветку и через минуту-две выкладывает его. Админка делает такой коммит сама —
+// через GitHub API, прямо из браузера.
 // Для этого нужен токен доступа (fine-grained, право Contents: Read and write на один этот репозиторий).
 // Токен хранится только в этом браузере (localStorage) и уходит только на api.github.com.
 
@@ -110,16 +111,23 @@ export const gh = {
       this.cfg.cname = cname || ''; this.cfg.host = /^[a-z0-9.-]+$/i.test(host) ? host : '';
       store.set(this.cfg);
     }
+    this.files = files;                    // путь → отпечаток: по нему админка достаёт картинку прямо из репозитория (см. blobUrl)
     return { sha: ref.object.sha, treeSha: commit.tree.sha, files };
   },
-  // Где смотреть опубликованный сайт. Свой домен открываем по http: если на нём включён https, он переадресует сам.
+  // Где смотреть опубликованный сайт: свой домен (он записан в файле CNAME) или стандартный адрес GitHub Pages
   get siteUrl() {
     const c = this.cfg;
     if (!c) return '';
-    return c.host ? `http://${c.host}/` : `https://${c.owner}.github.io/${c.repo}/`;
+    return c.host ? `https://${c.host}/` : `https://${c.owner}.github.io/${c.repo}/`;
   },
   async readJSON(sha) { return (await this.req('GET', `/git/blobs/${sha}`, null, { raw: true })).json(); },
   async readBlob(sha) { return (await this.req('GET', `/git/blobs/${sha}`, null, { raw: true })).blob(); },
+  // Картинка из репозитория — адресом для показа в админке. Годится и для закрытого репозитория (в отличие от rawUrl).
+  async blobUrl(path) {
+    const sha = this.files && this.files.get(path);
+    if (!sha) return '';
+    try { return URL.createObjectURL(await this.readBlob(sha)); } catch (_) { return ''; }
+  },
   rawUrl(path) { const c = this.cfg; return `https://raw.githubusercontent.com/${c.owner}/${c.repo}/${encodeURIComponent(c.branch)}/${path.split('/').map(encodeURIComponent).join('/')}`; },
 
   // Один коммит с файлами [{ path, bytes }]. Отправляются только те, что отличаются от лежащих на сайте.
@@ -155,6 +163,7 @@ export const gh = {
 
   // Ждёт, пока GitHub Pages выложит коммит. 'done' — правки на сайте, 'failed' — сборка упала,
   // 'unknown' — узнать не удалось (тогда сайт, скорее всего, обновится сам через пару минут).
+  // Нужна только когда админка открыта с компьютера (localhost): на самом сайте она спрашивает сайт — см. liveHas в admin.js.
   async deployed(sha, { timeout = 240000, every = 5000 } = {}) {
     const t0 = Date.now();
     let id = null, errors = 0;

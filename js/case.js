@@ -7,12 +7,18 @@ import { setTheme, themeOf, toneOf } from './theme.js';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BACK = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3 4.5 8l5 5"/></svg>';
 const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : '');
+// адрес картинки для url('…') в стилях: без кавычек и скобок, которые оборвали бы запись
+const cssUrl = (u) => encodeURI(String(u)).replace(/['()]/g, (ch) => `%${ch.charCodeAt(0).toString(16)}`);
 
 const paras = (s) => String(tx(s) || '').split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)
   .map((x) => `<p>${esc(x).replace(/\n/g, '<br>')}</p>`).join('');
 const h2 = (b) => (tx(b.title) ? `<h2>${esc(tx(b.title))}</h2>` : '');
 const cap = (b) => (tx(b.caption) ? `<figcaption>${esc(tx(b.caption))}</figcaption>` : '');
 const pic = (src, alt, extra = '') => `<img src="${esc(src)}" alt="${esc(tx(alt) || '')}" loading="lazy" decoding="async"${extra}>`;
+// Размеры картинки (их запоминает админка при загрузке): браузер заранее оставляет под неё место, и страница не прыгает,
+// когда картинка догружается при прокрутке. Нет размеров — всё работает как раньше.
+const sized = (o) => !!(o && typeof o === 'object' && o.w > 0 && o.h > 0);
+const dims = (o) => (sized(o) ? ` width="${Math.round(o.w)}" height="${Math.round(o.h)}"` : '');
 const tile = (bg) => (color(bg) ? ` style="--tile:${color(bg)}"` : '');
 const widthOf = (b, def = 'wide') => (['text', 'wide', 'full'].includes(b.width) ? b.width : def);
 const figures = (list) => (list || []).filter((m) => m && (tx(m.v) || tx(m.l)))
@@ -26,7 +32,9 @@ const BLOCKS = {
     const src = srcOf(b);
     if (!src) return '';
     const framed = !!(b.cut || color(b.bg));          // вырезанная картинка (без фона) кладётся на подложку
-    return `<figure class="blk blk-image blk--${widthOf(b)}${framed ? ' has-bg' : ''}"${tile(b.bg)}>${h2(b)}<div class="frame">${pic(src, b.alt)}</div>${cap(b)}</figure>`;
+    // вырезанная картинка стоит в подложке в свой размер, поэтому место под неё считается в стилях (см. .blk-image.has-bg img.is-sized)
+    const extra = dims(b) + (framed && sized(b) ? ` class="is-sized" style="--w:${Math.round(b.w)};--h:${Math.round(b.h)}"` : '');
+    return `<figure class="blk blk-image blk--${widthOf(b)}${framed ? ' has-bg' : ''}"${tile(b.bg)}>${h2(b)}<div class="frame">${pic(src, b.alt, extra)}</div>${cap(b)}</figure>`;
   },
 
   gallery(b) {
@@ -35,7 +43,7 @@ const BLOCKS = {
     const cols = clamp(Math.round(Number(b.columns)) || Math.min(3, items.length), 1, 4);
     const cover = (it) => (it.fit || b.fit) === 'cover';
     return `<section class="blk blk--${widthOf(b)}">${h2(b)}<div class="blk-gallery" style="--cols:${cols}">${items.map((it) =>
-      `<figure class="tile"><div class="tile-box${cover(it) ? ' is-cover' : ''}"${tile(it.bg || b.bg)}>${pic(srcOf(it), it.alt)}</div>${cap(it)}</figure>`).join('')}</div></section>`;
+      `<figure class="tile"><div class="tile-box${cover(it) ? ' is-cover' : ''}"${tile(it.bg || b.bg)}>${pic(srcOf(it), it.alt, dims(it))}</div>${cap(it)}</figure>`).join('')}</div></section>`;
   },
 
   metrics(b) {
@@ -60,7 +68,7 @@ const BLOCKS = {
     const a = srcOf(b.before), z = srcOf(b.after);
     if (!a || !z) return '';
     return `<figure class="blk blk-compare blk--${widthOf(b)}">${h2(b)}<div class="cmp" style="--at:50%">
-      ${pic(a, (b.before && b.before.alt) || t('before'))}
+      ${pic(a, (b.before && b.before.alt) || t('before'), dims(b.before))}
       <div class="cmp-after">${pic(z, (b.after && b.after.alt) || t('after'))}</div>
       <span class="cmp-tag cmp-tag--a" aria-hidden="true">${esc(t('before'))}</span><span class="cmp-tag cmp-tag--b" aria-hidden="true">${esc(t('after'))}</span>
       <input type="range" min="0" max="100" value="50" step="1" aria-label="${esc(t('compare'))}">
@@ -128,7 +136,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
       <h1 class="case-title" tabindex="-1">${esc(title)}</h1>
       ${tx(p.summary) ? `<p class="case-lead">${esc(tx(p.summary))}</p>` : ''}
       ${facts.length ? `<dl class="case-facts">${facts.map(([k, v]) => `<div><dt>${esc(t(k))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-      ${p.cover ? `<img class="case-cover" src="${esc(p.cover)}" alt="${esc(t('cover', { title }))}" decoding="async" fetchpriority="high">` : ''}
+      ${p.cover ? `<img class="case-cover" src="${esc(p.cover)}" alt="${esc(t('cover', { title }))}" decoding="async" fetchpriority="high"${p.thumb ? ` style="background-image:url('${esc(cssUrl(p.thumb))}')"` : ''}>` : ''}
     </header>
     <div class="case-sheet" data-sheet>
       <div class="case-in">

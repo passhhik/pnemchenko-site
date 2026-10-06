@@ -2,6 +2,10 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
+  <!-- Защита страницы: скрипты, стили, картинки и запросы — только со своего адреса. Чужой или вставленный в страницу
+       скрипт браузер не выполнит. 'unsafe-eval' нужен только затем, чтобы старые Safari разрешили распаковщик 3D-модели (WebAssembly). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data:; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Павел Немченко — продуктовый дизайнер</title>
   <meta name="description" content="Портфолио Павла Немченко: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.">
@@ -21,9 +25,22 @@
   <link rel="preload" href="content/site.json" as="fetch" crossorigin>
   <link rel="preload" href="content/projects.json" as="fetch" crossorigin>
   <link rel="stylesheet" href="css/style.css">
+  <!-- части интерфейса: качаются сразу и одновременно, а не по цепочке «скрипт → его зависимости» -->
+  <link rel="modulepreload" href="js/app.js">
+  <link rel="modulepreload" href="js/content.js">
+  <link rel="modulepreload" href="js/i18n.js">
+  <link rel="modulepreload" href="js/lines.js">
+  <link rel="modulepreload" href="js/folders.js">
+  <link rel="modulepreload" href="js/theme.js">
+  <link rel="modulepreload" href="js/arc.js">
+  <link rel="modulepreload" href="js/case.js">
+  <link rel="modulepreload" href="js/burst.js">
+  <link rel="modulepreload" href="js/subtitles.js">
+  <link rel="modulepreload" href="js/voice.js">
   <!-- 3D-голова подгружается после интерфейса; её модули начинаем качать заранее -->
   <link rel="modulepreload" href="vendor/three/three.module.js">
   <link rel="modulepreload" href="js/head.js">
+  <link rel="modulepreload" href="js/brain.js">
   <link rel="modulepreload" href="vendor/three/addons/loaders/GLTFLoader.js">
   <link rel="modulepreload" href="vendor/three/addons/utils/BufferGeometryUtils.js">
   <link rel="modulepreload" href="vendor/three/addons/libs/meshopt_decoder.module.js">
@@ -50,10 +67,12 @@
 
   <!-- работы из папок летят под головой: огибают её сзади, а не закрывают лицо -->
   <div class="burst" data-burst aria-hidden="true"></div>
-  <div class="eyes" data-eyes aria-hidden="true" hidden><i></i><i></i></div>
+  <div class="brainph" data-ph aria-hidden="true" hidden><i></i></div>
+  <!-- пустышка для прежней версии скрипта: браузер вернувшегося посетителя может минуту держать её в памяти -->
+  <div data-eyes aria-hidden="true" hidden></div>
   <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
 
-  <!-- загрузка без процентов: пока 3D-голова качается, на её месте — пара глаз (место им задаёт js/app.js),
+  <!-- загрузка без процентов: пока 3D-голова качается, на месте мозга — розовое пятно, потом сам мозг (место им задаёт js/app.js),
        а когда модель готова, голова собирается по частям -->
   <div class="loader" data-loader role="status"><span class="visually-hidden" data-t="loader">Собираю лицо</span></div>
 

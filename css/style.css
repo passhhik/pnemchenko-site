@@ -60,7 +60,7 @@ button{ font:inherit; color:inherit; }
 .bg-layer.is-on{ opacity:1; }
 /* размытая обложка проекта поверх его цвета. На тёмном фоне она только затемняет цвет, на светлом — только высветляет:
    так белый (или чёрный) текст интерфейса остаётся читаемым, какой бы ни была картинка */
-.bg-layer::before{ content:''; position:absolute; inset:-12%; background:var(--img, none) center/cover no-repeat; filter:blur(60px) saturate(1.3); opacity:.62; mix-blend-mode:multiply; }
+.bg-layer::before{ content:''; position:absolute; inset:0; background:var(--img, none) center/cover no-repeat; opacity:.62; mix-blend-mode:multiply; }   /* картинка уже размыта (js/theme.js) — без filter */
 .bg-layer[data-tone="light"]::before{ mix-blend-mode:screen; opacity:.5; }
 .bg-layer::after{ content:''; position:absolute; inset:0; background:radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0,0,0,.2)); }
 .bg-layer[data-tone="light"]::after{ background:radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(255,255,255,.3)); }
@@ -117,21 +117,18 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 /* сюда попадает только сообщение, если содержимое сайта не загрузилось; обычная загрузка — без текста и процентов */
 .loader{ position:fixed; inset:0; z-index:5; display:grid; place-content:center; gap:4px; padding:0 24px; text-align:center; font-size:clamp(17px, calc(var(--u) * 1.6), 28px); line-height:1.2; pointer-events:none; }
 body:not([data-view="hero"]) .loader{ display:none; }
-/* Пока 3D-голова качается, на её месте — пара глаз: посетитель сразу видит, что на него смотрят.
-   Место и размер — доли от рамки головы (--ph-*, их считает раскладка): настоящие глаза встают ровно сюда.
-   Цвета сняты с 3D-глаза, чтобы подмена была незаметной. */
-.eyes{ position:fixed; inset:0; z-index:1; pointer-events:none; --ed:calc(var(--ph-w, 30vw) * .156); }
-.eyes i{ position:absolute; left:calc(var(--ph-x, 35vw) + var(--ph-w, 30vw) * .335); top:calc(var(--ph-y, 20vh) + var(--ph-h, 40vw) * .541); width:var(--ed); height:var(--ed); margin:calc(var(--ed) / -2) 0 0 calc(var(--ed) / -2); border-radius:50%;
-  background:
-    radial-gradient(circle closest-side at 45.5% 46.5%, #fff 0 4.5%, rgba(255,255,255,0) 7%),
-    radial-gradient(circle closest-side, #2e2d2a 0 9.5%, #6e5a3c 15%, #7d7460 22%, #6f7462 30%, #3a342c 36%, #4d423b 38.5%, rgba(77,66,59,0) 40.5%),
-    radial-gradient(circle closest-side, rgba(190,174,168,0) 78%, rgba(190,174,168,.42) 97%, rgba(190,174,168,.2) 100%),
-    radial-gradient(circle at 50% 18%, #fff 0 44%, #f4eeea 57%, #e8e0da 65%, #dad3cd 70%, #c8c1bc 75%, #b6aea9 80%, #a29a96 86%);
-  animation:eye-in .5s var(--spring) both, eye-blink 3.6s 1.4s infinite; }
-.eyes i + i{ left:calc(var(--ph-x, 35vw) + var(--ph-w, 30vw) * .665); animation-delay:.12s, 1.4s; }
-@keyframes eye-in{ from{ transform:scale(0); } to{ transform:scale(1); } }
-@keyframes eye-blink{ 0%,93%,100%{ transform:scaleY(1); } 96.5%{ transform:scaleY(.06); } }
-.no-webgl .eyes,.is-preview .eyes{ display:none; }
+/* Пока качается 3D-движок, на месте мозга — розовое размытое пятно: оно «дышит», а когда движок готов, на его месте
+   проступает настоящий мозг (с него начинается сборка головы). Место и размер — доли от рамки головы (--ph-*, их считает раскладка). */
+.brainph{ position:fixed; inset:0; z-index:1; pointer-events:none; transition:opacity .3s ease; }
+.brainph.is-out{ opacity:0; }
+.brainph i{ position:absolute; left:calc(var(--ph-x, 35vw) + var(--ph-w, 30vw) * .5); top:calc(var(--ph-y, 20vh) + var(--ph-h, 40vw) * .28);
+  width:calc(var(--ph-w, 30vw) * .66); height:calc(var(--ph-w, 30vw) * .5); margin:calc(var(--ph-w, 30vw) * -.25) 0 0 calc(var(--ph-w, 30vw) * -.33);
+  border-radius:50% 50% 46% 46% / 58% 58% 42% 42%; filter:blur(calc(var(--ph-w, 30vw) * .055));
+  background:radial-gradient(ellipse at 42% 34%, #ffa6d0 0, #ff63ab 44%, #e23f8c 76%, #bf2a73 100%);
+  animation:ph-in .45s ease both, ph-breathe 1.3s ease-in-out .45s infinite alternate; }
+@keyframes ph-in{ from{ opacity:0; transform:scale(.6); } to{ opacity:.7; transform:scale(1); } }
+@keyframes ph-breathe{ from{ opacity:.7; transform:scale(1); } to{ opacity:.5; transform:scale(1.06); } }
+.no-webgl .brainph,.is-preview .brainph{ display:none; }
 
 /* ---------- главный экран ---------- */
 .hero{ position:fixed; inset:0; z-index:10; pointer-events:none; }
@@ -218,25 +215,9 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 /* ---------- пасхалка: заплёванный экран (js/spit.js) ----------
    Слой лежит поверх страницы, но под субтитрами: реплики головы остаются читаемыми. Клики пропускает. */
 .spit{ position:fixed; inset:0; z-index:58; pointer-events:none; overflow:hidden; }
-.spit-defs{ position:absolute; }
-/* сквозь слюну страница видна размытой; контур — объединение всех клякс (clip-path задаёт скрипт) */
-.spit-blur{ position:absolute; inset:0; -webkit-backdrop-filter:blur(2.6px) saturate(1.12) brightness(1.03); backdrop-filter:blur(2.6px) saturate(1.12) brightness(1.03); background-color:rgba(212,224,234,0); transition:background-color .9s; }
-.spit.is-flood .spit-blur{ -webkit-clip-path:none !important; clip-path:none !important; background-color:rgba(212,224,234,.2); }
-.spit-layer{ position:absolute; inset:0; }
-.spit-blob{ position:absolute; left:0; top:0; width:0; height:0; }
-.spit-blob svg{ position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
-.spit-in{ position:absolute; left:0; top:0; width:0; height:0; }
-.spit-drop,.spit-fly,.spit-bead{ position:absolute; left:0; top:0; border-radius:50% 46% 52% 48%; box-shadow:0 1px 2px rgba(30,50,70,.2);
-  background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.95) 0 10%, rgba(236,243,248,.55) 30%, rgba(190,206,219,.62) 78%, rgba(130,152,170,.72)); }
-.spit-fly{ will-change:transform; }
-/* подтёк: капля сползает вниз, струйка тянется за ней; сначала быстро, потом всё медленнее */
-.spit-drip{ position:absolute; width:0; height:0; }
-.spit-stream{ position:absolute; left:0; top:0; border-radius:50% 50% 0 0 / 12px 12px 0 0; transform:scaleY(.02); transform-origin:50% 0; transition:transform var(--t,4s) cubic-bezier(.16,.6,.3,1);
-  background:linear-gradient(90deg, rgba(110,135,156,.42), rgba(232,240,246,.72) 26%, rgba(255,255,255,.92) 40%, rgba(224,234,242,.62) 64%, rgba(110,135,156,.46)); }
-.spit-bead{ border-radius:48% 48% 50% 50% / 44% 44% 56% 56%; transform:translateY(0) scale(.55); transition:transform var(--t,4s) cubic-bezier(.16,.6,.3,1); }
-.spit-drip.is-on .spit-stream{ transform:none; }
-.spit-drip.is-on .spit-bead{ transform:translateY(var(--run)) scale(1); }
-/* посетитель очнулся — всё стекает вниз */
+/* один слой размытия на все кляксы: сквозь слюну страница видна чуть мутной; контур задаёт скрипт (clip-path) */
+.spit-blur{ position:absolute; inset:0; -webkit-backdrop-filter:blur(3px) saturate(1.08) brightness(1.02); backdrop-filter:blur(3px) saturate(1.08) brightness(1.02); }
+.spit-gl{ position:absolute; inset:0; width:100%; height:100%; }
 .spit.is-wiping{ transform:translateY(55%); opacity:0; transition:transform .8s cubic-bezier(.5,0,.85,.4), opacity .8s ease-in; }
 
 /* проверка на телефоне: адрес …/?diag */
@@ -254,6 +235,9 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 .catalog{ position:relative; z-index:20; }
 .arc{ position:fixed; inset:0; z-index:20; margin:0; padding:0; list-style:none; pointer-events:none; overflow:hidden; overflow:clip; }
 .arc-item{ position:absolute; left:0; top:0; will-change:transform; }
+/* папка не в фокусе и так размыта целиком — матовое стекло ей заменяет просто более плотная заливка: размытие
+   того, что под стеклом, — самая дорогая часть папки, а под общим размытием его всё равно не видно */
+.arc-item.is-soft .gf-front{ -webkit-backdrop-filter:none; backdrop-filter:none; background:linear-gradient(180deg, rgba(var(--gf-glass),.93), rgba(var(--gf-glass),.84)); }
 .arc-item .gf{ pointer-events:auto; transform:translate(-50%,-50%); }
 .arc-item.is-far .gf{ pointer-events:none; }
 .arc-title{ width:max-content; max-width:calc(var(--fw) * 1.5); margin:0; color:var(--fg); }
@@ -288,7 +272,7 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 .case-facts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:16px clamp(16px, 3vw, 40px); margin:clamp(28px, 5vh, 52px) 0 0; padding:18px 0 0; border-top:1px solid var(--line); }
 .case-facts dt{ color:var(--mute); font-size:.84em; }
 .case-facts dd{ margin:2px 0 0; }
-.case-cover{ display:block; width:100%; height:auto; aspect-ratio:4/3; max-height:min(78vh, 900px); margin:clamp(28px, 5vh, 56px) 0 0; object-fit:cover; border-radius:clamp(14px, 1.6vw, 26px); background:rgba(0,0,0,.08); box-shadow:0 30px 60px -30px rgba(0,0,0,.45); }
+.case-cover{ display:block; width:100%; height:auto; aspect-ratio:4/3; max-height:min(78vh, 900px); margin:clamp(28px, 5vh, 56px) 0 0; object-fit:cover; border-radius:clamp(14px, 1.6vw, 26px); background:rgba(0,0,0,.08) center/cover no-repeat; box-shadow:0 30px 60px -30px rgba(0,0,0,.45); }   /* пока грузится большая обложка, под ней — её малая копия (js/case.js) */
 /* белый лист с содержанием наезжает на цветную шапку */
 .case-sheet{ position:relative; background:#fff; color:#000; --fg:#000; --on-fg:#fff; --mute:#666; --line:rgba(0,0,0,.14); --pill:rgba(0,0,0,.07); border-radius:clamp(20px, 3vw, 44px) clamp(20px, 3vw, 44px) 0 0; padding:clamp(36px, 7vh, 84px) 0 0; }
 .case-in{ max-width:1280px; margin:0 auto; padding:0 var(--pad-x); }
@@ -311,6 +295,8 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 .blk-image img{ display:block; width:100%; height:auto; border-radius:clamp(10px, 1.2vw, 20px); }
 .blk-image.has-bg .frame{ display:grid; place-items:center; padding:clamp(20px, 5vw, 72px); border-radius:clamp(14px, 1.6vw, 26px); background:var(--tile,#F1F1F1); }
 .blk-image.has-bg img{ width:auto; max-width:100%; max-height:min(76vh, 760px); border-radius:0; filter:drop-shadow(0 18px 30px rgba(0,0,0,.16)); }
+/* размеры картинки известны (их запомнила админка) — место под неё занято ещё до загрузки: своя ширина, но не шире подложки и не выше предела */
+.blk-image.has-bg img.is-sized{ width:min(100%, calc(var(--w) * 1px), calc(min(76vh, 760px) * var(--w) / var(--h))); height:auto; max-height:none; aspect-ratio:var(--w) / var(--h); }
 .blk--full{ margin-left:calc(var(--pad-x) * -1); margin-right:calc(var(--pad-x) * -1); }
 .blk--full img,.blk--full .frame,.blk--full video,.blk--full .cmp{ border-radius:0 !important; }
 .blk--full h2,.blk--full figcaption{ padding:0 var(--pad-x); }

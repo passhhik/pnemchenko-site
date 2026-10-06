@@ -58,12 +58,15 @@ export function reloadDraft() {
   return !!draft;
 }
 
+// Обложка для мелкого показа (папки, «разлёт» работ, размытый фон): малая копия, которую делает админка; нет её — сама обложка
+export const thumbOf = (p) => (p && (p.thumb || p.cover)) || '';
+
 // Что выглядывает из папки проекта: то, что задано в поле peek, иначе — цельные картинки, обложка и вырезанные (в таком порядке)
 export function peekItems(p) {
   if (Array.isArray(p.peek) && p.peek.some((a) => srcOf(a))) return p.peek.filter((a) => srcOf(a)).slice(0, 3);
   const arts = (p.artifacts || []).filter((a) => srcOf(a));
   const cut = (a) => !!(a && typeof a === 'object' && a.cut);
-  return [...arts.filter((a) => !cut(a)), ...(p.cover ? [p.cover] : []), ...arts.filter(cut)].slice(0, 3);
+  return [...arts.filter((a) => !cut(a)), ...(thumbOf(p) ? [thumbOf(p)] : []), ...arts.filter(cut)].slice(0, 3);
 }
 
 export const sectionById = (id) => (content.site.sections || []).find((s) => s.id === id) || null;

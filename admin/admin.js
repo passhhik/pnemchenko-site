@@ -4,6 +4,7 @@
 // — отдавать архивом, если нет ни того ни другого.
 import { toneOf, contrastOf } from '../js/theme.js';
 import { gh, gitSha, GhError, DEFAULT_REPO } from './github.js';
+import { LINES, LINE_INFO } from '../js/lines.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -14,7 +15,7 @@ const isAsset = (s) => typeof s === 'string' && /^assets\/.+\.[a-z0-9]{2,5}$/i.t
 const fileName = (p) => String(p || '').split('/').pop();
 const fmtBytes = (n) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1e3))} КБ`);
 const SVG = (d) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-const I = { up: SVG('<path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/>'), down: SVG('<path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/>'), x: SVG('<path d="m4 4 8 8M12 4l-8 8"/>'),
+const I = { undo: SVG('<path d="M3 7h6.5a3.5 3.5 0 0 1 0 7H6"/><path d="M6 4 3 7l3 3"/>'), up: SVG('<path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/>'), down: SVG('<path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/>'), x: SVG('<path d="m4 4 8 8M12 4l-8 8"/>'),
   dup: SVG('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3 10.5V4a1.5 1.5 0 0 1 1.5-1.5H11"/>'), grip: SVG('<path d="M6 4h.01M10 4h.01M6 8h.01M10 8h.01M6 12h.01M10 12h.01" stroke-width="2.2"/>') };
 
 const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
@@ -193,10 +194,18 @@ async function prepFile(file, t) {
   const base = slugify(file.name.replace(/\.[^.]+$/, '')) || 'file';
   const ext = ((file.name.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase();
   if (t.kind === 'file' || t.kind === 'video' || ext === 'svg' || ext === 'gif') {
-    return { blob: file, name: `${base}.${ext || 'bin'}`, alpha: ext === 'svg', note: file.size > 15e6 ? `«${file.name}» весит ${fmtBytes(file.size)}: страница будет грузиться долго` : '' };
+    let size = {};
+    if (ext === 'gif') { try { const b = await createImageBitmap(file); size = { w: b.width, h: b.height }; } catch (_) { /* размеры не узнали — не страшно */ } }
+    return { blob: file, name: `${base}.${ext || 'bin'}`, alpha: ext === 'svg', ...size, note: file.size > 15e6 ? `«${file.name}» весит ${fmtBytes(file.size)}: страница будет грузиться долго` : '' };
   }
   const bmp = await createImageBitmap(file);
-  const max = Number(t.max) || 2400, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  // Мелкие картинки (работы для папок, наклейка, малая обложка) ограничены по длинной стороне. У картинок кейса важна ширина:
+  // длинный скриншот страницы не должен сжаться в узкую полоску. Высота — не больше четырёх ширин, всего — не больше 16 Мп
+  // (такую картинку ещё спокойно открывает телефон).
+  const max = Number(t.max) || 2400, big = max >= 2000;
+  const k = big
+    ? Math.min(1, max / bmp.width, (max * 4) / bmp.height, Math.sqrt(16e6 / (bmp.width * bmp.height)))
+    : Math.min(1, max / Math.max(bmp.width, bmp.height));
   const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -215,6 +224,25 @@ async function prepFile(file, t) {
   if (!blob || blob.type !== 'image/webp') { blob = await new Promise((res) => c.toBlob(res, alpha ? 'image/png' : 'image/jpeg', 0.88)); outExt = alpha ? 'png' : 'jpg'; }
   if (k === 1 && file.size <= blob.size && /^(png|jpe?g|webp|avif)$/.test(ext)) { blob = file; outExt = ext; }    // и так лёгкая — не трогаем
   return { blob, name: `${base}.${outExt}`, alpha, w, h };
+}
+// Размеры картинки хранятся рядом с её адресом: страница кейса заранее оставляет под неё место и не «прыгает» при загрузке
+function setDims(obj, path, size) {
+  const base = path.replace(/src$/, '');
+  if (base === path) return;
+  if (size && size.w > 0 && size.h > 0) { setPath(obj, `${base}w`, size.w); setPath(obj, `${base}h`, size.h); } else { delPath(obj, `${base}w`); delPath(obj, `${base}h`); }
+}
+// Малая копия картинки (для обложки): в папках, «разлёте» работ и размытом фоне большая обложка не нужна —
+// она весит в десять раз больше и тормозит главную и каталог. Большая остаётся для шапки кейса.
+const THUMB_MAX = 720;
+async function addThumb(obj, file, t, folder, out) {
+  delPath(obj, t.thumb);
+  if (!out.w || Math.max(out.w, out.h) <= THUMB_MAX * 1.25) return;       // и так небольшая (или SVG/GIF) — копия не нужна
+  let small;
+  try { small = await prepFile(file, { ...t, max: THUMB_MAX }); } catch (_) { return; }
+  const path = uniquePath(`${folder}/${small.name.replace(/(\.[^.]+)$/, '-s$1')}`);
+  st.pending.set(path, small.blob);
+  st.urls.set(path, URL.createObjectURL(small.blob));
+  setPath(obj, t.thumb, path);
 }
 function usedPaths() {
   const set = new Set(st.pending.keys());
@@ -238,7 +266,7 @@ function hydrate(root) {
     const p = el.dataset.src;
     el.src = /^(blob:|https?:|data:)/.test(p) ? p : ((await blobUrl(p)) || `../${p}`);
     // открыто с сайта: файла может не быть рядом с админкой (его добавили с другого компьютера) — берём из репозитория
-    if (st.src === 'github' && gh.on && isAsset(p)) el.onerror = () => { el.onerror = null; el.src = gh.rawUrl(p); };
+    if (st.src === 'github' && gh.on && isAsset(p)) el.onerror = () => { el.onerror = null; gh.blobUrl(p).then((u) => { el.src = u || gh.rawUrl(p); }); };
   });
 }
 async function addFiles(files, t) {
@@ -259,6 +287,8 @@ async function addFiles(files, t) {
     } else {
       setPath(obj, t.path, t.l ? setL(getPath(obj, t.path), path) : path);
       if (t.cut && out.alpha) setPath(obj, t.cut, true);
+      if (t.dims) setDims(obj, t.path, out);
+      if (t.thumb) await addThumb(obj, file, t, folder, out);
     }
     if (out.note) toast(out.note);
     n++;
@@ -301,12 +331,12 @@ function IMG(label, path, o = {}) {
   const src = o.l ? getL(v) : (v || '');
   const kind = o.kind || 'image';
   const thumb = !src ? 'нет файла' : kind === 'file' ? 'PDF' : kind === 'video' ? `<video data-src="${esc(src)}" muted preload="metadata"></video>` : `<img data-src="${esc(src)}" alt="">`;
-  const data = `data-path="${path}" data-kind="${kind}" data-max="${o.max || 2400}"${o.l ? ' data-l="1"' : ''}${o.cut ? ` data-cut="${o.cut}"` : ''}${o.fixed ? ` data-fixed="${o.fixed}"` : ''}`;
+  const data = `data-path="${path}" data-kind="${kind}" data-max="${o.max || 2400}"${o.l ? ' data-l="1"' : ''}${o.cut ? ` data-cut="${o.cut}"` : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}${o.fixed ? ` data-fixed="${o.fixed}"` : ''}`;
   return `<div class="imgf${o.small ? ' imgf--sm' : ''}" data-drop ${data}>
     <div class="imgf-thumb">${thumb}</div>
     <div class="imgf-main"><span class="lbl">${esc(label)}</span><span class="imgf-name">${esc(src ? src : (o.hint || ''))}</span>
       <div class="row"><button class="btn btn--line btn--sm" type="button" data-act="pick" ${data}>${src ? 'Заменить' : 'Выбрать файл'}</button>
-      ${src ? `<button class="btn btn--line btn--sm" type="button" data-act="clear" data-path="${path}"${o.l ? ' data-l="1"' : ''}>Убрать</button>` : ''}</div>
+      ${src ? `<button class="btn btn--line btn--sm" type="button" data-act="clear" data-path="${path}"${o.l ? ' data-l="1"' : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}>Убрать</button>` : ''}</div>
     </div></div>`;
 }
 function tools(path, i, n, what) {
@@ -348,15 +378,15 @@ const WIDTH = (P) => F('Ширина', `${P}.width`, { type: 'select', options: 
 
 const BF = {
   text: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 6, hint: 'Пустая строка — новый абзац.' }) + SAY(P),
-  image: (b, P) => IMG('Картинка', `${P}.src`, { cut: `${P}.cut` }) + F('Что на картинке', `${P}.alt`, { l: 1, hint: 'Для незрячих и поисковиков.' })
+  image: (b, P) => IMG('Картинка', `${P}.src`, { cut: `${P}.cut`, dims: 1 }) + F('Что на картинке', `${P}.alt`, { l: 1, hint: 'Для незрячих и поисковиков.' })
     + F('Подпись', `${P}.caption`, { l: 1 }) + WIDTH(P) + CHECK('Картинка без фона — положить на подложку', `${P}.cut`) + COLOR('Цвет подложки', `${P}.bg`, { optional: 1 }) + SAY(P),
   gallery: (b, P) => F('Заголовок', `${P}.title`, { l: 1 })
     + `<div class="grid2">${F('Колонок', `${P}.columns`, { type: 'select', kind: 'num', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']] })}${F('Картинка в плитке', `${P}.fit`, { type: 'select', kind: 'opt', options: [['', 'Вписать целиком'], ['cover', 'Заполнить плитку']] })}</div>`
-    + COLOR('Цвет плиток', `${P}.bg`, { optional: 1 }) + IMGLIST(`${P}.items`) + SAY(P),
+    + COLOR('Цвет плиток', `${P}.bg`, { optional: 1 }) + IMGLIST(`${P}.items`, { dims: 1 }) + SAY(P),
   metrics: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + PAIRS(`${P}.items`, 'metric') + SAY(P),
   quote: (b, P) => F('Цитата', `${P}.text`, { l: 1, type: 'area', rows: 4 }) + `<div class="grid2">${F('Кто сказал', `${P}.author`, { l: 1 })}${F('Должность, компания', `${P}.role`, { l: 1 })}</div>` + SAY(P),
   steps: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Как решал' }) + PAIRS(`${P}.items`, 'step') + SAY(P),
-  compare: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + IMG('До', `${P}.before.src`) + F('Что на картинке «до»', `${P}.before.alt`, { l: 1 })
+  compare: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + IMG('До', `${P}.before.src`, { dims: 1 }) + F('Что на картинке «до»', `${P}.before.alt`, { l: 1 })
     + IMG('После', `${P}.after.src`) + F('Что на картинке «после»', `${P}.after.alt`, { l: 1 }) + F('Подпись', `${P}.caption`, { l: 1 }) + WIDTH(P) + SAY(P),
   video: (b, P) => IMG('Видео', `${P}.src`, { kind: 'video', hint: 'MP4 или WebM. Короткая запись — до 15 МБ.' }) + IMG('Заставка до запуска', `${P}.poster`)
     + CHECK('Короткая запись: крутить по кругу без звука', `${P}.loop`) + F('Что в ролике', `${P}.alt`, { l: 1 }) + F('Подпись', `${P}.caption`, { l: 1 }) + WIDTH(P) + SAY(P),
@@ -469,7 +499,8 @@ function renderSide() {
         <span class="pitem-move"><button class="ico" type="button" data-act="up" data-i="${i}" aria-label="Поднять в списке"${i ? '' : ' disabled'}>${I.up}</button>
           <button class="ico" type="button" data-act="down" data-i="${i}" aria-label="Опустить в списке"${i < st.projects.length - 1 ? '' : ' disabled'}>${I.down}</button></span>
       </li>`).join('')}</ol>
-    <button class="side-site${st.idx < 0 ? ' is-cur' : ''}" type="button" data-act="open-site">Настройки сайта<span>Имя, контакты, резюме, разделы, языки</span></button>`;
+    <button class="side-site${st.idx < 0 && st.tab !== 'lines' ? ' is-cur' : ''}" type="button" data-act="open-site">Настройки сайта<span>Имя, контакты, резюме, разделы, языки</span></button>
+    <button class="side-site side-site--next${st.idx < 0 && st.tab === 'lines' ? ' is-cur' : ''}" type="button" data-act="open-lines">Реплики головы<span>Что и когда она говорит</span></button>`;
   hydrate($('[data-side]'));
 }
 const PANES = {
@@ -484,7 +515,7 @@ const PANES = {
   look: (p) => {
     const c = contrastHTML(p);
     return `
-    ${IMG('Обложка', 'cover', { hint: 'Главная картинка кейса, лучше 4:3. Она же — размытый фон проекта.' })}
+    ${IMG('Обложка', 'cover', { thumb: 'thumb', hint: 'Главная картинка кейса, лучше 4:3. Она же — размытый фон проекта.' })}
     ${IMG('Наклейка на папке', 'sticker', { small: 1, max: 480, hint: 'Знак или иконка проекта на прозрачном фоне: PNG или SVG.' })}
     <fieldset class="fs"><legend>Фон проекта</legend>
       <div class="grid2">${COLOR('Цвет', 'theme.color')}${F('Текст на фоне', 'theme.tone', { type: 'select', kind: 'opt', options: [['', 'Подобрать автоматически'], ['dark', 'Белый'], ['light', 'Чёрный']] })}</div>
@@ -560,10 +591,40 @@ function sitePane() {
         <small class="hint">Посетитель увидит переключатель RU / EN; язык по умолчанию выбирается по домену и языку браузера. После включения переведите тексты: вверху появится выбор языка, поля без перевода покажутся по-русски.</small></div>
     </fieldset>`;
 }
+// ---------- реплики головы ----------
+// Исходные тексты — в js/lines.js. Свои правки хранятся в настройках сайта (site.lines[язык][id]) и ложатся поверх;
+// пустая строка — «в этой ситуации промолчать». Совпало с исходным — правка не хранится вовсе.
+const lineDef = (id) => (LINES[st.lang] || {})[id] ?? '';
+const lineOwn = (id) => { const m = st.site.lines && st.site.lines[st.lang]; return m && id in m ? m[id] : undefined; };
+function lineRow(id, when) {
+  const def = lineDef(id), own = lineOwn(id), text = own ?? def;
+  return `<div class="ln${own !== undefined ? ' is-own' : ''}${text === '' ? ' is-mute' : ''}" data-line-row="${esc(id)}">
+    <div class="ln-when">${esc(when)}</div>
+    <div class="ln-text"><textarea data-line="${esc(id)}" rows="1" placeholder="Голова промолчит" aria-label="${esc(when)}">${esc(text)}</textarea>
+      <button class="ico" type="button" data-act="line-reset" data-id="${esc(id)}" title="Вернуть исходную реплику" aria-label="Вернуть исходную реплику: ${esc(when)}"${own === undefined ? ' hidden' : ''}>${I.undo}</button></div>
+  </div>`;
+}
+// поле реплики — ровно по высоте текста
+const fitLine = (t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
+function linesPane() {
+  const secs = st.site.sections || [], en = st.lang !== defLang();
+  const group = (g) => `<fieldset class="fs"><legend>${esc(g.title)}</legend>${g.note ? `<p class="hint">${esc(g.note)}</p>` : ''}
+    ${g.items.map(([id, when]) => (id.includes('*')
+    ? secs.map((sec) => lineRow(id.replace('*', sec.id), when.replace('{section}', txAny(sec.label) || sec.id))).join('')
+    : lineRow(id, when))).join('')}</fieldset>`;
+  return `<p class="hint">Слева — когда голова это говорит, справа — что. Поправьте текст и опубликуйте: на сайте реплика поменяется.
+      Пустое поле — в этой ситуации голова промолчит. Стрелка возвращает исходный текст.${en ? ' Сейчас вы правите английские реплики.' : ''}</p>
+    <p class="hint">В текст можно вставлять {name} — имя, {nameGen} — имя в родительном падеже, {role} — роль (из настроек сайта). Короткие реплики читаются лучше: до 80–90 знаков.
+      Если для реплики записан голос, после правки текста запись нужно обновить — иначе звук и субтитры разойдутся.</p>
+    ${LINE_INFO.map(group).join('')}`;
+}
+
 function renderEdit() {
   const root = $('[data-edit]');
   const keep = root.scrollTop;
-  if (st.idx < 0) {
+  if (st.idx < 0 && st.tab === 'lines') {
+    root.innerHTML = `<div class="edit-head"><h1>Реплики головы</h1></div><div class="pane pane--lines" style="margin-top:16px">${linesPane()}</div>`;
+  } else if (st.idx < 0) {
     root.innerHTML = `<div class="edit-head"><h1>Настройки сайта</h1></div><div class="pane" style="margin-top:16px">${sitePane()}</div>`;
   } else {
     const p = cur();
@@ -581,6 +642,7 @@ function renderEdit() {
       <div class="pane">${PANES[st.tab](p)}</div>
       <div class="checks" data-checks>${checksHTML(p)}</div>`;
   }
+  for (const t of $$('.ln textarea', root)) fitLine(t);
   root.scrollTop = keep;
   hydrate(root);
 }
@@ -771,9 +833,13 @@ async function publish() {
     }
     if (!res.changed.length) { pubNote(''); toast('На сайте уже эта версия — отправлять нечего'); return; }
     st.pubSha = res.sha; st.pubAt = '';
-    pubNote('Отправлено. Сайт пересобирается…');
+    pubNote('Отправлено. Сайт обновляется…');
     toast('Отправлено. Правки появятся на сайте через минуту-две');
-    watchDeploy(res.sha);
+    // по каким файлам потом узнаем, что правки дошли до сайта: содержимое, а если менялись только картинки — самая лёгкая из них
+    const sent = files.filter((f) => res.changed.includes(f.path) && f.sha);
+    const json = sent.filter((f) => f.path === SITE_JSON || f.path === PROJ_JSON);
+    const probes = (json.length ? json : sent.sort((a, b) => a.bytes.length - b.bytes.length).slice(0, 1)).map((f) => ({ path: f.path, sha: f.sha }));
+    watchDeploy(res.sha, probes);
   } catch (e) {
     console.error(e);
     pubNote('');
@@ -785,12 +851,36 @@ async function publish() {
     updateStatus();
   }
 }
-// ждём, пока GitHub выложит коммит; работать в админке это не мешает
-async function watchDeploy(sha) {
-  const state = await gh.deployed(sha).catch(() => 'unknown');
+// Дошли ли правки до сайта. Админка открыта на самом сайте — спрашиваем его: там должен лежать ровно тот файл, который мы отправили.
+// Так ответ не зависит от хостинга (сайт может раздавать не GitHub). С компьютера (localhost) сайт не спросить —
+// тогда смотрим, выложил ли коммит GitHub Pages.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isLocal = () => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+async function liveHas(probes, alive, { timeout = 300000, every = 6000 } = {}) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeout && alive()) {
+    await sleep(every);
+    try {
+      let same = true;
+      for (const f of probes) {
+        const r = await fetch(`../${f.path}?v=${Date.now()}`, { cache: 'no-store' });
+        if (!r.ok || (await gitSha(new Uint8Array(await r.arrayBuffer()))) !== f.sha) { same = false; break; }
+      }
+      if (same) return true;
+    } catch (_) { /* сайт на секунду пропал (хостинг переключает версию) — спросим ещё раз */ }
+  }
+  return false;
+}
+// ждём, пока правки появятся на сайте; работать в админке это не мешает
+async function watchDeploy(sha, probes = []) {
+  const live = !isLocal() && probes.length > 0;
+  const state = live
+    ? ((await liveHas(probes, () => st.pubSha === sha)) ? 'done' : 'late')
+    : await gh.deployed(sha).catch(() => 'unknown');
   if (st.pubSha !== sha) return;                 // за это время опубликовали что-то новее — отчитается та публикация
   if (state === 'done') { st.pubAt = `Опубликовано в ${clock()}`; pubNote(''); toast('Опубликовано: правки уже на сайте'); }
   else if (state === 'failed') { st.pubAt = ''; pubNote('GitHub не собрал сайт'); toast('GitHub не смог собрать сайт. Причина видна в репозитории на вкладке Actions'); }
+  else if (state === 'late') { st.pubAt = `Отправлено в ${clock()}`; pubNote(''); toast('Отправлено, но сайт пока отдаёт прежнюю версию. Хостинг обновляет его сам: загляните через несколько минут. Не обновился — проверьте деплой в панели хостинга'); }
   else { st.pubAt = `Отправлено в ${clock()}`; pubNote(''); toast('Отправлено. Если правок на сайте ещё нет, обновите страницу через пару минут'); }
 }
 
@@ -829,7 +919,7 @@ function newProject() {
   return p;
 }
 function move(arr, from, to) { if (to < 0 || to >= arr.length || from === to) return false; arr.splice(to, 0, arr.splice(from, 1)[0]); return true; }
-function openProject(i) { st.idx = i; st.open.clear(); st.menu = false; if (i < 0) st.tab = 'main'; renderSide(); renderEdit(); renderViews(); sendPreview(false); }
+function openProject(i) { st.idx = i; st.open.clear(); st.menu = false; if (i < 0 || !PANES[st.tab]) st.tab = 'main'; renderSide(); renderEdit(); renderViews(); sendPreview(false); }
 let toastT = 0;
 function toast(text, undo) {
   const el = $('[data-toast]');
@@ -841,7 +931,7 @@ function toast(text, undo) {
 }
 
 let pick = null;
-const targetOf = (el) => ({ path: el.dataset.path, kind: el.dataset.kind || 'image', max: el.dataset.max, cut: el.dataset.cut, dims: el.dataset.dims, fixed: el.dataset.fixed, l: !!el.dataset.l });
+const targetOf = (el) => ({ path: el.dataset.path, kind: el.dataset.kind || 'image', max: el.dataset.max, cut: el.dataset.cut, dims: el.dataset.dims, thumb: el.dataset.thumb, fixed: el.dataset.fixed, l: !!el.dataset.l });
 function openPicker(t) {
   pick = t;
   const inp = $('[data-file]');
@@ -887,6 +977,16 @@ const ACT = {
   new() { st.projects.unshift(newProject()); st.tab = 'main'; openProject(0); changed('title'); const t = $('[data-path="title"]'); if (t) { t.focus(); t.select(); } },
   open(el) { openProject(Number(el.dataset.i)); },
   'open-site'() { openProject(-1); },
+  'open-lines'() { st.idx = -1; st.tab = 'lines'; st.open.clear(); st.menu = false; renderSide(); renderEdit(); renderViews(); sendPreview(false); $('[data-edit]').scrollTop = 0; },
+  'line-reset'(el) {
+    const id = el.dataset.id, L = st.site.lines, m = L && L[st.lang];
+    if (!m || !(id in m)) return;
+    delete m[id];
+    if (!Object.keys(m).length) delete L[st.lang];
+    if (!Object.keys(L).length) delete st.site.lines;
+    renderEdit(); changed('lines');
+    const t = $(`[data-line="${CSS.escape(id)}"]`); if (t) t.focus();
+  },
   up(el) { const i = Number(el.dataset.i); if (move(st.projects, i, i - 1)) { if (st.idx === i) st.idx = i - 1; else if (st.idx === i - 1) st.idx = i; renderSide(); changed(); } },
   down(el) { const i = Number(el.dataset.i); if (move(st.projects, i, i + 1)) { if (st.idx === i) st.idx = i + 1; else if (st.idx === i + 1) st.idx = i; renderSide(); changed(); } },
   dup() {
@@ -913,6 +1013,8 @@ const ACT = {
   clear(el) {
     const o = cur(), path = el.dataset.path;
     if (el.dataset.l) setPath(o, path, setL(getPath(o, path), '')); else if (/\.(bg|folder)$|^folder$/.test(path)) delPath(o, path); else setPath(o, path, '');
+    if (el.dataset.dims) setDims(o, path, null);
+    if (el.dataset.thumb) delPath(o, el.dataset.thumb);
     renderEdit(); changed(path);
   },
   menu() { st.menu = !st.menu; renderEdit(); if (st.menu) { const b = $('.add-menu button'); if (b) b.focus(); } },
@@ -959,6 +1061,20 @@ document.addEventListener('input', (e) => {
     st.site.languages = el.checked ? ['ru', 'en'] : ['ru'];
     if (!el.checked) st.lang = defLang();
     renderBar(); changed('languages');
+    return;
+  }
+  if (el.dataset.line) {
+    // реплика головы: совпала с исходной — правку не храним; пустая — «промолчать»
+    const id = el.dataset.line, def = lineDef(id);
+    const L = st.site.lines = st.site.lines || {}, m = L[st.lang] = L[st.lang] || {};
+    if (el.value === def) delete m[id]; else m[id] = el.value;
+    if (!Object.keys(m).length) delete L[st.lang];
+    if (!Object.keys(L).length) delete st.site.lines;
+    const row = el.closest('.ln'), own = lineOwn(id) !== undefined;
+    row.classList.toggle('is-own', own); row.classList.toggle('is-mute', el.value === '');
+    row.querySelector('[data-act="line-reset"]').hidden = !own;
+    fitLine(el);
+    changed('lines');
     return;
   }
   const path = el.dataset.path;

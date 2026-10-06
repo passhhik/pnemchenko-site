@@ -77,6 +77,21 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .side-site{ display:block; margin-top:10px; padding:10px 12px; border:0; border-top:1px solid var(--line); border-radius:0 0 var(--r) var(--r); background:none; text-align:left; cursor:pointer; }
 .side-site.is-cur{ background:var(--soft); border-radius:var(--r); border-top-color:transparent; }
 .side-site span{ display:block; color:var(--mute); font-size:.84em; }
+.side-site--next{ margin-top:0; }
+/* реплики головы: слева — когда звучит, справа — текст; своя правка помечена чертой слева, «промолчать» — серым */
+.ln{ display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:6px 14px; align-items:start; padding:8px 0 8px 10px; margin-left:-10px; border-left:3px solid transparent; }
+.ln + .ln{ border-top:1px solid var(--line); }
+.ln.is-own{ border-left-color:#000; }
+.ln-when{ padding-top:9px; line-height:1.25; }
+.ln-text{ display:flex; gap:4px; align-items:flex-start; min-width:0; }
+.ln textarea{ flex:1; min-width:0; display:block; min-height:40px; padding:8px 11px; border:1px solid var(--line); border-radius:10px; background:#fff; line-height:1.3; resize:none; overflow:hidden; }
+.ln textarea:hover{ border-color:#9A9AA0; }
+.ln textarea:focus-visible{ outline:2px solid #000; outline-offset:0; border-color:#000; }
+.ln.is-mute textarea{ background:var(--soft); }
+.ln .ico{ flex:none; margin-top:5px; }
+.ln .ico[hidden]{ display:inline-grid; visibility:hidden; }
+.pane--lines .fs{ padding-bottom:6px; }
+@media (max-width:720px){ .ln{ grid-template-columns:1fr; } .ln-when{ padding-top:0; color:var(--mute); font-size:.9em; } }
 
 .edit{ padding:18px 18px 80px; }
 .edit-head h1{ font:400 1.7em/1.05 var(--font); letter-spacing:-.01em; text-wrap:balance; }

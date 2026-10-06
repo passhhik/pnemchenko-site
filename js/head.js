@@ -15,7 +15,11 @@ const R_MAX = 1.25;              // резиновый предел: чем да
 const PIVOT = new THREE.Vector3(0, -0.62, -0.05);   // шея — точка поворота головы
 const FIT_H = 2.1, FIT_W = 1.62;
 const CORNER_FIT = 0.86;         // какую долю кружка в углу занимает голова (по макету)
-const DEFAULT_BOX = { cx: 0, cy: 0.0, w: 1.5, h: 1.95 };   // габариты головы до загрузки модели (уточняются по модели)
+// Габариты и силуэт головы, пока модель не загрузилась: по ним камера сразу встаёт верно, и мозг (он появляется первым,
+// ещё до модели) не «прыгает», когда модель приходит. Числа сняты с assets/head.glb; после загрузки они уточняются
+// по самой модели — если модель заметно изменят, обновите их (см. _measureHead и _measureSilhouette).
+const DEFAULT_BOX = { cx: 0, cy: -0.131, w: 1.603, h: 2.248 };
+const DEFAULT_SIL = { xr: 0.7348, zr: -0.0741, xl: -0.731, zl: -0.0185, yt: 0.904, zt: 0.3049, yb: -0.9276, zb: 0.5203, w: 1.4658, zx: -0.0463, ar: 1.3281 };
 const EYE_FAR = 9;               // глаза сводятся на далёкой точке по линии взгляда — без косоглазия
 const EYE_YAW = 0.3, EYE_UP = 0.1, EYE_DOWN = 0.2;   // пределы поворота глаз, рад (≈17° / 6° / 11°)
 // Эффект присутствия на телефоне (датчик наклона). Телефон — коробка с головой внутри, зритель стоит на месте.
@@ -35,9 +39,12 @@ const SPIT_AT = [[0.33, -0.52, 0.5, 0.2], [-0.33, -0.52, 0.5, 0.2], [0.005, -0.6
 const SPIT_MOUTH = [0.005, -0.6, 0.92];   // откуда вылетает плевок
 // Очки сдвинуты с носа дальше этого — значит, сняты: рисуются поверх головы целиком (не проваливаются в лицо)
 const GLASSES_ON_TOP = 0.06;
-// Сборка головы при загрузке: когда какая часть появляется, секунды от начала. Сначала глаза, потом рот изнутри
-// (дёсны с языком, зубы — и дважды клацают), очки, пирсинг, мозг со стикерами — и в конце снизу вверх «нарастает» кожа.
-const INTRO = { eyes: 0, gums: 0.5, teeth: 0.78, clack: [1.14, 1.36], glasses: 1.6, septum: 2.0, cuff: 2.22, brain: 2.5, skin: 3.4, skinDur: 1.15 };
+// Сборка головы при загрузке. Первым появляется мозг со стикерами — сразу, пока ещё качается модель: он и есть «загрузка».
+// Когда модель готова (и мозг повисел хотя бы brainMin секунд), по расписанию выскакивают остальные части — секунды
+// от этого момента: глаза, рот изнутри (дёсны с языком, верхние зубы, нижние — и один раз клацают), очки (надеваются
+// спереди), пирсинг — и в конце снизу вверх «нарастает» кожа и закрывает мозг.
+const INTRO = { brainMin: 0.5, eyes: 0, gums: 0.34, teeth: 0.52, clack: [0.96], glasses: 1.08, septum: 1.36, cuff: 1.48, skin: 1.62, skinDur: 0.95 };
+const INTRO_ZOOM = 0.94;         // голова собирается чуть «издалека» и к концу сборки подплывает на своё место
 // Зубы в модели — с корнями; без кожи корни торчат из дёсен. Пока идёт сборка, от зубов оставляем коронки:
 // [z не глубже, y не выше, y не ниже] в координатах головы (в покое).
 const TEETH_CLIP = [0.43, -0.42, -0.7];
@@ -384,7 +391,11 @@ export class Head extends EventTarget {
     this.loaded = false;
 
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    // Плотность пикселей холста подстраивается под устройство (см. _adapt): начинаем с лучшей, а если кадры не успевают —
+    // снижаем, пока не станет плавно. ratio — текущая, max/min — границы, ema — средняя длительность кадра, мс.
+    const dpr = window.devicePixelRatio || 1;
+    this.q = { ratio: Math.min(dpr, 1.75), max: Math.min(dpr, 1.75), min: Math.min(dpr, 1), ema: 16, n: 0, hold: 0, upAt: 0, trial: null, upFrom: 0, pinned: false, calm: false, fps: 0, fpsN: 0, fpsT: 0 };
+    r.setPixelRatio(this.q.ratio);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = LOOK.toneMapping;
     r.toneMappingExposure = LOOK.exposure;
@@ -473,7 +484,7 @@ export class Head extends EventTarget {
     this.blind = 0;                   // 0 — очки на носу, 1 — мир в тумане
     this.ov = null;                   // отдельный холст для снятых очков (см. _ensureOverlay)
     this.glassMeshes = []; this.bodyMeshes = []; this.lensHull = [];
-    this.layout = null; this.rect = null; this.headBox = null; this.sil = null; this.aspect = 0;
+    this.layout = null; this.rect = null; this.headBox = null; this.sil = null; this.aspect = DEFAULT_SIL.ar;
     this.clock = new THREE.Clock();
     this._v = Array.from({ length: 8 }, () => new THREE.Vector3());
     this._n2 = new THREE.Vector2();
@@ -489,11 +500,13 @@ export class Head extends EventTarget {
       prev: new THREE.Quaternion(), slow: new THREE.Quaternion(), speed: 0, still: 0, w: 0, ty: 0, tp: 0, lean: 0,
       fy: 0, fvy: 0, fp: 0, fvp: 0, fr: 0, fvr: 0, yaw: 0, pitch: 0, roll: 0, px: 0, py: 0 };
     // сборка при загрузке (см. INTRO): пока она идёт, голова смотрит прямо в экран и не откликается на касания
-    this.intro = { on: false, t: 0, rate: 1, parts: [], jaw: 0 };
+    // pre — модель ещё качается, виден только мозг; base — в какой момент сборки модель стала готова (от него идёт расписание)
+    this.intro = { on: false, pre: false, t: 0, base: null, rate: 1, parts: [], jaw: 0, zoom: 1 };
+    this.brain = null; this.brainHold = null;
     this.ready = new Promise((res) => { this._ready = res; });     // голова собрана и готова разговаривать
     this.eyeShadows = [];
     // плевок: фаза (t < 0 — покой), три «своих» щипка (щёки, губы) и пружины рывка головы
-    this.spitS = { t: -1, wind: 0.46, fired: false, big: false, h: [null, null, null], p: 0, pv: 0, z: 0, zv: 0, jaw: 0, squint: 0 };
+    this.spitS = { t: -1, wind: 0.55, fired: false, big: false, amp: 1, side: 1, h: [null, null, null], p: 0, pv: 0, z: 0, zv: 0, r: 0, rv: 0, jaw: 0, squint: 0 };
     this._tq = new THREE.Quaternion(); this._tq2 = new THREE.Quaternion(); this._te = new THREE.Euler();
     this._tq1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);   // экран смотрит на зрителя, а не в небо
     this._tz = new THREE.Vector3(0, 0, 1); this._tu = new THREE.Vector3(); this._tup = new THREE.Vector3();
@@ -506,17 +519,27 @@ export class Head extends EventTarget {
   }
 
   // ---------- загрузка ----------
-  // intro — показать сборку головы по частям; eyes — глаза на странице уже нарисованы заглушкой и «выскакивать» не должны;
-  // rate — темп сборки (1 — обычный)
-  async load(onProgress, { intro = true, eyes = false, rate = 1 } = {}) {
+  // intro — показать сборку головы по частям; rate — темп сборки (1 — обычный)
+  async load(onProgress, { intro = true, rate = 1 } = {}) {
+    if (intro && !this.rm && this.mode !== 'corner') this._preIntro(rate);      // мозг — сразу, пока качается модель
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
-    const [gltf, faceTex] = await Promise.all([
-      new Promise((res, rej) => loader.load(this.opts.modelUrl, res, (e) => {
-        if (e.total && onProgress) onProgress(e.loaded / e.total);
-      }, rej)),
-      new THREE.TextureLoader().loadAsync(this.opts.faceUrl).catch((e) => { console.warn('Фото лица не загрузилось — голова будет без накладки', e); return null; }),
-    ]);
+    let gltf, faceTex;
+    try {
+      [gltf, faceTex] = await Promise.all([
+        new Promise((res, rej) => loader.load(this.opts.modelUrl, res, (e) => {
+          if (e.total && onProgress) onProgress(e.loaded / e.total);
+        }, rej)),
+        new THREE.TextureLoader().loadAsync(this.opts.faceUrl).catch((e) => { console.warn('Фото лица не загрузилось — голова будет без накладки', e); return null; }),
+      ]);
+    } catch (e) {
+      // модель не пришла: убираем одинокий мозг и чистим холст — сайт останется без головы
+      this.renderer.setAnimationLoop(null);
+      this._dropBrain();
+      this.intro.on = false; this.intro.pre = false; this.intro.parts.length = 0;
+      this.renderer.clear();
+      throw e;
+    }
     if (faceTex) {
       faceTex.colorSpace = THREE.SRGBColorSpace;
       faceTex.flipY = false;               // UV из glTF: начало координат сверху
@@ -565,12 +588,19 @@ export class Head extends EventTarget {
     this.sil = this._measureSilhouette(this.headBox);
     this.aspect = this.sil ? this.sil.ar : this.headBox.h / this.headBox.w;
     this.frame();
-    const assemble = intro && !this.rm && this.mode !== 'corner';
-    if (assemble) { this.brain = makeBrain(); this.root.add(this.brain); this.scene.updateMatrixWorld(true); }
-    this.renderer.compile(this.scene, this.camera);      // шейдеры собираются сейчас, пока всё видимо, — сборка пойдёт без рывков
+    // Шейдеры собираются сейчас — потом сборка пойдёт без рывков. Собираются в фоне, где браузер это умеет: страница
+    // (и мозг на экране) в это время не замирает. Модель на это время спрятана: на экране по-прежнему только мозг.
+    this.model.visible = false;
+    try { await this.renderer.compileAsync(this.scene, this.camera); } catch (_) { this.renderer.compile(this.scene, this.camera); }
+    this.model.visible = true;
+    // пока модель качалась и собиралась, могли уйти в каталог (сборка отменена) — тогда голова появляется сразу целой
+    const assemble = this.intro.on && this.intro.pre && this.mode !== 'corner';
+    if (assemble) { this.root.add(this.brain); this.pivot.remove(this.brainHold); this.brainHold = null; this.scene.updateMatrixWorld(true); }   // мозг переезжает в саму голову
+    else this._dropBrain();
     this.loaded = true;
     this.clock.getDelta();
-    if (assemble) { this.intro.rate = rate; this._startIntro(eyes); } else this._ready();
+    this.q.hold = performance.now() + 2500;              // первые секунды устройство «прогревается» — плотность пикселей пока не трогаем
+    if (assemble) this._startIntro(); else { this.intro.on = false; this.intro.pre = false; this.intro.parts.length = 0; this._ready(); }
     this._loop();
     // слой для снятых очков готовим заранее, в спокойный момент — чтобы не было рывка, когда их стянут с носа.
     // На слабых устройствах (мало памяти, режим экономии трафика) — только когда очки действительно взяли.
@@ -870,7 +900,9 @@ export class Head extends EventTarget {
           .replace('#include <lights_physical_pars_fragment>', SKIN_LIGHTS)
           .replace('#include <color_fragment>', `
             // сборка при загрузке: кожа «нарастает» снизу вверх, край чуть неровный
-            if (vRest.y > uReveal + 0.03 * sin(vRest.x * 9.0 + vRest.z * 6.0)) discard;
+            float sqRv = uReveal + 0.03 * sin(vRest.x * 9.0 + vRest.z * 6.0) - vRest.y;
+            if (sqRv < 0.0) discard;
+            totalEmissiveRadiance += vec3(1.0, 0.62, 0.58) * (1.0 - smoothstep(0.0, 0.09, sqRv)) * 0.5;      // свежий край кожи чуть светится
             #include <color_fragment>
             ${f.face ? `{
               float sqM = faceMask(vRest, normalize(vRestN), vFaceUv);
@@ -998,8 +1030,27 @@ export class Head extends EventTarget {
   // Пока сцена едет в угол или обратно, голова летит по прямой между этими двумя положениями и плавно меняет размер.
   frame() {
     const w = Math.max(1, this.container.clientWidth), h = Math.max(1, this.container.clientHeight);
-    const resized = w !== this._fw || h !== this._fh;
-    if (resized) { this._fw = w; this._fh = h; this.renderer.setSize(w, h, false); }   // смена размера очищает холст — без нужды не трогаем
+    // Размер самого холста (буфера) меняем редко: смена размера стоит дорого и очищает холст. Пока сцена едет в угол
+    // или обратно, её рамка меняется каждый кадр — буфер при этом не трогаем: растущей сцене сразу даём полный размер,
+    // сжимающаяся дорисовывается в прежнем, а когда рамка замерла — подгоняем точно. Картинка от этого не страдает:
+    // холст всегда растянут по рамке, а камера считается от рамки, не от буфера.
+    let resized = false;
+    if (w !== this._fw || h !== this._fh) {
+      this._fw = w; this._fh = h;
+      clearTimeout(this._bt);
+      if (w > (this._bw || 0) || h > (this._bh || 0)) {
+        const full = this.mode !== 'corner';
+        this._bw = full ? Math.max(w, window.innerWidth) : w; this._bh = full ? Math.max(h, window.innerHeight) : h;
+        this.renderer.setSize(this._bw, this._bh, false); resized = true;
+      } else if (w !== this._bw || h !== this._bh) {
+        this._bt = setTimeout(() => {
+          if (this._fw === this._bw && this._fh === this._bh) return;
+          this._bw = this._fw; this._bh = this._fh;
+          this.renderer.setSize(this._bw, this._bh, false);
+          if (this.loaded) this.renderer.render(this.scene, this.camera);
+        }, 180);
+      }
+    }
     const cam = this.camera;
     cam.aspect = w / h;
     const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
@@ -1014,7 +1065,7 @@ export class Head extends EventTarget {
     const f = h / (2 * tan);            // пикселей на единицу длины на расстоянии 1 от камеры
     // Главная. Куда поставить ось камеры (hx, hy) и какой взять масштаб hk (пикселей на единицу в плоскости лица),
     // чтобы силуэт от уха до уха занял ровно L.width пикселей, а его середина встала в точку (L.cx, L.cy)
-    const S = this.sil;
+    const S = this.sil || DEFAULT_SIL;
     let hx = 0, hy = 0, hk = 1, hh = 0;
     if (L) {
       if (S) {
@@ -1051,7 +1102,7 @@ export class Head extends EventTarget {
   }
 
   setLayout(l) { this.layout = l; if (this.mode !== 'corner') this.frame(); }
-  setMode(mode) { this.mode = mode; if (mode === 'corner' && this.intro.on) this._endIntro(); this.frame(); }
+  setMode(mode) { this.mode = mode; this._stir = performance.now() + 900; if (mode === 'corner' && this.intro.on) this._endIntro(); this.frame(); }
   setMouth(v) { this.mouthTarget = clamp(v, 0, 1); }
   lookAtClient(x, y) { this.lookOverride = { x, y }; }
   clearLook() { this.lookOverride = null; }
@@ -1151,30 +1202,65 @@ export class Head extends EventTarget {
   }
 
   // ---------- сборка при загрузке ----------
-  // Модель уже скачана целиком, но показывается по частям (см. INTRO): каждая часть «выскакивает» из своей середины
-  // на пружинке, кожа в конце «нарастает» снизу вверх и прячет мозг. Пока идёт сборка, голова не откликается.
-  _startIntro(eyesShown) {
+  // Мозг появляется сразу — модель ещё качается: он и есть «загрузка». Потом (см. INTRO) каждая часть «выскакивает»
+  // из своей середины на пружинке, кожа в конце «нарастает» снизу вверх и прячет мозг. Пока идёт сборка, голова
+  // смотрит прямо и не откликается.
+  _preIntro(rate) {
+    const I = this.intro;
+    I.on = true; I.pre = true; I.t = 0; I.base = null; I.rate = rate; I.skin = false; I.zoom = INTRO_ZOOM; I.parts.length = 0;
+    const brain = this.brain = makeBrain();
+    const hold = this.brainHold = new THREE.Group();
+    hold.position.copy(PIVOT).multiplyScalar(-1);            // там же, где встанет модель: мозг сразу на своём месте
+    hold.add(brain);
+    this.pivot.add(hold);
+    const cen = brain.position.clone();
+    brain.visible = false;
+    I.parts.push({ name: 'brain', at: 0, list: [{ node: brain, pos: cen.clone(), scale: brain.scale.clone(), cen }], s: 0.001, v: 0, k: 150, z: 0.32, shown: false });   // мозг — желе: колышется дольше
+    this.skinU.uReveal.value = -10;
+    this.pop.s = 1; this.pop.v = 0;                          // голова не «выпрыгивает» целиком — она собирается
+    this.pivot.scale.setScalar(I.zoom);
+    this.frame();
+    this.scene.updateMatrixWorld(true);
+    this.clock.getDelta();
+    this.renderer.setAnimationLoop(() => this._preTick());
+  }
+
+  // кадр, пока модели ещё нет: на сцене только мозг
+  _preTick() {
+    const real = this.clock.getDelta(), dt = Math.min(real, 1 / 30);
+    this._updateIntro(dt, Math.min(real, 0.12));
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  _dropBrain() {
+    if (!this.brain) return;
+    if (this.brain.parent) this.brain.parent.remove(this.brain);
+    if (this.brainHold) { this.pivot.remove(this.brainHold); this.brainHold = null; }
+    this.brain.userData.dispose();
+    this.brain = null;
+  }
+
+  // модель готова: остальные части встают в очередь за мозгом
+  _startIntro() {
     const I = this.intro, model = this.model;
     const named = (n) => model.getObjectByName(n);
     const cenOf = (node) => node.parent.worldToLocal(new THREE.Box3().setFromObject(node).getCenter(new THREE.Vector3()));
+    I.pre = false;
+    const t0 = I.base = Math.max(I.t, INTRO.brainMin);
     const part = (name, at, nodes, o = {}) => {
       const list = nodes.filter(Boolean).map((node) => ({ node, pos: node.position.clone(), scale: node.scale.clone(), cen: cenOf(node) }));
       for (const q of list) q.node.visible = false;
-      I.parts.push({ name, at, list, s: o.instant ? 1 : 0.001, v: 0, k: o.k || 260, z: o.z || 0.42, shown: false });
+      I.parts.push({ name, at: t0 + at, list, s: 0.001, v: 0, k: o.k || 210, z: o.z || 0.55, shown: false });
     };
-    part('eyes', INTRO.eyes, [named('Eye_L')], { instant: eyesShown });
-    part('eyes', INTRO.eyes + (eyesShown ? 0 : 0.12), [named('Eye_R')], { instant: eyesShown });
+    part('eyes', INTRO.eyes, [named('Eye_L')]);
+    part('eyes', INTRO.eyes + 0.08, [named('Eye_R')]);
     part('gums', INTRO.gums, [named('Gums_Tongue')]);
     part('teeth', INTRO.teeth, [named('Teeth_Upper')]);
-    part('teeth', INTRO.teeth + 0.09, [named('Teeth_Lower')]);
-    if (this.glasses.node) { this.glasses.cen.copy(cenOf(this.glasses.node)); part('glasses', INTRO.glasses, [this.glasses.node]); }
-    part('septum', INTRO.septum, [named('Piercing_Septum')], { k: 320, z: 0.3 });
-    part('cuff', INTRO.cuff, [named('Piercing_EarCuff')], { k: 320, z: 0.3 });
-    part('brain', INTRO.brain, [this.brain], { k: 150, z: 0.3 });           // мозг — желе: выскакивает и колышется дольше
-    this.skinU.uReveal.value = -10;
+    part('teeth', INTRO.teeth + 0.11, [named('Teeth_Lower')]);
+    if (this.glasses.node) { this.glasses.cen.copy(cenOf(this.glasses.node)); part('glasses', INTRO.glasses, [this.glasses.node], { k: 150, z: 0.8 }); }
+    part('septum', INTRO.septum, [named('Piercing_Septum')], { k: 320, z: 0.34 });
+    part('cuff', INTRO.cuff, [named('Piercing_EarCuff')], { k: 320, z: 0.34 });
     for (const o of this.eyeShadows) o.material.opacity = 0;
-    this.pop.s = 1; this.pop.v = 0;                  // голова не «выпрыгивает» целиком — она собирается
-    I.on = true; I.t = 0;
   }
 
   // dt — шаг для пружинок (не больше 1/30 с), real — сколько времени прошло на самом деле: расписание сборки идёт
@@ -1197,43 +1283,65 @@ export class Head extends EventTarget {
       if (p.name === 'glasses') { this.glasses.pop = s; continue; }
       for (const q of p.list) { q.node.scale.copy(q.scale).multiplyScalar(s); q.node.position.copy(q.pos).sub(q.cen).multiplyScalar(s).add(q.cen); }
     }
+    // мозг, пока ждёт остальных, слегка покачивается — как желе на блюдце; когда приходит модель, замирает на месте
+    if (this.brain) {
+      const w = I.base === null ? 1 : 1 - smoothstep(0, 0.45, I.t - I.base), b = I.parts[0];
+      this.brain.rotation.set(Math.sin(I.t * 2.3) * 0.045 * w, Math.sin(I.t * 1.5) * 0.17 * w, 0);
+      if (b && b.name === 'brain' && b.done) this.brain.position.y = b.list[0].cen.y + Math.sin(I.t * 2.9) * 0.014 * w;
+    }
+    if (I.base === null) return;                             // модель ещё не пришла — дальше расписания нет
+    const T = I.t - I.base, end = INTRO.skin + INTRO.skinDur;
+    // вся голова подплывает на место — одним плавным движением на всю сборку
+    const zk = clamp(T / end, 0, 1);
+    I.zoom = INTRO_ZOOM + (1 - INTRO_ZOOM) * (1 - (1 - zk) ** 3);
     // кожа: край «сборки» поднимается от подбородка к макушке
-    const B = this.headBox || DEFAULT_BOX, k = smoothstep(INTRO.skin, INTRO.skin + INTRO.skinDur, I.t);
+    const B = this.headBox || DEFAULT_BOX, k = smoothstep(INTRO.skin, end, T);
     const y = B.cy - B.h / 2 - 0.15 + (B.h + 0.35) * k;
     this.skinU.uReveal.value = k > 0 ? y : -10;
-    // рот приоткрыт, чтобы было видно зубы; они дважды клацают, а к приходу кожи рот закрывается
+    // рот приоткрыт, чтобы было видно зубы; они клацают, а к приходу кожи рот закрывается
     let bite = 0;
-    for (const c of INTRO.clack) bite = Math.max(bite, 1 - smoothstep(0.03, 0.09, Math.abs(I.t - c)));
-    I.jaw = 0.5 * smoothstep(INTRO.gums, INTRO.gums + 0.25, I.t) * (1 - smoothstep(INTRO.skin - 0.45, INTRO.skin - 0.05, I.t)) * (1 - 0.92 * bite);
+    for (const c of INTRO.clack) bite = Math.max(bite, 1 - smoothstep(0.03, 0.1, Math.abs(T - c)));
+    I.jaw = 0.5 * smoothstep(INTRO.gums, INTRO.gums + 0.22, T) * (1 - smoothstep(INTRO.skin - 0.34, INTRO.skin - 0.02, T)) * (1 - 0.92 * bite);
     for (const o of this.eyeShadows) o.material.opacity = LOOK.eyes.shadow * smoothstep(-0.3, 0.1, y);
     if (k > 0 && !I.skin) { I.skin = true; this._emit('introstep', { part: 'skin' }); }
-    if (I.t >= INTRO.skin + INTRO.skinDur + 0.1) this._endIntro();
+    if (T >= end + 0.08) this._endIntro(true);
   }
 
-  _endIntro() {
+  // done — сборка дошла до конца сама (а не оборвана уходом в каталог)
+  _endIntro(done = false) {
     const I = this.intro;
     if (!I.on) return;
-    I.on = false;
+    I.on = false; I.zoom = 1;
+    if (I.pre) {                                             // оборвали, пока модель ещё качалась: остался только мозг
+      I.pre = false; I.parts.length = 0;
+      this.renderer.setAnimationLoop(null);
+      this._dropBrain();
+      this.pivot.scale.setScalar(1);
+      this.skinU.uReveal.value = 10;
+      this.renderer.clear();
+      return;                                                // голова появится целой, когда модель загрузится (см. load)
+    }
     for (const p of I.parts) for (const q of p.list) { q.node.visible = true; q.node.scale.copy(q.scale); q.node.position.copy(q.pos); }
     I.parts.length = 0;
     this.glasses.pop = 1;
     I.jaw = 0;
     this.skinU.uReveal.value = 10;
     for (const o of this.eyeShadows) o.material.opacity = LOOK.eyes.shadow;
-    // мозг остаётся под кожей только на словах: он больше не виден, убираем его из сцены
-    if (this.brain) { this.root.remove(this.brain); this.brain.userData.dispose(); this.brain = null; }
+    this._dropBrain();                                       // мозг остаётся под кожей только на словах: он больше не виден
+    if (done) { this.sq.v -= 0.2; this.blink.next = 0.12; }  // собралась: мягко пружинит и моргает — «я тут»
     this._ready();
     this._emit('introend', {});
   }
 
   // ---------- плевок ----------
-  // Голова набирает в щёки, откидывается назад и резко подаётся вперёд: «тьфу». Щёки и губы — те же резиновые щипки,
-  // что и от пальца, только тянет их сама голова. В момент «выстрела» — событие spit с точкой рта на экране.
-  // quick — короткий замах (когда плюёт часто), big — долгое «хррр» перед большим плевком.
-  spit({ quick = false, big = false } = {}) {
+  // Голова набирает в щёки, откидывается назад и резко подаётся вперёд: «тьфу». Потом секунду довольно щурится,
+  // склонив голову набок. Щёки и губы — те же резиновые щипки, что и от пальца, только тянет их сама голова.
+  // В момент «выстрела» — событие spit с точкой рта на экране.
+  // wind — сколько секунд набирает; hark — долгое «хррр»: щёки дрожат, плевок сильнее.
+  spit({ wind = 0.55, hark = false } = {}) {
     const s = this.spitS;
     if (!this.loaded || this.rm || (s.t >= 0 && !s.fired)) return false;
-    s.t = 0; s.fired = false; s.big = big; s.wind = big ? 0.95 : quick ? 0.2 : 0.46;
+    s.t = 0; s.fired = false; s.big = hark; s.wind = wind; s.amp = hark ? 1.25 : 1; s.side = Math.random() < 0.5 ? -1 : 1;
     for (let i = 0; i < 3; i++) {
       let h = s.h[i];
       if (!h || h.owner !== s) {                     // щипок ещё не взят или его забрал палец — берём свободный
@@ -1262,10 +1370,10 @@ export class Head extends EventTarget {
 
   _updateSpit(dt) {
     const s = this.spitS;
-    let pT = 0, zT = 0, sqT = 0;
+    let pT = 0, zT = 0, sqT = 0, rT = 0;
     if (s.t >= 0) {
       s.t += dt;
-      const [L, R, M] = s.h, own = (h) => h && h.owner === s, amp = s.big ? 1.3 : 1;
+      const [L, R, M] = s.h, own = (h) => h && h.owner === s, amp = s.amp;
       if (!s.fired) {
         // набирает: щёки раздуваются, губы поджаты, голова откидывается и отъезжает назад
         const k = smoothstep(0, s.wind, s.t);
@@ -1287,9 +1395,11 @@ export class Head extends EventTarget {
         }
       } else {
         const u = s.t - s.wind, k = 1 - smoothstep(0.04, 0.3, u);
-        pT = 0.1 * k; zT = 0.3 * k; sqT = 0.35 * k;
+        // после плевка — довольная рожа: голова набок, глаза щурятся
+        const smug = smoothstep(0.35, 0.6, u) * (1 - smoothstep(1.25, 1.7, u));
+        pT = 0.1 * k - 0.04 * smug; zT = 0.3 * k; sqT = 0.35 * k + 0.3 * smug; rT = 0.075 * smug * s.side;
         if (u > 0.1) for (const hd of s.h) if (own(hd)) hd.grabbed = false;      // всё отпущено — пружинит обратно
-        if (u > (s.big ? 0.8 : 0.32)) s.t = -1;
+        if (u > 1.75) s.t = -1;
       }
     }
     // наклон и подача головы — на пружине: рывок вперёд и мягкий возврат
@@ -1297,6 +1407,7 @@ export class Head extends EventTarget {
     for (let i = 0; i < n; i++) {
       s.pv += ((pT - s.p) * kS - s.pv * cS) * h; s.p += s.pv * h;
       s.zv += ((zT - s.z) * kS - s.zv * cS) * h; s.z += s.zv * h;
+      s.rv += ((rT - s.r) * 60 - s.rv * 13) * h; s.r += s.rv * h;
     }
     s.squint += (sqT - s.squint) * damp(dt, 16);
     s.jaw *= Math.exp(-dt * 8);
@@ -1463,11 +1574,63 @@ export class Head extends EventTarget {
   _emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
 
   // ---------- кадр ----------
-  _loop() { this.renderer.setAnimationLoop(() => this._tick()); }
+  _loop() { this.renderer.setAnimationLoop(() => this._pace()); }
+
+  // Когда ничего не происходит (голову не трогают, она молчит, курсор и телефон неподвижны), хватает 30 кадров в секунду:
+  // моргание и лёгкое покачивание выглядят так же, а устройство греется вдвое меньше.
+  _calm(now) {
+    if (this.intro.on || this.drags.size || this.lookOverride || this.spitS.t >= 0 || this.glasses.grabbed || this.blind > 0) return false;
+    if (now - Math.max(this.pointer.lastMove, this.tilt.lastMove, this._stir || 0) < 1400 || this.tilt.speed > 0.06) return false;
+    if (this.mouthTarget > 0 || this.mouth > 0.01 || this.glasses.offset.lengthSq() > 1e-5) return false;
+    if (Math.abs(this.sq.v) > 0.02 || Math.abs(1 - this.sq.s) > 0.004 || Math.abs(1 - this.pop.s) > 0.004) return false;
+    for (const h of this.handles) if (h.active) return false;
+    return true;
+  }
+
+  _pace() {
+    const now = performance.now(), q = this.q;
+    q.calm = this._calm(now);
+    if (q.calm && now - (this._drawn || 0) < 29) return;       // спокойный режим: рисуем через кадр
+    this._drawn = now;
+    this._tick();
+  }
+
+  // Подстройка плотности пикселей. Кадры идут реже 40 в секунду — снижаем плотность на шаг и смотрим: стало быстрее —
+  // значит, не успевала видеокарта, оставляем; не стало — дело не в ней (режим энергосбережения, слабый процессор):
+  // возвращаем как было и больше не трогаем. Кадров с запасом — понемногу возвращаем резкость.
+  _adapt(real, now) {
+    const q = this.q;
+    q.fpsN++;
+    if (now - q.fpsT >= 1000) { q.fps = Math.round((q.fpsN * 1000) / (now - q.fpsT)); q.fpsN = 0; q.fpsT = now; }
+    if (q.pinned || q.calm || real > 0.25 || document.hidden) return;      // спокойный режим и возвращение на вкладку не считаем
+    if (this.intro.on) { q.n = 0; q.hold = now + 1500; return; }            // сборка головы — не показатель
+    q.ema += (Math.min(real * 1000, 50) - q.ema) * 0.08; q.n++;              // одиночный долгий кадр (сборка мусора) погоды не делает
+    if (now < q.hold || q.n < 45) return;
+    q.n = 0;
+    if (q.trial) {
+      if (q.ema > q.trial.ema * 0.88) { this._setRatio(q.trial.ratio); q.pinned = true; }
+      q.trial = null; q.hold = now + 1500;
+    } else if (q.upFrom) {
+      if (q.ema > 19) { q.max = q.upFrom; this._setRatio(q.upFrom); }       // резкость вернули рано: это потолок для устройства
+      q.upFrom = 0; q.hold = now + 1500;
+    } else if (q.ema > 25 && q.ratio > q.min + 0.01) {
+      q.trial = { ratio: q.ratio, ema: q.ema };
+      this._setRatio(Math.max(q.min, q.ratio * 0.8)); q.hold = now + 500;
+    } else if (q.ema < 12.5 && q.ratio < q.max - 0.01 && now > q.upAt) {
+      q.upFrom = q.ratio; q.upAt = now + 10000;
+      this._setRatio(Math.min(q.max, q.ratio * 1.15)); q.hold = now + 500;
+    }
+  }
+
+  _setRatio(r) {
+    this.q.ratio = r; this.q.ema = 16;
+    this.renderer.setPixelRatio(r);                      // буфер пересоздан и пуст — кадр дорисуется сразу, мы внутри _tick
+  }
 
   _tick() {
     const real = this.clock.getDelta(), dt = Math.min(real, 1 / 30);
     const now = performance.now();
+    this._adapt(real, now);
     if (this.onTick) this.onTick(dt, now);
     this._updatePop(dt);
     this._updateIntro(dt, Math.min(real, 0.12));
@@ -1515,7 +1678,8 @@ export class Head extends EventTarget {
       s.v += ((1 - s.s) * 150 - s.v * (this.rm ? 25 : 6.5)) * h; s.s += s.v * h;
     }
     const sy = clamp(s.s, 0.7, 1.35), sx = 1 / Math.sqrt(sy);
-    this.pivot.scale.set(p.s * sx, p.s * sy, p.s * sx);
+    const z = this.intro.on ? this.intro.zoom : 1;
+    this.pivot.scale.set(p.s * sx * z, p.s * sy * z, p.s * sx * z);
   }
 
   _lookTarget(out) {
@@ -1540,7 +1704,7 @@ export class Head extends EventTarget {
     this.rot.pitch += (pitch - this.rot.pitch) * damp(dt, k);
     // поворот от наклона телефона (эффект присутствия) ложится поверх: он «физический» и не должен запаздывать
     const P = this.tilt;
-    this._q.setFromEuler(this._e.set(this.rot.pitch + this.spitS.p + P.pitch, this.rot.yaw + P.yaw, P.roll, 'YXZ'));
+    this._q.setFromEuler(this._e.set(this.rot.pitch + this.spitS.p + P.pitch, this.rot.yaw + P.yaw, P.roll + this.spitS.r, 'YXZ'));
     const la = this.lean.a, ang = la.length();
     if (ang > 1e-6) this._q.multiply(this._q2.setFromAxisAngle(this._v[4].copy(la).divideScalar(ang), ang));
     this.pivot.quaternion.copy(this._q);
@@ -1634,7 +1798,7 @@ export class Head extends EventTarget {
       g.popDone = g.pop;
       g.node.scale.copy(g.homeS).multiplyScalar(g.pop);
     }
-    if (g.pop !== 1) g.node.position.copy(g.home).sub(g.cen).multiplyScalar(g.pop).add(g.cen).add(g.offset);
+    if (g.pop !== 1) { g.node.position.copy(g.home).sub(g.cen).multiplyScalar(g.pop).add(g.cen).add(g.offset); g.node.position.z += Math.max(0, 1 - g.pop) * 0.55; }   // …и надеваются спереди
     const dist = g.offset.length();
     // у лица очки сидят как на голове, вдали — разворачиваются «лицом» к зрителю, где бы на экране ни оказались
     const far = smoothstep(0.3, 1.1, dist);

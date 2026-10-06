@@ -4,8 +4,8 @@ import { Voice } from './voice.js';
 import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
-import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, isStack } from './content.js';
-import { LINES, REACTIONS } from './lines.js';
+import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, thumbOf, isStack } from './content.js';
+import { linesFor, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
 import { createCatalog } from './arc.js';
@@ -36,7 +36,7 @@ export function track(event, props = {}) {
 const els = {
   topbar: $('[data-topbar]'), logo: $('[data-logo]'), mark: $('[data-logo-mark]'), nav: $('.topnav'), lang: $('[data-lang]'),
   sound: $('[data-sound]'), allWork: $('.topnav [href="#/work"]'),
-  stage: $('#stage'), loader: $('[data-loader]'), eyes: $('[data-eyes]'),
+  stage: $('#stage'), loader: $('[data-loader]'), ph: $('[data-ph]') || document.createElement('div'),      // заглушки нет в прежней версии страницы (кэш) — тогда работаем без неё
   folders: $('[data-folders]'), burst: $('[data-burst]'), subs: $('[data-subs]'), veil: $('[data-veil]'),
   views: { hero: $('[data-screen="hero"]'), work: $('[data-screen="work"]'), case: $('[data-screen="case"]') },
 };
@@ -152,7 +152,7 @@ function artsOf(id) {
   const push = (src, print, cover) => { if (src && !seen.has(src)) { seen.add(src); out.push({ src, print, cover }); } };
   for (const p of sectionProjects(id)) {
     (p.artifacts || []).forEach((a) => push(srcOf(a), !(a && typeof a === 'object' && a.cut), false));
-    push(p.cover, true, true);
+    push(thumbOf(p), true, true);
   }
   return out.slice(0, BURST_MAX);
 }
@@ -518,7 +518,7 @@ function show(next, opts = {}) {
     switchT = setTimeout(() => document.body.classList.remove('is-switching'), 800);
   }
   document.body.dataset.view = next;
-  if (next !== 'hero') els.eyes.hidden = true;
+  if (next !== 'hero') els.ph.hidden = true;
   if (tiltTip && next !== 'hero') tiltTip.hidden = true;
   els.stage.classList.toggle('is-corner', next !== 'hero');
   for (const [k, el] of Object.entries(els.views)) el.hidden = k !== next;
@@ -640,8 +640,8 @@ function wireHead() {
   head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); say('glasses_self', { force: true }); });
   head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; });
   head.addEventListener('spit', (e) => onSpit(e.detail));
-  // сборка при загрузке: настоящие глаза встали на место — заглушка больше не нужна
-  head.addEventListener('introstep', (e) => { if (e.detail.part === 'eyes') els.eyes.hidden = true; });
+  // сборка при загрузке: настоящий мозг появился — розовое пятно-заглушка под ним гаснет
+  head.addEventListener('introstep', (e) => { if (e.detail.part === 'brain') { els.ph.classList.add('is-out'); setTimeout(() => { els.ph.hidden = true; }, 320); } });
   head.onTick = (dt) => { voice.tick(dt); };
   head.onFrame = () => { updateVeil(); parallax(); };
 
@@ -719,9 +719,9 @@ setInterval(() => {
   idle.n++; idle.at = now;
 }, 500);
 // ---------- пасхалка: посетитель «залип» — голова заплёвывает экран ----------
-// Если долго ничего не трогать, голова начинает плевать в экран: плевки остаются на «стекле» в случайных местах,
-// пока не покроют его целиком. Любое действие посетителя — и экран вытирается. Сами кляксы — в js/spit.js,
-// движение головы — в head.js (spit).
+// Если долго ничего не трогать, голова начинает плевать в экран — по одному, с паузами: слюна летит, шлёпается
+// о «стекло», стекает. Так понемногу заполняется весь экран. Любое действие посетителя — и стекло вытирается.
+// Сама слюна — в js/spit.js, движение головы — в head.js (spit).
 // СКОЛЬКО ЖДАТЬ — задаётся в админке: «Настройки сайта» → «Плевки» (минуты бездействия; 0 — выключить).
 // В содержимом это site.spitAfter; пока оно не загрузилось — 10 минут. Проверить с любым значением можно адресом: …/?spit=5 (секунды).
 const SPIT_DEFAULT_MIN = 10;
@@ -758,27 +758,36 @@ setInterval(() => {
 }, 250);
 
 async function startSpit() {
-  spit.state = 'on'; spit.n = 0;
+  spit.state = 'on'; spit.n = 0; spit.almost = false;
   try {
-    if (!spit.fx) { const { SpitScreen } = await import('./spit.js'); spit.fx = new SpitScreen(); }
+    if (!spit.fx) { const { SpitScreen } = await import('./spit.js'); spit.fx = new SpitScreen(); spit.fx.onResize = userInput; }   // окно повернули или растянули — стекло вытирается
   } catch (e) { console.warn('Плевки недоступны', e); spit.state = 'dead'; return; }
   if (spit.state !== 'on') return;                 // пока модуль грузился, посетитель очнулся
   spit.fx.reset();
   say('spit_warn', { force: true });
-  spit.t = setTimeout(spitNext, 1700);
+  spit.t = setTimeout(spitAim, 2400);
   track('spit_start');
 }
-function spitNext() {
+// Голова шкодничает, а не строчит очередями. Один плевок — маленькая сценка: присмотрелась к чистому месту, набрала
+// в щёки, плюнула, проводила плевок взглядом и глянула на посетителя — ну как? Пауза — и всё сначала.
+// Стекло заполняется понемногу: десяток-полтора плевков примерно за минуту.
+const spitRnd = (a, b) => a + Math.random() * (b - a);
+function spitAim() {
   if (spit.state !== 'on' || !head) return;
-  const to = spit.pending || spit.fx.next();       // куда плюнуть: в ещё чистое место; null — экран покрыт
+  if (speaking()) { spit.t = setTimeout(spitAim, 250); return; }          // договорит — тогда и плюнет
+  const to = spit.pending || spit.fx.next();       // куда плюнуть: в ещё чистое место; null — стекло заплёвано
   if (!to) { spitDone(); return; }
-  // голова целится туда, куда плюёт; последний плевок — во весь экран, с долгим «хррр»
-  if (!head.spit({ quick: spit.n > 2 && !to.last, big: !!to.last })) { spit.pending = to; spit.t = setTimeout(spitNext, 120); return; }
-  spit.pending = null; spit.to = to;
-  head.lookAtClient(to.x, to.y);
+  spit.pending = to;
+  head.lookAtClient(to.x, to.y);                   // присматривается
+  spit.t = setTimeout(spitFire, spit.n ? spitRnd(450, 800) : 900);
+}
+function spitFire() {
+  if (spit.state !== 'on' || !head) return;
+  const hark = spit.n > 0 && Math.random() < 0.3;  // иногда — с долгим «хррр»
+  if (!head.spit({ wind: hark ? 0.95 : spitRnd(0.5, 0.75), hark })) { spit.t = setTimeout(spitFire, 150); return; }
+  spit.to = spit.pending; spit.pending = null;
   spit.n++;
-  // всё чаще и чаще; после последнего плевка серию завершает его приземление (см. onSpit)
-  if (!to.last) spit.t = setTimeout(spitNext, Math.max(360, 1500 * 0.85 ** spit.n));
+  spit.t = setTimeout(spitAim, 4500);              // страховка: если плевок почему-то не вылетит или не долетит, серия идёт дальше
 }
 function spitDone() {
   if (spit.state !== 'on') return;
@@ -788,18 +797,27 @@ function spitDone() {
   say('spit_done', { force: true });
   track('spit_done', { n: spit.n });
 }
-// голова «выстрелила» — плевок летит от рта в экран
-const SPIT_LINES = { 1: 'spit_1', 4: 'spit_2', 9: 'spit_3', 16: 'spit_4' };
+// голова «выстрелила» — плевок летит от рта в экран. Первый — с «Тьфу!». Дальше она комментирует уже после шлепка:
+// после каждого второго плевка — очередная реплика из списка, а когда чистого стекла осталось мало — «Ещё чуть-чуть».
+const SPIT_SAY = ['spit_5', 'spit_2', 'spit_4', 'spit_3', 'spit_6'];
+const SPIT_ALMOST = 0.52;        // доля заплёванного стекла, с которой «ещё чуть-чуть» (серия кончается на 0,64 — см. next() в spit.js)
 function onSpit({ from }) {
-  const to = spit.to;
+  const to = spit.to, n = spit.n;
   if (spit.state !== 'on' || !to) return;
-  voice.spit(to.last ? 1 : 0.6);
-  if (to.last) spit.t = setTimeout(spitDone, 5000);          // страховка: если плевок почему-то не «приземлится»
+  spit.to = null;
+  voice.spit(0.7);
+  if (n === 1) say('spit_1', { force: true });
   spit.fx.launch(from, to, () => {
-    voice.splat(to.last ? 1 : 0.5); vibrate(10);
-    if (to.last && spit.state === 'on') { clearTimeout(spit.t); spit.t = setTimeout(spitDone, 1100); }
+    voice.splat(0.6); vibrate(10);
+    if (spit.state !== 'on') return;
+    clearTimeout(spit.t);
+    setTimeout(() => { if (spit.state === 'on' && head) head.clearLook(); }, 500);        // посмотрела, как растеклось, — и на посетителя
+    let line = null;
+    if (!spit.almost && spit.fx.coverage > SPIT_ALMOST) { spit.almost = true; line = 'spit_7'; }
+    else if (n % 2 === 0) line = SPIT_SAY[n / 2 - 1] || null;
+    if (line) setTimeout(() => { if (spit.state === 'on') say(line, { force: true }); }, 450);
+    spit.t = setTimeout(spitAim, n < 4 ? spitRnd(2400, 3800) : spitRnd(1700, 3200));
   });
-  if (SPIT_LINES[spit.n]) say(SPIT_LINES[spit.n], { force: true });
 }
 function stopSpit() {
   clearTimeout(spit.t);
@@ -812,22 +830,52 @@ function stopSpit() {
 
 // ---------- проверка на телефоне: адрес …/?diag показывает, что видит сайт ----------
 // Удобно, когда «на телефоне что-то не так»: размер экрана, размер головы, защищено ли соединение и жив ли датчик наклона.
+let modelAt = 0;
+// Как сайт загрузился: сколько файлов и мегабайт пришло по сети, сжимает ли их сервер, сколько браузер взял из своей памяти
+// и через сколько секунд была готова модель головы. Старые браузеры размеров не сообщают — тогда пишем только число файлов.
+function netLine() {
+  try {
+    const all = [...performance.getEntriesByType('navigation'), ...performance.getEntriesByType('resource')].filter((e) => e.name.startsWith(location.origin));
+    if (!all.length) return 'загрузка: браузер не сообщает';
+    const mb = (b) => (b / 1048576).toFixed(1).replace('.', ',');
+    let wire = 0, raw = 0, kept = 0, text = 0, packed = 0, known = false;
+    for (const e of all) {
+      if (e.decodedBodySize == null) continue;
+      known = true;
+      wire += e.transferSize || 0; raw += e.decodedBodySize || 0;
+      if (!e.transferSize && e.decodedBodySize) kept++;
+      if (/\.(js|css|json|html|svg)(\?|$)|\/(\?[^/]*)?$/.test(e.name) && e.decodedBodySize > 2000) { text++; if (e.encodedBodySize && e.encodedBodySize < e.decodedBodySize * 0.95) packed++; }
+    }
+    const ready = modelAt ? `; модель через ${(modelAt / 1000).toFixed(1).replace('.', ',')} с` : '';
+    if (!known) return `загрузка: файлов ${all.length}${ready}`;
+    return `загрузка: файлов ${all.length}, по сети ${mb(wire)} из ${mb(raw)} МБ, сжатие: ${!text ? '—' : packed ? 'есть' : 'нет'}, из памяти браузера: ${kept}${ready}`;
+  } catch (_) { return 'загрузка: браузер не сообщает'; }
+}
 function diag() {
   const el = document.createElement('pre');
   el.className = 'diag';
   document.body.appendChild(el);
   const yes = (v) => (v ? 'да' : 'нет');
   const deg = (v) => Math.round((v || 0) * 57.3);
+  // скорость: сколько кадров в секунду рисует голова и с какой плотностью пикселей (она подстраивается под устройство)
+  const fpsLine = () => {
+    const q = head && head.q;
+    if (!q) return 'кадры: головы нет';
+    return `кадры: ${q.fps}/с${q.calm ? ' (покой — вдвое реже)' : ''}, плотность ${q.ratio.toFixed(2)} из ${(window.devicePixelRatio || 1).toFixed(2)}${q.pinned ? ', закреплена' : ''}`;
+  };
   const draw = () => {
     const W = window.innerWidth, H = window.innerHeight, r = head && head.rect, tl = head && head.tilt;
     // наклон включён — остаются две строки про него: справка не должна закрывать лицо, на которое смотрят
     el.textContent = (tl && tl.on && tl.n ? [
+      fpsLine(),
       `наклон: событий ${tl.n}, углы α β γ ${[tl.a, tl.b, tl.g].map((v) => (v == null ? '—' : Math.round(v))).join(' ')}`,
       `зритель ${deg(tl.ty)}° ${deg(tl.tp)}°, крен ${deg(tl.lean)}° → голова ${deg(tl.yaw)}° ${deg(tl.pitch)}° ${deg(tl.roll)}°`,
     ] : [
       `экран ${W}×${H} @${(window.devicePixelRatio || 1).toFixed(2)}, раскладка: ${isStack() ? 'телефон' : 'компьютер'}`,
       `голова: ${r ? `${Math.round(r.w)} px — ${Math.round((r.w / W) * 100)}% ширины` : (head ? 'в углу' : 'нет (WebGL)')}`,
       `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
+      fpsLine(),
+      netLine(),
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
       `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}`,
       `наклон: ${tl && tl.on ? 'включён, событий пока нет' : 'выключен'}`,
@@ -889,7 +937,7 @@ async function boot() {
   const vars = { name: tx(site.name), nameGen: tx(site.nameGen) || tx(site.name), role: tx(site.role) };
   subs = new Subtitles({
     el: els.subs, srEl: $('[data-subs-sr]'), voice, reducedMotion: reduced,
-    lines: { ...LINES.ru, ...(LINES[content.lang] || {}) },
+    lines: linesFor(content.lang, site.lines),          // исходные реплики и поверх — свои, из админки
     fmt: (s) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ''),
   });
   if (debug) window.__subs = subs;
@@ -914,9 +962,10 @@ async function boot() {
     if (window.parent !== window) window.parent.postMessage({ type: 'ph:ready' }, location.origin);
     return;
   }
-  // Загрузка без процентов: пока качаются 3D-движок и модель, на месте головы — пара глаз (место им задаёт layout).
-  // Когда модель готова, голова собирается по частям (head.js, INTRO) и только потом здоровается.
-  els.eyes.hidden = view !== 'hero';
+  // Загрузка без процентов. Пока качается 3D-движок, на месте мозга — розовое размытое пятно (место ему задаёт layout).
+  // Движок готов — пятно сменяет настоящий мозг: он висит и покачивается, пока качается модель. Модель пришла —
+  // голова собирается по частям (head.js, INTRO) и только потом здоровается.
+  els.ph.hidden = view !== 'hero';
   try {
     const { Head } = await import('./head.js');
     head = new Head(els.stage, { reducedMotion: reduced });
@@ -924,7 +973,8 @@ async function boot() {
     head.setMode(view === 'hero' ? 'hero' : 'corner');
     layout();
     // тому, кто здесь уже был, сборку показываем быстрее: он её видел
-    await head.load(null, { intro: view === 'hero', eyes: !els.eyes.hidden, rate: store.get('seen', false) ? 1.4 : 1 });
+    await head.load(null, { intro: view === 'hero', rate: store.get('seen', false) ? 1.4 : 1 });
+    modelAt = performance.now();             // модель скачана и разобрана (для справки ?diag)
   } catch (e) {
     // нет WebGL, не скачался модуль или модель — сайт остаётся рабочим, просто без головы
     console.warn('3D-голова недоступна', e);
@@ -932,7 +982,7 @@ async function boot() {
     head = null;
   }
   layout();
-  if (!head || !head.intro.on) els.eyes.hidden = true;
+  if (!head || !head.intro.on) els.ph.hidden = true;
   els.loader.hidden = true;
   preloadArtifacts();
   await voice.init();
