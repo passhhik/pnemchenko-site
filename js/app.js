@@ -581,6 +581,20 @@ function updateVeil() {
   st.clipPath = cp; st.webkitClipPath = cp;
 }
 
+// Наклон телефона, эффект присутствия. Логотип лежит «в глубине» за головой: телефон повернули — он смещается
+// в сторону зрителя, и голова отделяется от фона, как предмет за стеклом. Сдвигаем знак внутри ссылки: место самой
+// ссылки-логотипа участвует в раскладке папок и меняться не должно.
+let parX = 0, parY = 0;
+function parallax() {
+  const tl = head.tilt;
+  const on = tl.w > 0.001 && view === 'hero';
+  const k = Math.min(window.innerWidth, 520) * 0.07;           // «глубина» логотипа: пикселей на единицу тангенса угла
+  const x = on ? Math.round(tl.px * k * 2) / 2 : 0, y = on ? Math.round(-tl.py * k * 2) / 2 : 0;
+  if (x === parX && y === parY) return;
+  parX = x; parY = y;
+  els.mark.style.transform = x || y ? `translate3d(${x}px, ${y}px, 0)` : '';
+}
+
 // наклон телефона (гироскоп). Android: включается сразу. iPhone/iPad: нужно разрешение —
 // просим плашкой, а не системным окном «из ниоткуда».
 let tiltTip = null, tiltAsk = false;
@@ -629,7 +643,7 @@ function wireHead() {
   // сборка при загрузке: настоящие глаза встали на место — заглушка больше не нужна
   head.addEventListener('introstep', (e) => { if (e.detail.part === 'eyes') els.eyes.hidden = true; });
   head.onTick = (dt) => { voice.tick(dt); };
-  head.onFrame = updateVeil;
+  head.onFrame = () => { updateVeil(); parallax(); };
 
   // Датчик наклона браузеры отдают только сайту, открытому по https (защищённое соединение):
   // по http события не приходят вовсе, и голова на телефоне следит только за папками.
@@ -803,21 +817,39 @@ function diag() {
   el.className = 'diag';
   document.body.appendChild(el);
   const yes = (v) => (v ? 'да' : 'нет');
+  const deg = (v) => Math.round((v || 0) * 57.3);
   const draw = () => {
     const W = window.innerWidth, H = window.innerHeight, r = head && head.rect, tl = head && head.tilt;
-    el.textContent = [
+    // наклон включён — остаются две строки про него: справка не должна закрывать лицо, на которое смотрят
+    el.textContent = (tl && tl.on && tl.n ? [
+      `наклон: событий ${tl.n}, углы α β γ ${[tl.a, tl.b, tl.g].map((v) => (v == null ? '—' : Math.round(v))).join(' ')}`,
+      `зритель ${deg(tl.ty)}° ${deg(tl.tp)}°, крен ${deg(tl.lean)}° → голова ${deg(tl.yaw)}° ${deg(tl.pitch)}° ${deg(tl.roll)}°`,
+    ] : [
       `экран ${W}×${H} @${(window.devicePixelRatio || 1).toFixed(2)}, раскладка: ${isStack() ? 'телефон' : 'компьютер'}`,
       `голова: ${r ? `${Math.round(r.w)} px — ${Math.round((r.w / W) * 100)}% ширины` : (head ? 'в углу' : 'нет (WebGL)')}`,
       `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
       `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}`,
-      `наклон: ${tl && tl.on ? `включён, событий ${tl.n}` : 'выключен'}`,
-      ...(tl && tl.on ? [`углы α β γ: ${[tl.a, tl.b, tl.g].map((v) => (v == null ? '—' : Math.round(v))).join(' ')}; цель: ${tl.target.x.toFixed(2)} ${tl.target.y.toFixed(2)}; голова: ${Math.round(head.rot.yaw * 57.3)}° ${Math.round(head.rot.pitch * 57.3)}°`] : []),
+      `наклон: ${tl && tl.on ? 'включён, событий пока нет' : 'выключен'}`,
       `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки: ${Number.isFinite(SPIT_AFTER) ? `через ${SPIT_AFTER} с` : 'выключены'}`,
-    ].join('\n');
+    ]).join('\n');
   };
   draw();
   setInterval(draw, 500);
+  // Ползунки эффекта присутствия: подобрать на телефоне, как голова отвечает на наклон (значения — в справке выше)
+  if (head && window.matchMedia('(pointer: coarse)').matches) {
+    const box = document.createElement('div');
+    box.className = 'tune';
+    box.innerHTML = [['depth', 'объём', -1, 1], ['follow', 'доворот', 0, 1], ['roll', 'крен', 0, 1]]
+      .map(([k, label, min, max]) => `<label><span>${label} <output>${head.tiltCfg[k]}</output></span><input type="range" min="${min}" max="${max}" step="0.05" value="${head.tiltCfg[k]}" data-k="${k}" aria-label="${label}"></label>`).join('');
+    box.addEventListener('input', (e) => {
+      const k = e.target.dataset.k;
+      if (!k) return;
+      head.tiltCfg[k] = Number(e.target.value);
+      e.target.parentNode.querySelector('output').textContent = e.target.value;
+    });
+    document.body.appendChild(box);
+  }
 }
 
 // ---------- предпросмотр из админки: содержимое приходит черновиком, голова не нужна ----------

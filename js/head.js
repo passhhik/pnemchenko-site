@@ -18,6 +18,17 @@ const CORNER_FIT = 0.86;         // какую долю кружка в углу
 const DEFAULT_BOX = { cx: 0, cy: 0.0, w: 1.5, h: 1.95 };   // габариты головы до загрузки модели (уточняются по модели)
 const EYE_FAR = 9;               // глаза сводятся на далёкой точке по линии взгляда — без косоглазия
 const EYE_YAW = 0.3, EYE_UP = 0.1, EYE_DOWN = 0.2;   // пределы поворота глаз, рад (≈17° / 6° / 11°)
+// Эффект присутствия на телефоне (датчик наклона). Телефон — коробка с головой внутри, зритель стоит на месте.
+// depth  — «объём»: повернул телефон — видишь голову чуть сбоку, как любой объёмный предмет в руке (0 — плоская картинка, 1 — как настоящий);
+// follow — «доворот»: какую часть этого поворота голова отыгрывает обратно, поворачиваясь к зрителю (за ~полсекунды);
+// roll   — «крен»: насколько голова остаётся вертикальной, когда телефон заваливают набок.
+// Глаза при этом всегда смотрят в камеру — то есть на зрителя. Значения подбираются на телефоне ползунками (адрес …/?diag).
+export const TILT = { depth: 0.6, follow: 0.4, roll: 0.7 };
+const TILT_SETTLE = 6;           // телефон замер в новой позе — за столько секунд она становится «прямо перед зрителем»
+const TILT_LEASH = 0.8;          // дальше этого угла (рад) от опорной позы голова не «помнит» зрителя: поза подтягивается следом
+const TILT_ROLL_LEASH = 0.35;    // то же для оси, вдоль которой меряется крен
+// Мягкие пределы поворота головы от наклона, рад. Чуть шире пределов глаз (EYE_*): дальше глаза не дотянутся до зрителя
+const TILT_YAW = 0.34, TILT_DOWN = 0.14, TILT_UP = 0.24, TILT_ROLL = 0.42;
 const GLASSES_HOLD = 4200;       // сколько очки висят там, где их отпустили, прежде чем голова наденет их сама, мс
 // Плевок: где голова «берётся» сама за себя (координаты головы) и радиус щипка — две щеки и губы
 const SPIT_AT = [[0.33, -0.52, 0.5, 0.2], [-0.33, -0.52, 0.5, 0.2], [0.005, -0.6, 0.8, 0.14]];
@@ -472,10 +483,11 @@ export class Head extends EventTarget {
     this._e = new THREE.Euler();
     this._headInv = new THREE.Matrix4();
     this._plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -2.0);
-    // Гироскоп: зрительный контакт с посетителем при наклоне телефона
-    this.tiltGain = 1.6;              // >1 — живее; отрицательное значение — голова «смотрит» по наклону, а не на зрителя
-    this.tilt = { on: false, has: false, n: 0, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0,
-      target: new THREE.Vector3(0, 0.05, 2), announced: false };
+    // Датчик наклона: эффект присутствия (см. TILT). yaw/pitch/roll — поворот головы от наклона, px/py — сдвиг для слоёв «в глубине»
+    this.tiltCfg = { ...TILT };
+    this.tilt = { on: false, has: false, n: 0, q: new THREE.Quaternion(), base: null, last: new THREE.Quaternion(), lastMove: 0, announced: false,
+      prev: new THREE.Quaternion(), slow: new THREE.Quaternion(), speed: 0, still: 0, w: 0, ty: 0, tp: 0, lean: 0,
+      fy: 0, fvy: 0, fp: 0, fvp: 0, fr: 0, fvr: 0, yaw: 0, pitch: 0, roll: 0, px: 0, py: 0 };
     // сборка при загрузке (см. INTRO): пока она идёт, голова смотрит прямо в экран и не откликается на касания
     this.intro = { on: false, t: 0, rate: 1, parts: [], jaw: 0 };
     this.ready = new Promise((res) => { this._ready = res; });     // голова собрана и готова разговаривать
@@ -484,7 +496,8 @@ export class Head extends EventTarget {
     this.spitS = { t: -1, wind: 0.46, fired: false, big: false, h: [null, null, null], p: 0, pv: 0, z: 0, zv: 0, jaw: 0, squint: 0 };
     this._tq = new THREE.Quaternion(); this._tq2 = new THREE.Quaternion(); this._te = new THREE.Euler();
     this._tq1 = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);   // экран смотрит на зрителя, а не в небо
-    this._tz = new THREE.Vector3(0, 0, 1); this._tu = new THREE.Vector3(); this._tt = new THREE.Vector3();
+    this._tz = new THREE.Vector3(0, 0, 1); this._tu = new THREE.Vector3(); this._tup = new THREE.Vector3();
+    this._ty = new THREE.Vector3(); this._tc = new THREE.Vector3();
 
     this._bind();
     this._ro = new ResizeObserver(() => this.frame());
@@ -1067,27 +1080,74 @@ export class Head extends EventTarget {
     this.tilt.n++; this.tilt.a = e.alpha; this.tilt.b = e.beta; this.tilt.g = e.gamma;   // сырые углы — для справки ?diag
     const d = THREE.MathUtils.DEG2RAD;
     const orient = (((screen.orientation && screen.orientation.angle) ?? window.orientation) || 0) * d;
+    // поза телефона в мире: оси как у камеры — x вправо по экрану, y вверх, z из экрана на зрителя
     const q = this._tq.setFromEuler(this._te.set((e.beta || 0) * d, (e.alpha || 0) * d, -(e.gamma || 0) * d, 'YXZ'));
     q.multiply(this._tq1).multiply(this._tq2.setFromAxisAngle(this._tz, -orient));
+    if (!Number.isFinite(q.x + q.y + q.z + q.w)) return;  // датчик прислал мусор
     const t = this.tilt;
     t.q.copy(q);
-    if (!t.base) { t.base = q.clone(); t.last.copy(q); t.has = true; return; }
+    if (!t.base) {                                       // первая поза (или экран перевернули): зритель — прямо перед экраном
+      t.base = q.clone(); t.last.copy(q); t.prev.copy(q); t.slow.copy(q); t.has = true;
+      t.fy = t.fp = t.fvy = t.fvp = 0; t.still = 0;
+      return;
+    }
     if (t.last.angleTo(q) > 0.03) {                     // ~1,7°: заметное движение, а не дрожание рук
       t.last.copy(q); t.lastMove = performance.now();
       if (!t.announced && t.base.angleTo(q) > 0.2) { t.announced = true; this._emit('tiltstart', {}); }
     }
   }
 
+  // Эффект присутствия. Голова «закреплена» в телефоне, зритель неподвижен. Телефон повернули — зритель видит голову
+  // сбоку (depth), она доворачивается к нему обратно (follow), крен гасит (roll). Глаза всё это время смотрят в камеру
+  // (см. _updateLook): на плоском экране взгляд «в камеру» — это взгляд на зрителя под любым углом.
   _updateTilt(dt) {
-    const t = this.tilt;
+    const t = this.tilt, C = this.tiltCfg;
+    const live = t.has && !!t.base && !this.intro.on;
+    t.w += ((live ? 1 : 0) - t.w) * damp(dt, 3);         // включается и выключается плавно
     if (!t.has || !t.base) return;
-    t.base.slerp(t.q, damp(dt, 0.2));                   // нейтраль за ~5 с подстраивается под новую позу
-    // где зритель в координатах экрана: u = q⁻¹ · base · (0, 0, 1)
-    const u = this._tu.set(0, 0, 1).applyQuaternion(t.base).applyQuaternion(this._tq2.copy(t.q).invert());
-    const G = this.tiltGain;
-    const yaw = clamp(Math.atan2(u.x, u.z) * G, -0.9, 0.9);
-    const pitch = clamp(Math.atan2(u.y, Math.hypot(u.x, u.z)) * G, -0.7, 0.7);
-    t.target.lerp(this._tt.set(Math.tan(yaw) * 2, 0.05 + Math.tan(pitch) * 2, 2), damp(dt, 10));
+    // 1. Опорная поза — та, в которой зритель прямо перед экраном. Пока телефон крутят, она почти не меняется;
+    //    телефон замер — новая поза за несколько секунд становится опорной (человек пересел, лёг, перехватил телефон).
+    const moved = t.prev.angleTo(t.q); t.prev.copy(t.q);
+    t.speed += ((dt > 0 ? moved / dt : 0) - t.speed) * damp(dt, 8);
+    t.still = t.speed < 0.2 ? t.still + dt : 0;
+    t.base.slerp(t.q, damp(dt, t.still > 1.2 ? 1 / TILT_SETTLE : 1 / 15));
+    const off = t.base.angleTo(t.q);
+    if (off > TILT_LEASH) t.base.slerp(t.q, 1 - TILT_LEASH / off);
+    // 2. Где зритель в осях экрана: u = q⁻¹ · base · (0, 0, 1). ty > 0 — правее нормали к экрану, tp > 0 — выше.
+    const inv = this._tq2.copy(t.q).invert();
+    const u = this._tu.set(0, 0, 1).applyQuaternion(t.base).applyQuaternion(inv);
+    const a = damp(dt, 40);
+    t.ty += (Math.atan2(u.x, u.z) - t.ty) * a;
+    t.tp += (Math.atan2(u.y, Math.hypot(u.x, u.z)) - t.tp) * a;
+    // 3. Крен — насколько телефон завален набок в глазах зрителя. Зритель смотрит вдоль оси v, «верх» для него — верх мира
+    //    (сила тяжести); сравниваем с ним длинную сторону экрана — обе в проекции на плоскость, перпендикулярную взгляду.
+    //    Ось v — своя опора, медленная и на коротком поводке: когда наклонённый телефон поворачивают «дверью», голова не
+    //    должна крениться, а когда человек сам повернулся вместе с телефоном — должна быстро это забыть.
+    //    Телефон лежит на столе или повёрнут набок (читают лёжа, альбомный разворот) — крен не трогаем.
+    t.slow.slerp(t.q, damp(dt, 1 / 15));
+    const offS = t.slow.angleTo(t.q);
+    if (offS > TILT_ROLL_LEASH) t.slow.slerp(t.q, 1 - TILT_ROLL_LEASH / offS);
+    const v = this._tup.set(0, 0, 1).applyQuaternion(t.slow);
+    const U = this._tu.set(0, 1, 0).addScaledVector(v, -v.y);                               // верх мира
+    const Y = this._ty.set(0, 1, 0).applyQuaternion(t.q); Y.addScaledVector(v, -Y.dot(v));  // длинная сторона экрана
+    t.lean = -Math.atan2(v.dot(this._tc.crossVectors(U, Y)), U.dot(Y));
+    const lean = t.lean * smoothstep(0.3, 0.55, U.length()) * smoothstep(0.3, 0.55, Y.length()) * (1 - smoothstep(0.6, 1.0, Math.abs(t.lean)));
+    // 4. Голова догоняет зрителя как живая: с разгоном и торможением, без рывка (пружина без колебаний)
+    const steps = 2, h = dt / steps, W = 7, WR = 10;
+    for (let i = 0; i < steps; i++) {
+      t.fvy += ((t.ty - t.fy) * W * W - 2 * W * t.fvy) * h; t.fy += t.fvy * h;
+      t.fvp += ((t.tp - t.fp) * W * W - 2 * W * t.fvp) * h; t.fp += t.fvp * h;
+      t.fvr += ((lean - t.fr) * WR * WR - 2 * WR * t.fvr) * h; t.fr += t.fvr * h;
+    }
+    // 5. Итог. Зритель справа — жёстко закреплённую голову он видел бы с её левой стороны: нос уходит влево (−depth · ty);
+    //    голова поворачивается к нему (+follow). Зритель сверху — видит макушку, нос вниз (+depth · tp); голова поднимает лицо.
+    const soft = (x, m) => m * Math.tanh(x / m);
+    const pitch = C.depth * t.tp - C.follow * t.fp;
+    t.yaw = soft(-C.depth * t.ty + C.follow * t.fy, TILT_YAW) * t.w;
+    t.pitch = soft(pitch, pitch > 0 ? TILT_DOWN : TILT_UP) * t.w;
+    t.roll = soft(C.roll * t.fr, TILT_ROLL) * t.w;
+    // то, что лежит «в глубине» за головой (логотип), смещается в сторону зрителя: тангенс угла, страница умножит на глубину
+    t.px = Math.tan(clamp(t.ty, -0.7, 0.7)) * t.w; t.py = Math.tan(clamp(t.tp, -0.7, 0.7)) * t.w;
   }
 
   // ---------- сборка при загрузке ----------
@@ -1460,8 +1520,6 @@ export class Head extends EventTarget {
 
   _lookTarget(out) {
     if (this.intro.on) return out.set(0, 0.05, this.camera.position.z);      // пока собирается — взгляд прямо в экран
-    const fingerRecent = this.pointer.has && (this.drags.size > 0 || performance.now() - this.pointer.lastMove < 1200);
-    if (!this.lookOverride && this.tilt.has && !fingerRecent) return out.copy(this.tilt.target);
     const src = this.lookOverride || (this.pointer.has ? this.pointer : null);
     if (!src) return out.set(0, 0.05, this.camera.position.z);
     this.raycaster.setFromCamera(this._ndc(src.x, src.y), this.camera);
@@ -1480,7 +1538,9 @@ export class Head extends EventTarget {
     const k = this.drags.size ? 1.5 : (this.rm ? 3 : 4.5);
     this.rot.yaw += (yaw - this.rot.yaw) * damp(dt, k);
     this.rot.pitch += (pitch - this.rot.pitch) * damp(dt, k);
-    this._q.setFromEuler(this._e.set(this.rot.pitch + this.spitS.p, this.rot.yaw, 0, 'YXZ'));
+    // поворот от наклона телефона (эффект присутствия) ложится поверх: он «физический» и не должен запаздывать
+    const P = this.tilt;
+    this._q.setFromEuler(this._e.set(this.rot.pitch + this.spitS.p + P.pitch, this.rot.yaw + P.yaw, P.roll, 'YXZ'));
     const la = this.lean.a, ang = la.length();
     if (ang > 1e-6) this._q.multiply(this._q2.setFromAxisAngle(this._v[4].copy(la).divideScalar(ang), ang));
     this.pivot.quaternion.copy(this._q);
@@ -1504,7 +1564,7 @@ export class Head extends EventTarget {
       const ep = clamp(Math.atan2(v.y, Math.hypot(v.x, v.z)) + this.sacc.y, -EYE_DOWN, EYE_UP);
       this.gazePitch = ep;
       this._q.setFromEuler(this._e.set(-ep, ey, 0, 'YXZ'));
-      eye.quaternion.slerp(this._q, damp(dt, this.rm ? 10 : 20));
+      eye.quaternion.slerp(this._q, damp(dt, P.w > 0.5 ? 40 : (this.rm ? 10 : 20)));   // при наклоне глаза держат зрителя цепко
     }
   }
 
