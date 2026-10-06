@@ -1064,7 +1064,7 @@ export class Head extends EventTarget {
 
   _tiltEvent(e) {
     if (e.alpha == null && e.beta == null && e.gamma == null) return;   // ноутбук без датчиков
-    this.tilt.n++;
+    this.tilt.n++; this.tilt.a = e.alpha; this.tilt.b = e.beta; this.tilt.g = e.gamma;   // сырые углы — для справки ?diag
     const d = THREE.MathUtils.DEG2RAD;
     const orient = (((screen.orientation && screen.orientation.angle) ?? window.orientation) || 0) * d;
     const q = this._tq.setFromEuler(this._te.set((e.beta || 0) * d, (e.alpha || 0) * d, -(e.gamma || 0) * d, 'YXZ'));

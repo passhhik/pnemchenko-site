@@ -584,12 +584,15 @@ function updateVeil() {
 // наклон телефона (гироскоп). Android: включается сразу. iPhone/iPad: нужно разрешение —
 // просим плашкой, а не системным окном «из ниоткуда».
 let tiltTip = null, tiltAsk = false;
+const tiltLog = { asked: 0, state: '', err: '' };          // что ответил браузер — для справки ?diag
 async function askTilt() {
-  let state = 'denied';
-  try { state = await DeviceOrientationEvent.requestPermission(); } catch (_) { /* отказ или нет жеста */ }
-  store.set('tilt', state);
+  let state = '';
+  tiltLog.asked++; tiltLog.err = '';
+  try { state = await DeviceOrientationEvent.requestPermission(); } catch (e) { tiltLog.err = String((e && e.message) || e); }
+  tiltLog.state = state || 'сбой';
+  if (state) store.set('tilt', state);                      // сбой — не отказ: его не запоминаем, в следующий раз спросим снова
   if (state === 'granted') { head.enableTilt(); say('tilt_on', { force: true }); } else say('tilt_denied', { force: true });
-  track('tilt_permission', { state });
+  track('tilt_permission', { state: state || 'error' });
 }
 
 // Вызывается один раз, когда голова создана: подписки на её события
@@ -651,7 +654,8 @@ function wireHead() {
     if (store.get('tilt') === 'granted') {
       const again = () => {
         window.removeEventListener('touchend', again); window.removeEventListener('click', again);
-        DeviceOrientationEvent.requestPermission().then((st) => { if (st === 'granted') head.enableTilt(); }).catch(() => {});
+        tiltLog.asked++;
+        DeviceOrientationEvent.requestPermission().then((st) => { tiltLog.state = st; if (st === 'granted') head.enableTilt(); }).catch((e) => { tiltLog.state = 'сбой'; tiltLog.err = String((e && e.message) || e); });
       };
       window.addEventListener('touchend', again); window.addEventListener('click', again);
     }
@@ -806,7 +810,9 @@ function diag() {
       `голова: ${r ? `${Math.round(r.w)} px — ${Math.round((r.w / W) * 100)}% ширины` : (head ? 'в углу' : 'нет (WebGL)')}`,
       `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
+      `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}`,
       `наклон: ${tl && tl.on ? `включён, событий ${tl.n}` : 'выключен'}`,
+      ...(tl && tl.on ? [`углы α β γ: ${[tl.a, tl.b, tl.g].map((v) => (v == null ? '—' : Math.round(v))).join(' ')}; цель: ${tl.target.x.toFixed(2)} ${tl.target.y.toFixed(2)}; голова: ${Math.round(head.rot.yaw * 57.3)}° ${Math.round(head.rot.pitch * 57.3)}°`] : []),
       `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки: ${Number.isFinite(SPIT_AFTER) ? `через ${SPIT_AFTER} с` : 'выключены'}`,
     ].join('\n');
   };
@@ -904,7 +910,9 @@ async function boot() {
   if (view === 'hero') greet();
   if (query.has('diag')) diag();
   // Плашка про наклон (iPhone/iPad): появляется после приветствия и сама уходит, если её не тронули
-  if (tiltTip && store.get('tilt') == null) {
+  // В режиме ?diag плашка видна сразу и не уходит, даже если раньше от неё отказались: так наклон можно включить заново.
+  if (tiltTip && query.has('diag')) tiltTip.hidden = view !== 'hero';
+  else if (tiltTip && store.get('tilt') == null) {
     setTimeout(() => {
       if (view !== 'hero') return;
       tiltTip.hidden = false;
