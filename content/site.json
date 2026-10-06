@@ -33,7 +33,8 @@
     0.848,
     0.5
    ],
-   "tilt": 11
+   "tilt": 11,
+   "folder": "#00B3FF"
   },
   {
    "id": "marketing",
@@ -45,7 +46,8 @@
     0.17,
     0.665
    ],
-   "tilt": -10
+   "tilt": -10,
+   "folder": "#FF7575"
   },
   {
    "id": "identity",
@@ -57,7 +59,8 @@
     0.17,
     0.3
    ],
-   "tilt": 8
+   "tilt": 8,
+   "folder": "#57FFA0"
   }
  ],
  "cvFileName": "Pavel-Nemchenko-CV.pdf",
