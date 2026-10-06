@@ -551,6 +551,10 @@ function sitePane() {
       </fieldset>`).join('')}
       <div class="f"><button class="btn btn--line btn--sm" type="button" data-act="sec-add">Добавить раздел</button></div>
     </fieldset>
+    <fieldset class="fs"><legend>Пасхалка: плевки</legend>
+      <p class="hint">Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.</p>
+      ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: '0 — выключить. Чтобы посмотреть, как это выглядит, поставьте 0,1 (шесть секунд) — и не забудьте вернуть.' })}
+    </fieldset>
     <fieldset class="fs"><legend>Языки</legend>
       <div class="f"><label class="switch"><input type="checkbox" data-toggle="en"${en ? ' checked' : ''}><span>Английская версия сайта</span></label>
         <small class="hint">Посетитель увидит переключатель RU / EN; язык по умолчанию выбирается по домену и языку браузера. После включения переведите тексты: вверху появится выбор языка, поля без перевода покажутся по-русски.</small></div>

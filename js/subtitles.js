@@ -56,7 +56,6 @@ export class Subtitles {
   constructor({ el, srEl, voice, lines, fmt, reducedMotion }) {
     this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion;
     this.token = 0; this.last = 0; this.busyUntil = 0; this.readUntil = 0;
-    this.onLine = null;       // (id) — реплика начала звучать: страница может добавить к ней жест (подмигивание)
   }
 
   text(id) { return this.fmt(this.lines[id] ?? id); }
@@ -102,7 +101,6 @@ export class Subtitles {
 
   async _line(id, alive, more) {
     const text = this.text(id);
-    if (this.onLine) this.onLine(id);
     this.srEl.textContent = text.replace(/\n/g, ' ');
     const { p, spans } = buildLine(text);
     this.el.innerHTML = '';

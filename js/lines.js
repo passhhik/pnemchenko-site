@@ -142,9 +142,6 @@ export const REACTIONS = {
   stretch: ['stretch_big_1', 'stretch_big_2'], poke: ['poke_1', 'poke_2', 'poke_3'],
   glassesOff: ['glasses_off_1', 'glasses_off_2'],
   dragFolder: ['drag_folder_1', 'drag_folder_2', 'drag_folder_far'],
-  // посетитель затих: голова окликает его (и подмигивает — см. WINKS) и между делом подсказывает, что тут можно делать
+  // посетитель затих: голова окликает его и между делом подсказывает, что тут можно делать
   idle: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_4', 'idle_hey_3', 'idle_3', 'idle_1'],
 };
-
-// На каких репликах голова подмигивает, глядя прямо в экран
-export const WINKS = new Set(['idle_hey_1', 'idle_hey_2', 'idle_hey_3', 'hello_back']);

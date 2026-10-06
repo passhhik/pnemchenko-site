@@ -452,7 +452,7 @@ export class Head extends EventTarget {
     this.rot = { yaw: 0, pitch: 0 };
     this.mouth = 0; this.mouthTarget = 0;
     this.blink = { next: 1.4, t: -1, double: false };
-    this.squint = 0; this.winkT = { L: 0, R: 0 }; this.winkV = { L: 0, R: 0 };
+    this.squint = 0;
     this.pop = { s: this.rm ? 1 : 0.001, v: 0 };
     this.sq = { s: 1, v: 0 };
     this.sacc = { x: 0, y: 0, next: 0 };
@@ -1042,7 +1042,6 @@ export class Head extends EventTarget {
   setMouth(v) { this.mouthTarget = clamp(v, 0, 1); }
   lookAtClient(x, y) { this.lookOverride = { x, y }; }
   clearLook() { this.lookOverride = null; }
-  wink(side = 'R') { this.winkT[side] = 0.32; }
   boing(a = 0.06) { this.sq.v -= a * 14; }
   // Цвет сцены: мягкий контровой свет цвета фона — голова «сидит» в сцене, а не наклеена поверх
   setSceneColor(hex) {
@@ -1528,14 +1527,10 @@ export class Head extends EventTarget {
     v = clamp(v, 0, 1);
     const sqT = Math.max(this.glasses.off ? 0.38 : 0, this.spitS.squint);
     this.squint += (sqT - this.squint) * damp(dt, sqT > this.squint ? 12 : 6);
-    for (const s of ['L', 'R']) {
-      this.winkT[s] = Math.max(0, this.winkT[s] - dt);
-      this.winkV[s] += ((this.winkT[s] > 0 ? 1 : 0) - this.winkV[s]) * damp(dt, 28);
-    }
     // веки следуют за взглядом вниз — как у живого человека
     const lidDown = 0.35 * smoothstep(0.02, EYE_DOWN, -(this.gazePitch || 0));
-    this._setMorph('Blink_L', Math.max(v, this.squint, this.winkV.L, lidDown));
-    this._setMorph('Blink_R', Math.max(v, this.squint, this.winkV.R, lidDown));
+    this._setMorph('Blink_L', Math.max(v, this.squint, lidDown));
+    this._setMorph('Blink_R', Math.max(v, this.squint, lidDown));
   }
 
   _updateMouth(dt) {

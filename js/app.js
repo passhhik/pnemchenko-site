@@ -5,7 +5,7 @@ import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
 import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, isStack } from './content.js';
-import { LINES, REACTIONS, WINKS } from './lines.js';
+import { LINES, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
 import { createCatalog } from './arc.js';
@@ -621,7 +621,7 @@ function wireHead() {
     track('glasses_off');
   });
   head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); say('glasses_self', { force: true }); });
-  head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; head.wink('R'); });
+  head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; });
   head.addEventListener('spit', (e) => onSpit(e.detail));
   // сборка при загрузке: настоящие глаза встали на место — заглушка больше не нужна
   head.addEventListener('introstep', (e) => { if (e.detail.part === 'eyes') els.eyes.hidden = true; });
@@ -680,7 +680,7 @@ function greet() {
 function activity() { lastActivity = performance.now(); }
 // движение мыши сюда попадает отфильтрованным — см. ниже, где считается бездействие для плевков
 ['pointerdown', 'pointerup', 'keydown', 'scroll', 'touchstart'].forEach((ev) => window.addEventListener(ev, activity, { passive: true }));
-// Посетитель затих на главной — голова окликает его («Эй, ты тут?») и подмигивает. Тишина считается с последнего
+// Посетитель затих на главной — голова окликает его («Эй, ты тут?»). Тишина считается с последнего
 // действия посетителя или с конца последней реплики головы: договорила, подождала — и только потом окликает.
 // Первый раз — через несколько секунд, дальше реже и не больше трёх реплик за одно затишье: потом она молчит
 // (а если ждать совсем долго — начнёт плеваться).
@@ -692,7 +692,7 @@ setInterval(() => {
   const now = performance.now(), last = Math.max(lastActivity, head ? head.tilt.lastMove : 0);
   if (last > idle.mark) { idle.mark = last; idle.n = 0; }                 // посетитель шевельнулся — затишье считаем заново
   if (idle.n >= 3 || speaking()) return;
-  // первая реплика должна успеть до плевков: при проверочных 5 секундах — через 3, на боевом сайте — через 7.
+  // первая реплика — через 7 секунд; если плевкам задана совсем короткая задержка, оклик звучит раньше, чтобы успеть до них.
   // Когда весь список уже прозвучал, голова окликает реже (вдвое, втрое…), чтобы не надоедать
   const round = 1 + Math.floor(idle.i / REACTIONS.idle.length);
   const wait = idle.n ? 13000 : Math.min(7, Math.max(2.5, SPIT_AFTER * 0.6)) * 1000 * round;
@@ -700,26 +700,21 @@ setInterval(() => {
   say(REACTIONS.idle[idle.i++ % REACTIONS.idle.length], { force: true });
   idle.n++; idle.at = now;
 }, 500);
-// На некоторых репликах (см. WINKS в js/lines.js) голова смотрит прямо в экран и подмигивает
-let winkT = 0;
-function winkAtViewer() {
-  if (!head || reduced) return;
-  if (view === 'hero' && head.rect && !openId && spit.state === 'off') {
-    const r = head.rect;
-    head.lookAtClient(r.x + r.w / 2, r.y + r.h * 0.42);
-    clearTimeout(winkT);
-    winkT = setTimeout(() => { if (head && !openId && spit.state === 'off') head.clearLook(); }, 1700);
-  }
-  setTimeout(() => { if (head) head.wink(Math.random() < 0.5 ? 'L' : 'R'); }, 420);
-}
-
 // ---------- пасхалка: посетитель «залип» — голова заплёвывает экран ----------
 // Если долго ничего не трогать, голова начинает плевать в экран: плевки остаются на «стекле» в случайных местах,
 // пока не покроют его целиком. Любое действие посетителя — и экран вытирается. Сами кляксы — в js/spit.js,
 // движение головы — в head.js (spit).
-// СКОЛЬКО ЖДАТЬ: сейчас 5 секунд — для проверки. На боевом сайте поставьте 600 (10 минут).
-// Проверить с любым значением можно и адресом: …/?spit=5
-const SPIT_AFTER = Number(query.get('spit')) > 0 ? Number(query.get('spit')) : 5;
+// СКОЛЬКО ЖДАТЬ — задаётся в админке: «Настройки сайта» → «Плевки» (минуты бездействия; 0 — выключить).
+// В содержимом это site.spitAfter; пока оно не загрузилось — 10 минут. Проверить с любым значением можно адресом: …/?spit=5 (секунды).
+const SPIT_DEFAULT_MIN = 10;
+let SPIT_AFTER = SPIT_DEFAULT_MIN * 60;       // секунды
+function spitDelay(site) {
+  const q = Number(query.get('spit'));
+  if (q > 0) return q;
+  const m = site ? site.spitAfter : undefined;
+  if (m === 0 || m === '0') return Infinity;                      // выключено
+  return (Number(m) > 0 ? Number(m) : SPIT_DEFAULT_MIN) * 60;
+}
 const spit = { state: 'off', fx: null, n: 0, t: 0, to: null, pending: null, input: performance.now(), px: -1, py: -1 };   // state: off | on | done | dead
 if (debug) window.__spit = spit;
 const speaking = () => !!subs && (document.body.classList.contains('is-speaking') || performance.now() < Math.max(subs.busyUntil, subs.readUntil));
@@ -812,7 +807,7 @@ function diag() {
       `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
       `наклон: ${tl && tl.on ? `включён, событий ${tl.n}` : 'выключен'}`,
-      `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки через ${SPIT_AFTER} с`,
+      `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки: ${Number.isFinite(SPIT_AFTER) ? `через ${SPIT_AFTER} с` : 'выключены'}`,
     ].join('\n');
   };
   draw();
@@ -852,13 +847,13 @@ async function boot() {
     return;
   }
   const site = content.site;
+  SPIT_AFTER = spitDelay(site);
   const vars = { name: tx(site.name), nameGen: tx(site.nameGen) || tx(site.name), role: tx(site.role) };
   subs = new Subtitles({
     el: els.subs, srEl: $('[data-subs-sr]'), voice, reducedMotion: reduced,
     lines: { ...LINES.ru, ...(LINES[content.lang] || {}) },
     fmt: (s) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ''),
   });
-  subs.onLine = (id) => { if (WINKS.has(id)) winkAtViewer(); };
   if (debug) window.__subs = subs;
   knownSizes();
   applyContent();
