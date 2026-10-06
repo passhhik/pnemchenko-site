@@ -367,6 +367,7 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   body[data-view="work"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); }
   body[data-view="work"] .subs-line:empty{ display:none; }
   .tip{ top:max(5px, env(safe-area-inset-top)); bottom:auto; }
+  .diag{ top:calc(58px + env(safe-area-inset-top)); }      /* ниже плашки наклона, чтобы справка её не закрывала */
   /* папки разделов — горизонтальная лента; первая стоит по центру, соседние выглядывают по бокам */
   .folders{ inset:auto 0 var(--bar) 0; display:flex; align-items:flex-start; gap:22px; padding:calc(var(--mfw,170px) * .4) calc(50% - var(--mfw,170px) / 2) 8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; pointer-events:auto; -webkit-overflow-scrolling:touch; }
   .folders::-webkit-scrollbar{ display:none; }
