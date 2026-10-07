@@ -4,12 +4,13 @@ import { Voice } from './voice.js';
 import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
-import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, thumbOf, isStack } from './content.js';
+import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, thumbOf, isStack, heroFolders } from './content.js';
 import { linesFor, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
 import { createCatalog } from './arc.js';
 import { renderCase } from './case.js';
+import { fetchModel, fetched, warmLoaders } from './model.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -42,10 +43,18 @@ const els = {
 };
 
 const HEAD_AR = 1.33;             // пропорции головы, пока модель не загрузилась (потом берутся с самой модели)
-const MOBILE_HEAD = 0.76;         // телефон: голова (от уха до уха) занимает не больше этой доли ширины экрана
+const MOBILE_HEAD = 0.76;         // телефон, папки лентой: голова (от уха до уха) занимает не больше этой доли ширины экрана
+// Телефон без папок на главной («чистый» экран): логотип, голова, реплика, кнопки — и воздух между ними.
+const CLEAN_LOGO = 1.3 / 3;       // ширина логотипа в долях ширины экрана: на треть крупнее прежнего (был треть экрана)
+const CLEAN_HEAD = [0.72, 0.78];   // голова от уха до уха — не больше этой доли ширины экрана: на обычном экране и на вытянутом (там больше высоты)
+const CLEAN_HEAD_MAX = 540;       // …и не больше стольких точек (планшет в портрете)
+const CLEAN_DROP = 0.56;          // какая доля свободной высоты уходит над голову (остальное — под реплику): голова стоит чуть ниже середины
 const SUBS_LH = 1.15;             // межстрочный интервал субтитров — тот же, что у .subs в css/style.css
 let head = null, subs = null, catalog = null, caseView = null;
 let view = null, folderEls = [], logoAR = 393 / 95;
+// Время этапов загрузки, мс от открытия страницы (для справки ?diag): когда что появилось
+const stages = {};
+const stage = (k) => { if (!(k in stages)) stages[k] = performance.now(); };
 const voice = new Voice({ head: { setMouth(v) { if (head) head.setMouth(v); } } });
 // Невидимый двойник кружка в углу (стили те же, что у .stage.is-corner): по нему голова знает,
 // куда лететь при переходе в каталог, ещё до того, как сцена туда доехала
@@ -96,6 +105,7 @@ function applyContent() {
     els.logo.classList.remove('is-text');
     els.logo.classList.add('is-ready');
     const im = new Image();
+    im.crossOrigin = 'anonymous';             // так же, как браузер качает маску логотипа, — тогда файл скачивается один раз, а не дважды
     im.onload = () => { if (im.naturalWidth && im.naturalHeight) { logoAR = im.naturalWidth / im.naturalHeight; rs.setProperty('--logo-ar', String(logoAR)); layout(); } };
     im.onerror = () => textLogo(name);
     im.src = url;
@@ -156,8 +166,22 @@ function artsOf(id) {
   }
   return out.slice(0, BURST_MAX);
 }
+// Папки на главной есть не везде: на телефоне главный экран чистый (см. heroFolders в js/content.js). Где их нет,
+// мы их и не строим — вместе с ними не качаются и картинки работ. foldersOn — есть ли папки сейчас; folderEls — они сами
+// (пусто, когда папок нет). Раскладка сверяется при каждом пересчёте: планшет повернули — папки появились.
+let foldersOn = false, folderAll = null;
+function syncFolders() {
+  const on = heroFolders();
+  if (on && !folderAll) buildFolders();
+  if (on === foldersOn && els.folders.hidden === !on) return;
+  foldersOn = on;
+  folderEls = on ? folderAll : [];
+  els.folders.hidden = !on;
+  document.body.classList.toggle('no-folders', !on);
+  if (!on) closeFolder();
+  else if (booted) preloadArtifacts();
+}
 function buildFolders() {
-  installFolderDefs();
   els.folders.innerHTML = (content.site.sections || []).map((s) => {
     const ps = sectionProjects(s.id);
     return folderHTML({
@@ -166,17 +190,20 @@ function buildFolders() {
       cls: 'gf--section', attrs: `data-section="${esc(s.id)}"`, lazy: false,
     });
   }).join('');
-  folderEls = $$('.gf', els.folders);
-  folderEls.forEach(bindFolder);
+  folderAll = $$('.gf', els.folders);
+  folderAll.forEach(bindFolder);
+  geo.centered = false;
 }
 
 // ---------- раскладка: шапка и главный экран ----------
-const geo = { subs: null, mobile: false, fw: 220, centered: false };
+const geo = { subs: null, mobile: false, fw: 220, centered: false, tip: 0 };      // tip — высота, занятая плашкой наклона над кнопками (телефон без папок)
 function layout() {
   const W = window.innerWidth, H = window.innerHeight, mobile = isStack();
   const u = Math.min(W, 1.5 * H) / 100;                       // единица макета, как --u в стилях
   const hero = (view || 'hero') === 'hero';
   geo.mobile = mobile;
+  syncFolders();
+  const clean = mobile && !foldersOn;                         // телефон без папок: чистый экран
 
   // шапка: на главной логотип крупный (как в макете), внутри сайта — компактный.
   // Логотип — отдельный слой (на главной он лежит под головой), поэтому его место считаем здесь, а не сеткой шапки.
@@ -190,8 +217,8 @@ function layout() {
   } else {
     rs.setProperty('--pad-top', hero ? '12px' : '8px');
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
-    // телефон: логотип — треть ширины экрана; всё освободившееся место отдаём голове
-    logoW = hero ? W / 3 : Math.min(W / 3, 36 * logoAR);
+    // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее)
+    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, 420) : W / 3) : Math.min(W / 3, 36 * logoAR);
     const row = hero ? logoW / logoAR : Math.max(36, logoW / logoAR);
     hdr = hero ? padTop + row + 4 : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
@@ -244,8 +271,29 @@ function layout() {
       el.style.setProperty('--x', `${x.toFixed(1)}px`); el.style.setProperty('--y', `${y.toFixed(1)}px`);
     });
     geo.centered = false;
+  } else if (clean) {
+    // Телефон, чистый экран: логотип, голова, три строки реплики, кнопки под большим пальцем. Папок нет — свободную
+    // высоту не отдаём голове целиком, а оставляем воздухом: чуть больше над головой, остальное — под репликой.
+    subsSize = clamp(0.05 * W, 16, 32);
+    subsH = subsSize * SUBS_LH * 3;
+    subsW = Math.min(W - 28, subsSize * 30);
+    const bar = els.nav.getBoundingClientRect().height || 66;
+    const gap = 10;                                             // наименьший зазор сверху (от логотипа) и снизу (до кнопок)
+    // реплика стоит под подбородком с запасом: когда голова говорит, челюсть опускается
+    const chin = (hh) => Math.max(14, hh * 0.06);
+    const room = H - hdr - gap - subsH - gap - geo.tip - bar;      // высота на голову вместе с зазором до реплики
+    // на вытянутом экране голова чуть крупнее — иначе она теряется в белом. Плашку наклона здесь не считаем:
+    // пока она на экране и когда уходит, голова остаётся того же размера и только сдвигается
+    const tall = clamp(((room + geo.tip) / W - 1.2) / 0.3, 0, 1);
+    const cap = Math.min((CLEAN_HEAD[0] + (CLEAN_HEAD[1] - CLEAN_HEAD[0]) * tall) * W, CLEAN_HEAD_MAX);
+    width = clamp(room / (ar * 1.06), 110, cap);
+    const hh = width * ar;
+    top = hdr + gap + Math.max(0, room - hh - chin(hh)) * CLEAN_DROP;
+    subsY = top + hh + chin(hh);
+    fw = geo.fw;
+    geo.centered = false;
   } else {
-    // телефон: маленький логотип, крупная голова, три строки субтитров, лента папок, кнопки под большим пальцем
+    // телефон с папками: маленький логотип, крупная голова, три строки субтитров, лента папок, кнопки под большим пальцем
     subsSize = clamp(0.05 * W, 16, 32);
     subsH = subsSize * SUBS_LH * 3;
     subsW = Math.min(W - 28, subsSize * 30);
@@ -287,6 +335,7 @@ function layout() {
   rs.setProperty('--ph-w', `${width.toFixed(1)}px`); rs.setProperty('--ph-h', `${(width * ar).toFixed(1)}px`);
   rs.setProperty('--subs-x', `${cx}px`); rs.setProperty('--subs-y', `${subsY.toFixed(1)}px`);
   rs.setProperty('--subs-w', `${subsW.toFixed(1)}px`); rs.setProperty('--subs-size', `${subsSize.toFixed(2)}px`);
+  rs.setProperty('--tip', `${(clean ? geo.tip : 0).toFixed(1)}px`);
 }
 let raf = 0;
 window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { layout(); closeFolder(); }); });
@@ -299,8 +348,10 @@ const sizes = new Map();
 function knownSizes() {
   for (const p of content.projects) for (const a of p.artifacts || []) if (a && a.w && a.h) sizes.set(a.src, { w: a.w, h: a.h });
 }
+let artsAsked = false;
 function preloadArtifacts() {
-  if (navigator.connection && navigator.connection.saveData) return;
+  if (artsAsked || !foldersOn || (navigator.connection && navigator.connection.saveData)) return;
+  artsAsked = true;
   const list = [...new Set((content.site.sections || []).flatMap((s) => artsOf(s.id).map((a) => a.src)))];
   let i = 0;
   const next = () => {
@@ -519,7 +570,7 @@ function show(next, opts = {}) {
   }
   document.body.dataset.view = next;
   if (next !== 'hero') els.ph.hidden = true;
-  if (tiltTip && next !== 'hero') tiltTip.hidden = true;
+  if (next !== 'hero') showTip(false, true);
   els.stage.classList.toggle('is-corner', next !== 'hero');
   for (const [k, el] of Object.entries(els.views)) el.hidden = k !== next;
   if (next === 'work') els.allWork.setAttribute('aria-current', 'page'); else els.allWork.removeAttribute('aria-current');
@@ -552,6 +603,7 @@ function show(next, opts = {}) {
       if (subs) subs.clear();
       $('#hero-title').focus({ preventScroll: true });
       if (booted) greet();      // пришли по ссылке на кейс и впервые вышли на главную — голова здоровается
+      offerTilt();              // …и плашка про наклон, если её ещё не видели
     }
   }
 }
@@ -595,18 +647,89 @@ function parallax() {
   els.mark.style.transform = x || y ? `translate3d(${x}px, ${y}px, 0)` : '';
 }
 
-// наклон телефона (гироскоп). Android: включается сразу. iPhone/iPad: нужно разрешение —
-// просим плашкой, а не системным окном «из ниоткуда».
-let tiltTip = null, tiltAsk = false;
+// Наклон телефона (гироскоп). Android: включается сразу. iPhone/iPad: нужно разрешение — просим плашкой, а не
+// системным окном «из ниоткуда». Плашка появляется сразу, вместе со страницей (голова ей не нужна): пока та
+// собирается, посетитель уже может разрешить наклон. Датчик браузеры отдают только сайту, открытому по https:
+// по http события не приходят вовсе, и голова на телефоне следит только за папками.
+let tiltTip = null, tiltAsk = false, tiltOk = false, tiltWanted = false, tiltHello = false;      // tiltWanted — наклон разрешён, а головы ещё нет
 const tiltLog = { asked: 0, state: '', err: '' };          // что ответил браузер — для справки ?diag
+const TIP_SLOT = 56;             // сколько высоты плашка занимает над кнопками на телефоне: сама плашка (48) и зазор до кнопок (8)
+function enableTilt() { tiltWanted = true; if (head) head.enableTilt(); }
 async function askTilt() {
   let state = '';
   tiltLog.asked++; tiltLog.err = '';
   try { state = await DeviceOrientationEvent.requestPermission(); } catch (e) { tiltLog.err = String((e && e.message) || e); }
   tiltLog.state = state || 'сбой';
   if (state) store.set('tilt', state);                      // сбой — не отказ: его не запоминаем, в следующий раз спросим снова
-  if (state === 'granted') { head.enableTilt(); say('tilt_on', { force: true }); } else say('tilt_denied', { force: true });
+  if (state === 'granted') {
+    enableTilt();
+    if (greeted) say('tilt_on', { force: true }); else tiltHello = true;      // голова ещё собирается — скажет после приветствия
+  } else if (greeted) say('tilt_denied', { force: true });
   track('tilt_permission', { state: state || 'error' });
+}
+// На телефоне плашка стоит над кнопками, и раскладка оставляет под неё место (geo.tip), чтобы она не легла на реплику.
+// Когда плашка уходит, место плавно возвращается голове и реплике. Если на телефоне включена лента папок, места
+// внизу нет — там плашка встаёт наверху, поверх логотипа (см. стили).
+let tipRaf = 0, tipT = 0, tipHideT = 0;
+function tipSlot(to, instant) {
+  cancelAnimationFrame(tipRaf);
+  if (instant || reduced || view !== 'hero' || Math.abs(geo.tip - to) < 0.5) { geo.tip = to; layout(); return; }
+  const from = geo.tip, t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 420);
+    geo.tip = from + (to - from) * (1 - (1 - k) ** 3);
+    layout();
+    if (k < 1) tipRaf = requestAnimationFrame(step);
+  };
+  tipRaf = requestAnimationFrame(step);
+}
+function showTip(on, instant = false) {
+  if (!tiltTip) return;
+  clearTimeout(tipT); clearTimeout(tipHideT);
+  if (on) { tiltTip.hidden = false; tiltTip.classList.remove('is-out'); }
+  else if (instant || reduced || tiltTip.hidden) tiltTip.hidden = true;
+  else { tiltTip.classList.add('is-out'); tipT = setTimeout(() => { tiltTip.hidden = true; }, 260); }
+  tipSlot(on ? TIP_SLOT : 0, instant);
+}
+// Вызывается один раз, когда содержимое загружено (нужны тексты): что умеет устройство и нужна ли плашка
+function setupTilt() {
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  tiltOk = coarse && !reduced && window.isSecureContext && 'DeviceOrientationEvent' in window;
+  tiltAsk = tiltOk && typeof DeviceOrientationEvent.requestPermission === 'function';
+  if (tiltOk && !tiltAsk) enableTilt();
+  if (!tiltAsk) return;
+  tiltTip = document.createElement('div');
+  tiltTip.className = 'tip';
+  tiltTip.hidden = true;
+  tiltTip.setAttribute('role', 'group');
+  tiltTip.setAttribute('aria-label', t('tiltLabel'));
+  tiltTip.innerHTML = '<svg class="tip-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="8" y="2.5" width="8" height="13" rx="2" transform="rotate(-12 12 9)"/><path d="M4.5 17.5a10 10 0 0 0 15 0"/><path d="M19.5 14v3.5H16"/></svg>' +
+    `<span class="tip-text">${esc(t('tiltText'))}</span>` +
+    `<button class="tip-btn" type="button">${esc(t('tiltOn'))}</button>` +
+    `<button class="tip-close" type="button" aria-label="${esc(t('tiltNo'))}">×</button>`;
+  document.body.appendChild(tiltTip);
+  tiltTip.querySelector('.tip-btn').addEventListener('click', async () => { await askTilt(); showTip(false); });
+  tiltTip.querySelector('.tip-close').addEventListener('click', () => { store.set('tilt', 'dismissed'); track('tilt_permission', { state: 'dismissed' }); showTip(false); });
+  if (store.get('tilt') === 'granted') {
+    // разрешение уже давали: браузер всё равно ждёт касания — спрашиваем на первом же, окно при этом не появляется
+    const again = () => {
+      window.removeEventListener('touchend', again); window.removeEventListener('click', again);
+      tiltLog.asked++;
+      DeviceOrientationEvent.requestPermission().then((st) => { tiltLog.state = st; if (st === 'granted') enableTilt(); }).catch((e) => { tiltLog.state = 'сбой'; tiltLog.err = String((e && e.message) || e); });
+    };
+    window.addEventListener('touchend', again); window.addEventListener('click', again);
+  }
+  offerTilt(true);
+}
+// Показываем плашку сразу — один раз за визит и только на главной. В режиме ?diag она видна, даже если раньше от неё
+// отказались (так наклон можно включить заново), и сама не уходит.
+let tipOffered = false;
+function offerTilt(instant = false) {
+  if (!tiltTip || tipOffered || view !== 'hero' || !(query.has('diag') || store.get('tilt') == null)) return;
+  tipOffered = true;
+  showTip(true, instant);
+  if (greeted && !query.has('diag')) tipHideT = setTimeout(() => showTip(false), 20000);
 }
 
 // Вызывается один раз, когда голова создана: подписки на её события
@@ -641,39 +764,12 @@ function wireHead() {
   head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; });
   head.addEventListener('spit', (e) => onSpit(e.detail));
   // сборка при загрузке: настоящий мозг появился — розовое пятно-заглушка под ним гаснет
-  head.addEventListener('introstep', (e) => { if (e.detail.part === 'brain') { els.ph.classList.add('is-out'); setTimeout(() => { els.ph.hidden = true; }, 320); } });
+  head.addEventListener('introstep', (e) => { if (e.detail.part === 'brain') { stage('brain'); els.ph.classList.add('is-out'); setTimeout(() => { els.ph.hidden = true; }, 320); } });
+  head.addEventListener('model', () => stage('model'));
   head.onTick = (dt) => { voice.tick(dt); };
   head.onFrame = () => { updateVeil(); parallax(); };
 
-  // Датчик наклона браузеры отдают только сайту, открытому по https (защищённое соединение):
-  // по http события не приходят вовсе, и голова на телефоне следит только за папками.
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const tiltOk = coarse && !reduced && window.isSecureContext && 'DeviceOrientationEvent' in window;
-  tiltAsk = tiltOk && typeof DeviceOrientationEvent.requestPermission === 'function';
-  if (tiltOk && !tiltAsk) head.enableTilt();
-  if (tiltAsk) {
-    tiltTip = document.createElement('div');
-    tiltTip.className = 'tip';
-    tiltTip.hidden = true;
-    tiltTip.setAttribute('role', 'group');
-    tiltTip.setAttribute('aria-label', t('tiltLabel'));
-    tiltTip.innerHTML = '<svg class="tip-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<rect x="8" y="2.5" width="8" height="13" rx="2" transform="rotate(-12 12 9)"/><path d="M4.5 17.5a10 10 0 0 0 15 0"/><path d="M19.5 14v3.5H16"/></svg>' +
-      `<span class="tip-text">${esc(t('tiltText'))}</span>` +
-      `<button class="tip-btn" type="button">${esc(t('tiltOn'))}</button>` +
-      `<button class="tip-close" type="button" aria-label="${esc(t('tiltNo'))}">×</button>`;
-    document.body.appendChild(tiltTip);
-    tiltTip.querySelector('.tip-btn').addEventListener('click', async () => { await askTilt(); tiltTip.hidden = true; });
-    tiltTip.querySelector('.tip-close').addEventListener('click', () => { store.set('tilt', 'dismissed'); track('tilt_permission', { state: 'dismissed' }); tiltTip.hidden = true; });
-    if (store.get('tilt') === 'granted') {
-      const again = () => {
-        window.removeEventListener('touchend', again); window.removeEventListener('click', again);
-        tiltLog.asked++;
-        DeviceOrientationEvent.requestPermission().then((st) => { tiltLog.state = st; if (st === 'granted') head.enableTilt(); }).catch((e) => { tiltLog.state = 'сбой'; tiltLog.err = String((e && e.message) || e); });
-      };
-      window.addEventListener('touchend', again); window.addEventListener('click', again);
-    }
-  }
+  if (tiltWanted) head.enableTilt();                          // наклон уже разрешён (Android — сразу, iPhone — плашкой)
   head.addEventListener('tiltstart', () => {
     if (!tiltAsk && !store.get('tiltHi', false)) { store.set('tiltHi', true); say('tilt_hi', { force: true }); }
     track('tilt_start');
@@ -691,9 +787,27 @@ function greet() {
   store.set('seen', true);
   // если за эти полсекунды посетитель уже ушёл в каталог — приветствие главного экрана там не нужно
   setTimeout(() => {
-    // вторая реплика — про то, как здесь смотреть папки: навести, нажать или листать ленту (телефон)
-    if (view === 'hero') say(returning ? ['hello_back'] : ['hello_1', isStack() ? 'hello_2_strip' : touchUI ? 'hello_2_touch' : 'hello_2'], { force: true });
+    if (view !== 'hero') return;
+    // вторая реплика — про то, как здесь смотреть работы: навести на папку, нажать, листать ленту; папок нет — про кнопку «Все работы»
+    const how = !foldersOn ? 'hello_2_clean' : isStack() ? 'hello_2_strip' : touchUI ? 'hello_2_touch' : 'hello_2';
+    const list = returning ? [foldersOn ? 'hello_back' : 'hello_back_clean'] : ['hello_1', how];
+    if (tiltHello) { tiltHello = false; list.push('tilt_on'); }      // наклон разрешили, пока голова собиралась
+    say(list, { force: true });
   }, reduced ? 0 : 500);
+  // плашка наклона, если её так и не тронули, уходит сама — отсчёт от приветствия
+  if (tiltTip && !tiltTip.hidden && !query.has('diag')) tipHideT = setTimeout(() => showTip(false), 20000);
+}
+// Голова говорит про кнопку «Все работы» — и смотрит на неё; кнопка в ответ один раз «кивает»
+const WORK_LINES = new Set(['hello_2_clean', 'idle_5']);
+let pointT = 0;
+function pointAtWork() {
+  if (view !== 'hero' || openId || dragging) return;
+  lookAtEl(els.allWork);
+  els.allWork.classList.remove('is-nudge');
+  void els.allWork.offsetWidth;                  // анимация запускается заново
+  els.allWork.classList.add('is-nudge');
+  clearTimeout(pointT);
+  pointT = setTimeout(() => { els.allWork.classList.remove('is-nudge'); if (head && view === 'hero' && !openId && spit.state === 'off') head.clearLook(); }, 1700);
 }
 function activity() { lastActivity = performance.now(); }
 // движение мыши сюда попадает отфильтрованным — см. ниже, где считается бездействие для плевков
@@ -712,10 +826,11 @@ setInterval(() => {
   if (idle.n >= 3 || speaking()) return;
   // первая реплика — через 7 секунд; если плевкам задана совсем короткая задержка, оклик звучит раньше, чтобы успеть до них.
   // Когда весь список уже прозвучал, голова окликает реже (вдвое, втрое…), чтобы не надоедать
-  const round = 1 + Math.floor(idle.i / REACTIONS.idle.length);
+  const calls = foldersOn ? REACTIONS.idle : REACTIONS.idleClean;
+  const round = 1 + Math.floor(idle.i / calls.length);
   const wait = idle.n ? 13000 : Math.min(7, Math.max(2.5, SPIT_AFTER * 0.6)) * 1000 * round;
   if (now - (idle.n ? idle.at : Math.max(last, spokeUntil())) < wait) return;
-  say(REACTIONS.idle[idle.i++ % REACTIONS.idle.length], { force: true });
+  say(calls[idle.i++ % calls.length], { force: true });
   idle.n++; idle.at = now;
 }, 500);
 // ---------- пасхалка: посетитель «залип» — голова заплёвывает экран ----------
@@ -830,9 +945,8 @@ function stopSpit() {
 
 // ---------- проверка на телефоне: адрес …/?diag показывает, что видит сайт ----------
 // Удобно, когда «на телефоне что-то не так»: размер экрана, размер головы, защищено ли соединение и жив ли датчик наклона.
-let modelAt = 0;
-// Как сайт загрузился: сколько файлов и мегабайт пришло по сети, сжимает ли их сервер, сколько браузер взял из своей памяти
-// и через сколько секунд была готова модель головы. Старые браузеры размеров не сообщают — тогда пишем только число файлов.
+// Как сайт загрузился: сколько файлов и мегабайт пришло по сети, сжимает ли их сервер и сколько браузер взял из своей памяти.
+// Старые браузеры размеров не сообщают — тогда пишем только число файлов.
 function netLine() {
   try {
     const all = [...performance.getEntriesByType('navigation'), ...performance.getEntriesByType('resource')].filter((e) => e.name.startsWith(location.origin));
@@ -846,10 +960,15 @@ function netLine() {
       if (!e.transferSize && e.decodedBodySize) kept++;
       if (/\.(js|css|json|html|svg)(\?|$)|\/(\?[^/]*)?$/.test(e.name) && e.decodedBodySize > 2000) { text++; if (e.encodedBodySize && e.encodedBodySize < e.decodedBodySize * 0.95) packed++; }
     }
-    const ready = modelAt ? `; модель через ${(modelAt / 1000).toFixed(1).replace('.', ',')} с` : '';
-    if (!known) return `загрузка: файлов ${all.length}${ready}`;
-    return `загрузка: файлов ${all.length}, по сети ${mb(wire)} из ${mb(raw)} МБ, сжатие: ${!text ? '—' : packed ? 'есть' : 'нет'}, из памяти браузера: ${kept}${ready}`;
+    if (!known) return `загрузка: файлов ${all.length}`;
+    return `загрузка: файлов ${all.length}, по сети ${mb(wire)} из ${mb(raw)} МБ, сжатие: ${!text ? '—' : packed ? 'есть' : 'нет'}, из памяти браузера: ${kept}`;
   } catch (_) { return 'загрузка: браузер не сообщает'; }
+}
+// Этапы загрузки, секунды от открытия страницы: когда появились логотип и кнопки, когда скачался и запустился 3D-движок,
+// когда на экране появился мозг, когда модель скачана и разобрана и когда голова собралась и готова здороваться
+function stageLine() {
+  const sec = (k) => (k in stages ? (stages[k] / 1000).toFixed(1).replace('.', ',') : '—');
+  return `этапы, с: страница ${sec('ui')} · движок ${sec('engine')} · мозг ${sec('brain')} · модель ${sec('model')} · собрана ${sec('ready')}`;
 }
 function diag() {
   const el = document.createElement('pre');
@@ -876,6 +995,7 @@ function diag() {
       `https: ${yes(window.isSecureContext)} (${location.protocol}//${location.host})`,
       fpsLine(),
       netLine(),
+      stageLine(),
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
       `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}`,
       `наклон: ${tl && tl.on ? 'включён, событий пока нет' : 'выключен'}`,
@@ -904,7 +1024,7 @@ function diag() {
 function redraw() {
   knownSizes();
   applyContent();
-  buildFolders();
+  folderAll = null; folderEls = []; foldersOn = false; els.folders.innerHTML = '';      // папки пересоберёт раскладка — если они на этом экране нужны
   catalog.render();
   route();
 }
@@ -925,6 +1045,7 @@ if (content.preview) {
 
 // ---------- старт ----------
 async function boot() {
+  const voiceReady = voice.init();            // список записей голоса — не ждём его, он понадобится только к приветствию
   try {
     await loadContent();
   } catch (e) {
@@ -940,10 +1061,11 @@ async function boot() {
     lines: linesFor(content.lang, site.lines),          // исходные реплики и поверх — свои, из админки
     fmt: (s) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ''),
   });
+  subs.onLine = (id) => { if (WORK_LINES.has(id)) pointAtWork(); };
   if (debug) window.__subs = subs;
   knownSizes();
   applyContent();
-  buildFolders();
+  installFolderDefs();                       // контур стекла папки: он нужен и каталогу, и кейсу
   catalog = createCatalog(els.views.work, {
     reduced, onHover: lookAtEl,
     onFilter(cat, n) {
@@ -954,6 +1076,8 @@ async function boot() {
   });
   layout();
   route();                                   // шапка, папки и каталог уже работают — голова догружается следом
+  if (!content.preview) setupTilt();         // плашка про наклон (iPhone) — сразу, не дожидаясь головы
+  stage('ui');
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layout());
 
   if (content.preview) {
@@ -965,16 +1089,27 @@ async function boot() {
   // Загрузка без процентов. Пока качается 3D-движок, на месте мозга — розовое размытое пятно (место ему задаёт layout).
   // Движок готов — пятно сменяет настоящий мозг: он висит и покачивается, пока качается модель. Модель пришла —
   // голова собирается по частям (head.js, INTRO) и только потом здоровается.
+  // Порядок загрузки — по очереди, а не всё сразу: сначала движок (он нужен мозгу), и только когда он скачан — модель
+  // и её загрузчики. Иначе тяжёлая модель делит канал с движком, и на мобильной сети мозг появляется вдвое позже.
   els.ph.hidden = view !== 'hero';
   try {
-    const { Head } = await import('./head.js');
+    const engine = import('./head.js');
+    let engineOk = true;
+    engine.catch(() => { engineOk = false; });
+    const model = fetched('three.module.js', engine).then(() => {
+      if (!engineOk) throw new Error('3D-движок не загрузился — модель не нужна');
+      warmLoaders();
+      return fetchModel();
+    });
+    model.catch(() => {});                   // ошибку покажет head.load — здесь только чтобы она не осталась «ничьей»
+    const { Head } = await engine;
+    stage('engine');
     head = new Head(els.stage, { reducedMotion: reduced });
     wireHead();
     head.setMode(view === 'hero' ? 'hero' : 'corner');
     layout();
     // тому, кто здесь уже был, сборку показываем быстрее: он её видел
-    await head.load(null, { intro: view === 'hero', rate: store.get('seen', false) ? 1.4 : 1 });
-    modelAt = performance.now();             // модель скачана и разобрана (для справки ?diag)
+    await head.load(null, { intro: view === 'hero', rate: store.get('seen', false) ? 1.4 : 1, data: model });
   } catch (e) {
     // нет WebGL, не скачался модуль или модель — сайт остаётся рабочим, просто без головы
     console.warn('3D-голова недоступна', e);
@@ -985,21 +1120,14 @@ async function boot() {
   if (!head || !head.intro.on) els.ph.hidden = true;
   els.loader.hidden = true;
   preloadArtifacts();
-  await voice.init();
+  await voiceReady;
   if (head) await head.ready;                // голова собралась
+  stage('ready');
   booted = true;
   spit.input = performance.now();      // бездействие считаем с момента, когда сайт готов, а не пока он грузился
   if (view === 'hero') greet();
   if (query.has('diag')) diag();
-  // Плашка про наклон (iPhone/iPad): появляется после приветствия и сама уходит, если её не тронули
-  // В режиме ?diag плашка видна сразу и не уходит, даже если раньше от неё отказались: так наклон можно включить заново.
-  if (tiltTip && query.has('diag')) tiltTip.hidden = view !== 'hero';
-  else if (tiltTip && store.get('tilt') == null) {
-    setTimeout(() => {
-      if (view !== 'hero') return;
-      tiltTip.hidden = false;
-      setTimeout(() => { tiltTip.hidden = true; }, 20000);
-    }, 4000);
-  }
+  // каталог откроют следующим шагом: первые папки подгружаем заранее, когда главный экран уже готов
+  if (catalog && !(navigator.connection && navigator.connection.saveData)) setTimeout(() => catalog.warm(), 1500);
 }
 boot();

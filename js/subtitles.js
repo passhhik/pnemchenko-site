@@ -1,4 +1,7 @@
 // Субтитры под головой: реплика печатается по буквам, рот двигается в такт, потом текст гаснет.
+// Про плавность. Буквы проявляются без «ускоренных» эффектов (прозрачность с переходом у каждой буквы заставляла
+// браузер заводить под неё отдельный слой — по два десятка в секунду; в Safari от этого мигало матовое стекло папок).
+// Гаснет реплика целиком: меняется прозрачность всего блока субтитров, у которого слой один и постоянный.
 import { VOWELS } from './voice.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -56,6 +59,7 @@ export class Subtitles {
   constructor({ el, srEl, voice, lines, fmt, reducedMotion }) {
     this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion;
     this.token = 0; this.last = 0; this.busyUntil = 0; this.readUntil = 0;
+    this.onLine = null;       // (id) — началась реплика: страница может на неё отозваться (например, голова смотрит на кнопку, о которой говорит)
   }
 
   text(id) { return this.fmt(this.lines[id] ?? id); }
@@ -79,7 +83,7 @@ export class Subtitles {
     }
   }
 
-  clear() { ++this.token; this.voice.stop(); this.el.innerHTML = ''; this.busyUntil = 0; this._speaking(false); }
+  clear() { ++this.token; this.voice.stop(); this.el.innerHTML = ''; this.el.classList.remove('is-out'); this.busyUntil = 0; this._speaking(false); }
 
   // пока голова говорит, у кнопки «Звук» пляшут столбики
   _speaking(on) { document.body.classList.toggle('is-speaking', on); }
@@ -105,6 +109,7 @@ export class Subtitles {
     const { p, spans } = buildLine(text);
     this.el.innerHTML = '';
     this.el.appendChild(p);
+    this.el.classList.remove('is-out');
     this._hug(p);
     let audio = null;
     if (this.voice.has(id)) audio = await this.voice.play(id);
@@ -127,6 +132,7 @@ export class Subtitles {
     const t0 = performance.now();
     this.busyUntil = t0 + total + 600;
     this._speaking(true);
+    if (this.onLine) this.onLine(id);
     if (this.rm) spans.forEach((s) => s.classList.add('is-on'));
     else {
       for (let i = 0; i < plan.length;) {
@@ -144,7 +150,7 @@ export class Subtitles {
     this.readUntil = performance.now() + 1400;        // реплику только что договорили — дайте её дочитать
     await sleep(more ? 700 : Math.max(1600, text.length * 55));
     if (!alive()) return;
-    p.classList.add('is-out');
+    this.el.classList.add('is-out');
     await sleep(more ? 250 : 500);
   }
 }

@@ -1,7 +1,7 @@
 // Каталог: папки проектов стоят на большой дуге и едут по ней при прокрутке — ближние крупнее и чуть не в фокусе.
 // При наведении на папку фон страницы принимает стиль проекта. На телефоне — лента сверху вниз: прокрутка
 // защёлкивается на папке, папка в центре экрана раскрывается и показывает работы, фон принимает стиль проекта.
-import { content, tx, t, count, esc, projectsOf, peekItems, sectionById, isStack } from './content.js';
+import { content, tx, t, count, esc, srcOf, projectsOf, peekItems, sectionById, isStack } from './content.js';
 import { folderHTML } from './folders.js';
 import { setTheme, themeOf } from './theme.js';
 
@@ -13,6 +13,7 @@ const FOCUS = [0.62, 0.4];     // где на экране стоит папка
 const LN_G = Math.log(G);
 const NEAR = -3.1, FAR = 3.4;   // дальше этих позиций папки не видны
 const INDEX_ROWS = 9;           // сколько названий видно в списке слева внизу
+const EAGER = 4;                // у стольких первых папок картинки грузятся сразу, у остальных — когда папка подъезжает
 
 export function createCatalog(root, { onFilter, onHover, reduced = false }) {
   const state = { cat: 'all', list: [], active: false, items: [], step: 400, raf: 0, hoverT: 0, hovered: null, saved: {}, rowH: 0 };
@@ -51,9 +52,11 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     const sec = sectionById(state.cat);
     // заголовок раздела едет по дуге первым — пока каталог не прокрутили, он занимает место «предыдущей» папки
     const head = `<li class="arc-item arc-title" aria-hidden="true"><p class="arc-h">${esc(sec ? tx(sec.label) : t('allWork'))}</p><p class="arc-n">${esc(count(state.list.length, 'project'))}</p></li>`;
+    // Картинки первых папок грузятся сразу, остальных — по мере прокрутки. Пока каталог не открыт (страница началась
+    // с главной), не грузим ни одной: там сейчас качается голова. Первые папки подогреет warm(), когда главная готова.
     arc.innerHTML = head + state.list.map((p, i) => `<li class="arc-item" data-i="${i}">${folderHTML({
       href: `#/work/${encodeURIComponent(p.slug)}`, title: tx(p.title), pill: String(p.year || ''),
-      items: peekItems(p), stickers: [p.sticker], tint: p.folder, cls: 'gf--project gf--auto', attrs: `data-i="${i}"`, lazy: i > 3,
+      items: peekItems(p), stickers: [p.sticker], tint: p.folder, cls: 'gf--project gf--auto', attrs: `data-i="${i}"`, lazy: !state.active || i >= EAGER,
     })}</li>`).join('');
     index.innerHTML = state.list.map((p, i) => `<li><a href="#/work/${encodeURIComponent(p.slug)}" data-i="${i}" tabindex="-1">${esc(tx(p.title))}</a></li>`).join('');
     state.title = arc.firstElementChild;
@@ -215,12 +218,29 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
     state.active = on;
     snap();
     if (on) {
+      eager();
       measure();
       window.scrollTo(0, restore ? (state.saved[state.cat] || 0) : 0);
       layout();
       watchCenter();
       requestAnimationFrame(() => { state.moving = false; });      // вход в каталог — не прокрутка: голова смотрит на посетителя
     } else { hover(null); clearTimeout(state.themeT); setTheme(null); if (io) { io.disconnect(); io = null; } }
+  }
+
+  // Каталог ещё не открыт, но главная уже готова: картинки первых папок подгружаются заранее, по одной —
+  // когда посетитель нажмёт «Все работы», папки откроются уже с работами
+  let warmed = false;
+  function warm() {
+    if (warmed || state.active) return;
+    warmed = true;
+    const list = [...new Set(projectsOf('all').slice(0, EAGER).flatMap((p) => [...peekItems(p).map(srcOf), p.sticker]).filter(Boolean))];
+    let i = 0;
+    const next = () => { if (i >= list.length || state.active) return; const im = new Image(); im.decoding = 'async'; im.onload = im.onerror = next; im.src = list[i++]; };
+    next();
+  }
+  // каталог открыли: ленивые картинки первых папок превращаются в обычные — без задержки на «подъехала ли папка»
+  function eager() {
+    state.items.slice(0, EAGER).forEach((li) => li.querySelectorAll('img[loading="lazy"]').forEach((im) => { im.loading = 'eager'; }));
   }
 
   // показать проект открытым и в фокусе (предпросмотр в админке)
@@ -235,5 +255,5 @@ export function createCatalog(root, { onFilter, onHover, reduced = false }) {
   }
 
   render();
-  return { setCategory, activate, render, state, scrollToIndex, focus };
+  return { setCategory, activate, render, state, scrollToIndex, focus, warm };
 }

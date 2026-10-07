@@ -4,9 +4,9 @@
 // как единое целое и внутренности никогда не видны.
 // Three.js лежит на сайте (vendor/three) и подключается относительными путями — без CDN и без import map
 import * as THREE from '../vendor/three/three.module.js';
-import { GLTFLoader } from '../vendor/three/addons/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from '../vendor/three/addons/libs/meshopt_decoder.module.js';
 import { makeBrain } from './brain.js';
+// Загрузчик модели (GLTFLoader, распаковщик сеток) подключается в load(): мозгу, с которого начинается сборка, он не нужен,
+// а весит как шестая часть движка — без него мозг появляется раньше.
 
 const NH = 4;                    // одновременных «щипков» (мультитач)
 const SIG_MIN = 0.22;            // радиус щипка в покое, в единицах головы (ширина головы ≈ 1.5)
@@ -406,7 +406,7 @@ export class Head extends EventTarget {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(26, 1, 0.1, 60);
     this.scene.environment = studioEnvironment(r);
-    this.metalEnv = jewelryEnvironment(r);
+    this.metalEnv = null;             // окружение для металла нужно только модели — считается, когда она пришла (см. load)
     const dl = ([c, i, p]) => { const l = new THREE.DirectionalLight(c, i); l.position.set(...p); return l; };
     this.lights = {
       hemi: new THREE.HemisphereLight(...LOOK.hemi),
@@ -519,27 +519,39 @@ export class Head extends EventTarget {
   }
 
   // ---------- загрузка ----------
-  // intro — показать сборку головы по частям; rate — темп сборки (1 — обычный)
-  async load(onProgress, { intro = true, rate = 1 } = {}) {
+  // intro — показать сборку головы по частям; rate — темп сборки (1 — обычный);
+  // data — байты модели (или обещание их): страница начинает качать модель заранее, см. js/model.js. Нет — качаем сами.
+  async load(onProgress, { intro = true, rate = 1, data = null } = {}) {
     if (intro && !this.rm && this.mode !== 'corner') this._preIntro(rate);      // мозг — сразу, пока качается модель
-    const loader = new GLTFLoader();
-    loader.setMeshoptDecoder(MeshoptDecoder);
+    // Окружение для металла (оправа, пирсинг) считаем, пока модель ещё качается — когда мозг уже на экране и успокоился.
+    // Модель пришла раньше — посчитаем перед материалами (ниже).
+    const warmMetal = setTimeout(() => { if (!this.metalEnv && !this.loaded) this.metalEnv = jewelryEnvironment(this.renderer); }, 700);
+    const bytes = data ? Promise.resolve(data) : null;
+    if (bytes) bytes.catch(() => {});                      // ошибку обработаем ниже — здесь только чтобы она не осталась «ничьей»
     let gltf, faceTex;
     try {
-      [gltf, faceTex] = await Promise.all([
-        new Promise((res, rej) => loader.load(this.opts.modelUrl, res, (e) => {
-          if (e.total && onProgress) onProgress(e.loaded / e.total);
-        }, rej)),
-        new THREE.TextureLoader().loadAsync(this.opts.faceUrl).catch((e) => { console.warn('Фото лица не загрузилось — голова будет без накладки', e); return null; }),
+      const face = new THREE.TextureLoader().loadAsync(this.opts.faceUrl).catch((e) => { console.warn('Фото лица не загрузилось — голова будет без накладки', e); return null; });
+      const [{ GLTFLoader }, { MeshoptDecoder }] = await Promise.all([
+        import('../vendor/three/addons/loaders/GLTFLoader.js'), import('../vendor/three/addons/libs/meshopt_decoder.module.js'),
       ]);
+      const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      const model = bytes
+        ? bytes.then((buf) => loader.parseAsync(buf, ''))
+        : loader.loadAsync(this.opts.modelUrl, (e) => { if (e.total && onProgress) onProgress(e.loaded / e.total); });
+      [gltf, faceTex] = await Promise.all([model, face]);
     } catch (e) {
       // модель не пришла: убираем одинокий мозг и чистим холст — сайт останется без головы
+      clearTimeout(warmMetal);
       this.renderer.setAnimationLoop(null);
       this._dropBrain();
       this.intro.on = false; this.intro.pre = false; this.intro.parts.length = 0;
       this.renderer.clear();
       throw e;
     }
+    this._emit('model', {});                               // модель скачана и разобрана; дальше — материалы и шейдеры
+    clearTimeout(warmMetal);
+    if (!this.metalEnv) this.metalEnv = jewelryEnvironment(this.renderer);
     if (faceTex) {
       faceTex.colorSpace = THREE.SRGBColorSpace;
       faceTex.flipY = false;               // UV из glTF: начало координат сверху
@@ -582,10 +594,16 @@ export class Head extends EventTarget {
         }
       }
     });
+    // Мерим голову в покое, в полный размер. Пока идёт сборка, она стоит чуть «издалека» (INTRO_ZOOM) — в мерку этот
+    // масштаб попасть не должен, иначе камера встанет под уменьшенную голову, и настоящая окажется крупнее своего места.
+    const zoom = this.pivot.scale.clone();
+    this.pivot.scale.setScalar(1);
     this.scene.updateMatrixWorld(true);
-    this._updateMatrices();
     this.headBox = this._measureHead();
     this.sil = this._measureSilhouette(this.headBox);
+    this.pivot.scale.copy(zoom);
+    this.scene.updateMatrixWorld(true);
+    this._updateMatrices();
     this.aspect = this.sil ? this.sil.ar : this.headBox.h / this.headBox.w;
     this.frame();
     // Шейдеры собираются сейчас — потом сборка пойдёт без рывков. Собираются в фоне, где браузер это умеет: страница
@@ -602,11 +620,25 @@ export class Head extends EventTarget {
     this.q.hold = performance.now() + 2500;              // первые секунды устройство «прогревается» — плотность пикселей пока не трогаем
     if (assemble) this._startIntro(); else { this.intro.on = false; this.intro.pre = false; this.intro.parts.length = 0; this._ready(); }
     this._loop();
-    // слой для снятых очков готовим заранее, в спокойный момент — чтобы не было рывка, когда их стянут с носа.
-    // На слабых устройствах (мало памяти, режим экономии трафика) — только когда очки действительно взяли.
-    const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.connection && navigator.connection.saveData);
-    if (!weak) setTimeout(() => this._ensureOverlay(), 2200);
+    this._warmOverlay();
     return this;
+  }
+
+  // Слой для снятых очков готовим заранее — чтобы не было рывка, когда их стянут с носа. Но не посреди сборки головы
+  // и не посреди реплики (создание второго холста — заметная пауза на телефоне), а когда голова собралась и секунду
+  // молчит. На слабых устройствах (мало памяти, режим экономии трафика) — только когда очки действительно взяли.
+  _warmOverlay() {
+    const weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.connection && navigator.connection.saveData);
+    if (weak) return;
+    let since = 0;
+    const check = () => {
+      if (this.ov || this._ovFailed) return;
+      const now = performance.now();
+      const quiet = !this.intro.on && !this.drags.size && this.spitS.t < 0 && this.mouthTarget < 0.004 && this.mouth < 0.02 && !document.hidden;
+      since = quiet ? (since || now) : 0;
+      if (since && now - since > 900) this._ensureOverlay(); else setTimeout(check, 300);
+    };
+    this.ready.then(() => setTimeout(check, 1200));
   }
 
   // Рамка геометрии головы (без очков и пирсинга): на её центр смотрит камера
@@ -1581,7 +1613,7 @@ export class Head extends EventTarget {
   _calm(now) {
     if (this.intro.on || this.drags.size || this.lookOverride || this.spitS.t >= 0 || this.glasses.grabbed || this.blind > 0) return false;
     if (now - Math.max(this.pointer.lastMove, this.tilt.lastMove, this._stir || 0) < 1400 || this.tilt.speed > 0.06) return false;
-    if (this.mouthTarget > 0 || this.mouth > 0.01 || this.glasses.offset.lengthSq() > 1e-5) return false;
+    if (this.mouthTarget > 0.004 || this.mouth > 0.01 || this.glasses.offset.lengthSq() > 1e-5) return false;
     if (Math.abs(this.sq.v) > 0.02 || Math.abs(1 - this.sq.s) > 0.004 || Math.abs(1 - this.pop.s) > 0.004) return false;
     for (const h of this.handles) if (h.active) return false;
     return true;

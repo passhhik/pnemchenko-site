@@ -8,7 +8,9 @@ export const LINES = {
     hello_2: 'Наведи на папку — покажу, что внутри.',
     hello_2_touch: 'Нажми на папку — покажу, что внутри.',
     hello_2_strip: 'Листай папки — покажу, что внутри.',
+    hello_2_clean: 'Жми «Все работы» — там кейсы. А меня можно потянуть: я резиновый.',
     hello_back: 'О, снова ты! Я запомнил твоё лицо. Надеюсь, ты моё тоже.\nПродолжим? Выбирай.',
+    hello_back_clean: 'О, снова ты! Я запомнил твоё лицо. Надеюсь, ты моё тоже.\nПродолжим?',
     folder_digital: 'Цифровые продукты: приложения, сервисы, дашборды.',
     folder_marketing: 'Маркетинг и коммуникация: кампании, плакаты, промо.',
     folder_identity: 'Айдентика и брендинг: знаки, упаковка, фирменные системы.',
@@ -33,6 +35,7 @@ export const LINES = {
     idle_2: 'Можно меня потянуть. Я разрешаю.',
     idle_3: 'Очки, кстати, снимаются. Но лучше не надо.',
     idle_4: 'Папки можно таскать. Обратно я их не разложу — рук нет.',
+    idle_5: 'Кейсы сами себя не посмотрят. Жми «Все работы».',
     grab_nose_1: 'Это нос. Он мне ещё пригодится.',
     grab_nose_2: 'Аккуратнее, я им дизайн нюхаю.',
     grab_mouth_1: 'Ммм-мф! Я вообще-то разговариваю!',
@@ -77,7 +80,9 @@ export const LINES = {
     hello_2: 'Hover over a folder — I’ll show you what’s inside.',
     hello_2_touch: 'Tap a folder — I’ll show you what’s inside.',
     hello_2_strip: 'Swipe the folders — I’ll show you what’s inside.',
+    hello_2_clean: 'Hit “All work” — the case studies are in there. And go on, pull me: I’m rubbery.',
     hello_back: 'Oh, you again! I remember your face. Hope you remember mine.\nShall we continue? Pick one.',
+    hello_back_clean: 'Oh, you again! I remember your face. Hope you remember mine.\nShall we continue?',
     folder_digital: 'Digital products: apps, services, dashboards.',
     folder_marketing: 'Marketing and communication: campaigns, posters, promo.',
     folder_identity: 'Identity and branding: marks, packaging, brand systems.',
@@ -102,6 +107,7 @@ export const LINES = {
     idle_2: 'You can pull me. I allow it.',
     idle_3: 'The glasses come off, by the way. Better not, though.',
     idle_4: 'The folders can be dragged. I won’t put them back — no hands.',
+    idle_5: 'The case studies won’t look at themselves. Hit “All work”.',
     grab_nose_1: 'That’s my nose. I still need it.',
     grab_nose_2: 'Careful, I sniff out design with that.',
     grab_mouth_1: 'Mmm-mph! I’m talking here!',
@@ -152,6 +158,8 @@ export const REACTIONS = {
   dragFolder: ['drag_folder_1', 'drag_folder_2', 'drag_folder_far'],
   // посетитель затих: голова окликает его и между делом подсказывает, что тут можно делать
   idle: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_4', 'idle_hey_3', 'idle_3', 'idle_1'],
+  // то же, когда папок на главной нет (телефон): вместо подсказки про папки — про кнопку «Все работы»
+  idleClean: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_5', 'idle_hey_3', 'idle_3', 'idle_1'],
 };
 
 // Какие реплики получит посетитель: исходные русские → свои русские → (для другого языка) исходные на нём → свои на нём.
@@ -168,8 +176,10 @@ export const LINE_INFO = [
     ['hello_1', 'Первый визит: голова здоровается'],
     ['hello_2', 'Сразу следом — на компьютере'],
     ['hello_2_touch', 'Сразу следом — на планшете'],
-    ['hello_2_strip', 'Сразу следом — на телефоне'],
+    ['hello_2_strip', 'Сразу следом — на телефоне, когда папки стоят лентой'],
+    ['hello_2_clean', 'Сразу следом — когда папок на главной нет (сейчас так на телефоне)'],
     ['hello_back', 'Посетитель уже был на сайте и вернулся'],
+    ['hello_back_clean', 'Вернулся — когда папок на главной нет'],
   ] },
   { title: 'Папки на главной', items: [
     ['folder_*', 'Раскрыли папку «{section}»'],
@@ -191,7 +201,9 @@ export const LINE_INFO = [
     ['open_project', 'Открыли кейс'],
   ] },
   { title: 'Посетитель затих', note: 'Оклики на главной: первый — через 7 секунд тишины, следующие — каждые 13 секунд, не больше трёх за одно затишье. Идут по кругу в этом порядке.', items: [
-    ['idle_hey_1', 'Оклик 1'], ['idle_2', 'Оклик 2'], ['idle_hey_2', 'Оклик 3'], ['idle_4', 'Оклик 4'], ['idle_hey_3', 'Оклик 5'], ['idle_3', 'Оклик 6'], ['idle_1', 'Оклик 7'],
+    ['idle_hey_1', 'Оклик 1'], ['idle_2', 'Оклик 2'], ['idle_hey_2', 'Оклик 3'],
+    ['idle_4', 'Оклик 4 — когда папки на главной есть'], ['idle_5', 'Оклик 4 — когда папок на главной нет'],
+    ['idle_hey_3', 'Оклик 5'], ['idle_3', 'Оклик 6'], ['idle_1', 'Оклик 7'],
   ] },
   { title: 'Голову трогают', note: 'Где реплик несколько, звучит одна из них — по очереди.', items: [
     ['grab_nose_1', 'Схватили за нос'], ['grab_nose_2', 'Схватили за нос (вторая)'],

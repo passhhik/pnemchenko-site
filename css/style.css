@@ -89,15 +89,23 @@ body:not([data-view="hero"]) .logo{ z-index:42; }
 /* на главной кнопки стоят чуть ниже середины логотипа — как в макете */
 body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 .is-switching .topnav{ transition:transform .5s var(--ease); }
-.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5em; height:var(--btn-h); padding:0 calc(var(--btn-h) * .44); border:0; border-radius:999px; background:var(--fg); color:var(--on-fg); font:400 var(--btn-fs)/1 var(--font); text-decoration:none; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 2px var(--fg); transition:background-color .2s, color .2s, box-shadow .2s; -webkit-tap-highlight-color:transparent; }
-.btn:hover,.btn[aria-current="page"]{ background:transparent; color:var(--fg); }
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5em; height:var(--btn-h); padding:0 calc(var(--btn-h) * .44); border:0; border-radius:999px; background:var(--fg); color:var(--on-fg); font:400 var(--btn-fs)/1 var(--font); text-decoration:none; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 2px var(--fg); transition:background-color .2s, color .2s, box-shadow .2s, transform .12s; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.btn:active{ transform:scale(.97); }      /* кнопка отвечает на нажатие — на телефоне наведения нет, это единственный отклик */
+.btn[aria-current="page"]{ background:transparent; color:var(--fg); }
 .btn--line{ background:transparent; color:var(--fg); }
-.btn--line:hover{ background:var(--fg); color:var(--on-fg); }
+/* наведение — только там, где оно есть: на телефоне :hover «залипает» после касания, и кнопка остаётся перекрашенной */
+@media (hover:hover){
+  .btn:hover{ background:transparent; color:var(--fg); }
+  .btn--line:hover{ background:var(--fg); color:var(--on-fg); }
+}
+/* голова говорит про кнопку и смотрит на неё — кнопка один раз «кивает» в ответ (js/app.js, pointAtWork) */
+.btn.is-nudge{ animation:nudge 1.1s var(--ease) 1; }
+@keyframes nudge{ 0%,72%,100%{ transform:none; } 18%{ transform:scale(1.07); } 36%{ transform:scale(.98); } 54%{ transform:scale(1.03); } }
 .no-cv [data-cv]{ display:none !important; }
 /* «Звук»: когда включён, рядом с надписью три столбика; они пляшут, пока голова говорит */
 .btn--toggle .eq{ display:none; align-items:flex-end; gap:2px; height:.7em; }
 .btn--toggle[aria-pressed="true"] .eq{ display:inline-flex; }
-.eq i{ display:block; width:3px; height:100%; background:currentColor; border-radius:1px; transform-origin:50% 100%; transform:scaleY(.4); }
+.eq i{ display:block; width:3px; height:100%; background:currentColor; border-radius:1px; transform-origin:50% 100%; transform:scaleY(.4); will-change:transform; }
 .eq i:nth-child(2){ transform:scaleY(.8); animation-delay:-.3s; } .eq i:nth-child(3){ transform:scaleY(.55); animation-delay:-.6s; }
 .is-speaking .eq i{ animation:eq .9s ease-in-out infinite; }
 @keyframes eq{ 0%,100%{ transform:scaleY(.35); } 50%{ transform:scaleY(1); } }
@@ -171,23 +179,45 @@ body:not([data-view="hero"]) .loader{ display:none; }
 .gf-pill{ display:table; margin:.5em auto 0; padding:.26em .8em .3em; border-radius:999px; background:var(--pill); color:var(--mute); font-size:.78em; line-height:1.1; white-space:nowrap; }
 /* открытая папка: стенка откидывается, работы выезжают веером */
 .gf.is-open .gf-items,.gf--auto:hover .gf-items,.gf--auto:focus-visible .gf-items{ clip-path:inset(-160% -60% 4% -60%); }
-.gf.is-open .gf-front,.gf.is-open .gf-edge,.gf--auto:hover .gf-front,.gf--auto:hover .gf-edge,.gf--auto:focus-visible .gf-front,.gf--auto:focus-visible .gf-edge{ transform:perspective(calc(var(--fw) * 3)) rotateX(-13deg); }
+.gf.is-open .gf-front,.gf.is-open .gf-edge,.gf.is-open .gf-ghost,.gf--auto:hover .gf-front,.gf--auto:hover .gf-edge,.gf--auto:hover .gf-ghost,.gf--auto:focus-visible .gf-front,.gf--auto:focus-visible .gf-edge,.gf--auto:focus-visible .gf-ghost{ transform:perspective(calc(var(--fw) * 3)) rotateX(-13deg); }
 .gf.is-open .s-l,.gf--auto:hover .s-l,.gf--auto:focus-visible .s-l{ transform:translate(-50%,-50%) translate(calc(var(--fw) * -.43), calc(var(--fw) * .03)) rotate(-14deg); }
 .gf.is-open .s-c,.gf--auto:hover .s-c,.gf--auto:focus-visible .s-c{ transform:translate(-50%,-50%) translate(calc(var(--fw) * -.04), calc(var(--fw) * -.34)) rotate(3deg); }
 .gf.is-open .s-r,.gf--auto:hover .s-r,.gf--auto:focus-visible .s-r{ transform:translate(-50%,-50%) translate(calc(var(--fw) * .44), calc(var(--fw) * -.06)) rotate(10deg); }
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .gf-front{ background:rgba(var(--gf-glass),.94); } }
+/* Телефон и планшет: стекло папки не размывает «всё, что под ним» (backdrop-filter). Это самый дорогой эффект на
+   телефоне — лента папок с ним прокручивается рывками, — и в Safari такое стекло мигает, когда рядом что-то меняется
+   (например, печатается реплика головы). Матовость собрана иначе, а выглядит так же:
+   — под стеклом лежит размытый двойник нутра папки: задняя стенка и те же работы (.gf-ghost, разметка — js/folders.js).
+     Он обрезан по контуру стекла и откидывается вместе с ним; работы в нём — те же .gf-item, их двигают те же
+     правила: папка раскрывается — «тени» за стеклом едут следом;
+   — настоящие стенка и работы под стеклом не рисуются: их видно только там, где стекла нет (контуры ниже повторяют
+     его край с язычком слева, с небольшим заходом под стекло). Закрытая папка — работ не видно, только тени;
+     раскрытая — работы выезжают из-за края и по бокам. */
+.gf-ghost{ display:none; }
+.is-touch .gf-front{ -webkit-backdrop-filter:none; backdrop-filter:none; }
+.is-touch .gf-ghost{ display:block; position:absolute; left:0; right:0; top:6.3%; bottom:0; overflow:hidden; overflow:clip; clip-path:url(#gf-front); pointer-events:none; transform-origin:50% 100%; transition:transform .55s var(--spring); }
+.is-touch .gf-ghost-in{ position:absolute; left:0; right:0; top:-6.724%; height:106.724%; filter:blur(calc(var(--fw) * .05)) saturate(1.4); }
+.is-touch .gf-body > .gf-back{ clip-path:polygon(0 0, 100% 0, 100% 21.67%, 50.29% 21.67%, 46.06% 19.56%, 42.86% 15%, 39.66% 10.44%, 35.43% 8.33%, 0 8.33%); }
+.is-touch .gf-items,.is-touch .gf.is-open .gf-items,.is-touch .gf--auto:hover .gf-items,.is-touch .gf--auto:focus-visible .gf-items{
+  clip-path:polygon(-60% -160%, 160% -160%, 160% 96%, 99% 96%, 99% 26%, 97.5% 21.3%, 94% 19.5%, 51.5% 19.5%, 47.8% 17.6%, 45% 13.5%, 42.2% 9.4%, 38.5% 7.5%, 6% 7.5%, 2.5% 9.6%, 1% 14%, 1% 96%, -60% 96%); transition:none; }
 
 /* ---------- субтитры: просто текст под головой ---------- */
 .subs{ position:fixed; z-index:60; left:var(--subs-x,50%); top:var(--subs-y,80%); width:var(--subs-w,64vw); transform:translateX(-50%); margin:0; text-align:center; pointer-events:none;
   font:400 var(--subs-size, clamp(20px, calc(var(--u) * 2.77), 58px))/1.15 var(--font); text-wrap:balance; color:var(--fg); }
-.subs-line{ margin:0; transition:opacity .45s var(--ease); }
+.subs-line{ margin:0; }
 /* на главной строка переносится между предложениями, а не посреди фразы (пока предложение помещается целиком) */
 body[data-view="hero"] .subs-line .s{ display:inline-block; max-width:100%; }
-.subs-line.is-out{ opacity:0; }
-/* слово не рвётся при переносе; буквы проявляются по одной (место под всю реплику занято сразу) */
+/* реплика гаснет целиком: прозрачность меняется у всего блока субтитров (у него слой один и постоянный) */
+.subs{ will-change:opacity; }
+.subs.is-out{ opacity:0; transition:opacity .45s var(--ease); }
+/* слово не рвётся при переносе; буквы проявляются по одной (место под всю реплику занято сразу). Проявляются через
+   visibility и цвет, а не через opacity: прозрачность с переходом у каждой буквы — это отдельный слой на букву,
+   два десятка слоёв в секунду; от такой чехарды в Safari мигает матовое стекло по соседству. */
 .w{ display:inline-block; white-space:pre; }
-.subs-line .c{ opacity:0; transition:opacity .08s linear; }
-.subs-line .c.is-on,.subs-line .w.is-on .c{ opacity:1; }
+.subs-line .c{ visibility:hidden; }
+.subs-line .c.is-on,.subs-line .w.is-on .c{ visibility:visible; animation:c-in .09s linear; }
+@keyframes c-in{ from{ color:transparent; } }
+.is-touch .subs-line .c.is-on,.is-touch .subs-line .w.is-on .c{ animation:none; }      /* на телефоне буква появляется сразу: меньше перерисовок */
 /* в каталоге и кейсе реплики стоят слева от кружка с головой, по его центру */
 body:not([data-view="hero"]) .subs{ left:auto; right:calc(var(--corner-r) + var(--corner) + clamp(12px, calc(var(--u) * 1.8), 36px)); top:auto; bottom:calc(var(--corner-b) + var(--corner) * .5); width:fit-content; max-width:min(calc(var(--u) * 30), calc(100vw - var(--corner) - var(--corner-r) - 60px)); transform:translateY(50%); text-align:left; font-size:clamp(16px, calc(var(--u) * 1.65), 32px); }
 body[data-view="case"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:0 1px 0 rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08); }
@@ -196,12 +226,16 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 /* предпросмотр в админке: вместо головы — её силуэт, чтобы расставлять папки */
 .is-preview[data-view="hero"] .hero::before{ content:''; position:fixed; left:var(--ph-x); top:var(--ph-y); width:var(--ph-w); height:var(--ph-h); border-radius:48% 48% 50% 50% / 40% 40% 60% 60%; background:#ECECEF; }
 
-/* плашка «наклон телефона» (iPhone/iPad) */
-.tip{ position:fixed; z-index:45; left:50%; bottom:max(20px, env(safe-area-inset-bottom)); transform:translateX(-50%); display:flex; align-items:center; gap:8px; max-width:calc(100vw - 12px); padding:4px 4px 4px 14px; border-radius:999px; background:#000; color:#fff; font:400 15px/1.2 var(--font); white-space:nowrap; pointer-events:auto; }
-.tip-text{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+/* Плашка «наклон телефона» (iPhone/iPad): светлая, чтобы не спорить с чёрными кнопками. Появляется сразу, вместе со страницей.
+   На телефоне стоит над кнопками, раскладка оставляет под неё место (--tip, js/app.js). */
+.tip{ position:fixed; z-index:45; left:50%; bottom:max(20px, env(safe-area-inset-bottom)); transform:translateX(-50%); display:flex; align-items:center; gap:8px; width:max-content; max-width:calc(100vw - 20px); padding:4px 4px 4px 14px; border-radius:999px; background:#EEEEF0; color:#000; font:400 15px/1.2 var(--font); white-space:nowrap; pointer-events:auto; transition:opacity .25s ease, transform .25s var(--ease); animation:tip-in .35s var(--ease); }
+.tip.is-out{ opacity:0; transform:translateX(-50%) translateY(8px); pointer-events:none; }
+@keyframes tip-in{ from{ opacity:0; transform:translateX(-50%) translateY(8px); } }
+.tip-text{ min-width:0; white-space:normal; text-wrap:balance; line-height:1.12; }      /* на узком экране текст встаёт в две строки, а не обрезается */
 .tip-ico{ width:20px; height:20px; flex:none; }
-.tip-btn{ min-height:36px; padding:0 14px; border:0; border-radius:999px; background:#fff; color:#000; font:400 15px/1 var(--font); cursor:pointer; }
-.tip-close{ width:36px; height:36px; border:0; border-radius:50%; background:transparent; color:inherit; font:400 20px/1 var(--font); cursor:pointer; }
+.tip-btn{ flex:none; min-height:40px; padding:0 16px; border:0; border-radius:999px; background:#000; color:#fff; font:400 15px/1 var(--font); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .12s; }
+.tip-btn:active{ transform:scale(.96); }
+.tip-close{ flex:none; width:40px; height:40px; border:0; border-radius:50%; background:transparent; color:#555; font:400 22px/1 var(--font); cursor:pointer; -webkit-tap-highlight-color:transparent; }
 
 /* «без очков»: всё размыто; отверстия — точно по линзам (clip-path задаёт скрипт) */
 .veil{ position:fixed; inset:0; z-index:50; pointer-events:none;
@@ -223,7 +257,7 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 /* проверка на телефоне: адрес …/?diag */
 .diag{ position:fixed; z-index:90; left:6px; top:calc(6px + env(safe-area-inset-top)); max-width:calc(100vw - 12px); margin:0; padding:6px 8px; border-radius:8px; background:rgba(0,0,0,.82); color:#fff; font:400 11px/1.35 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; pointer-events:none; }
 /* ползунки эффекта присутствия — там же, в ?diag */
-.tune{ position:fixed; z-index:91; left:6px; right:6px; bottom:calc(var(--bar, 0px) + 8px); display:grid; gap:2px; padding:6px 10px; border-radius:10px; background:rgba(0,0,0,.82); color:#fff; font:400 11px/1.3 ui-monospace,Menlo,Consolas,monospace; }
+.tune{ position:fixed; z-index:91; left:6px; right:6px; bottom:calc(var(--bar, 0px) + var(--tip, 0px) + 8px); display:grid; gap:2px; padding:6px 10px; border-radius:10px; background:rgba(0,0,0,.82); color:#fff; font:400 11px/1.3 ui-monospace,Menlo,Consolas,monospace; }
 .tune label{ display:grid; grid-template-columns:96px 1fr; align-items:center; gap:8px; }
 .tune input{ width:100%; height:32px; margin:0; accent-color:#fff; }
 
@@ -341,7 +375,9 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 body:not([data-view="case"]) .site-footer{ display:none; }
 
 /* ---------- «столбик»: телефон и планшет в портретной ориентации ----------
-   Логотип, голова, субтитры, лента папок, кнопки под большим пальцем. То же условие — в js/content.js (STACK). */
+   Логотип, голова, субтитры, кнопки под большим пальцем. Папок разделов на главной здесь по умолчанию нет — экран
+   чистый (js/content.js, heroFolders); если их включить в админке, они встают лентой над кнопками.
+   То же условие — в js/content.js (STACK). */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
   :root{ --btn-h:48px; --btn-fs:17px; --bar:calc(var(--btn-h) + 14px + max(12px, env(safe-area-inset-bottom))); --corner:76px; --corner-r:14px; }
   body[data-view="case"]{ --corner:68px; --corner-r:12px; }
@@ -350,15 +386,20 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .lang{ height:36px; font-size:15px; }
   /* кнопки — в нижней панели, под большим пальцем */
   .topnav,body[data-view="hero"] .topnav{ position:fixed; left:0; right:0; bottom:0; z-index:41; justify-self:stretch; gap:10px; padding:8px 10px max(12px, env(safe-area-inset-bottom)); transform:none; transition:none; }
-  .topnav .btn{ flex:1 1 0; min-width:0; padding:0 6px; }
+  /* главное действие — «Все работы» — залито и шире; CV и «Звук» — контуром: на экране одна чёрная кнопка, а не три */
+  .topnav .btn{ flex:1 1 0; min-width:0; padding:0 6px; background:transparent; color:var(--fg); }
+  .topnav .btn[href="#/work"]{ flex:1.6 1 0; background:var(--fg); color:var(--on-fg); }
   body:not([data-view="hero"]) .topnav{ background:rgba(255,255,255,.9); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); --fg:#000; --on-fg:#fff; }
   .stage.is-corner,.corner-probe{ top:calc(100% - var(--bar) - var(--corner) - 10px); left:calc(100% - var(--corner) - var(--corner-r)); }
   body:not([data-view="hero"]) .subs{ right:calc(var(--corner) + var(--corner-r) + 10px); bottom:calc(var(--bar) + 10px + var(--corner) * .5); max-width:calc(100vw - var(--corner) - var(--corner-r) - 26px); font-size:16px; line-height:1.25; }
   body[data-view="work"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); }
   body[data-view="work"] .subs-line:empty{ display:none; }
+  /* плашка наклона: на чистом экране — в 8 точках над кнопками, место под неё оставляет раскладка (TIP_SLOT в js/app.js);
+     с лентой папок места внизу нет — она встаёт наверху */
   .tip{ top:max(5px, env(safe-area-inset-top)); bottom:auto; }
-  .diag{ top:calc(58px + env(safe-area-inset-top)); }      /* ниже плашки наклона, чтобы справка её не закрывала */
-  /* папки разделов — горизонтальная лента; первая стоит по центру, соседние выглядывают по бокам */
+  .no-folders .tip{ top:auto; bottom:calc(var(--bar) + 2px); }
+  body:not(.no-folders) .diag{ top:calc(58px + env(safe-area-inset-top)); }      /* ниже плашки наклона, чтобы справка её не закрывала */
+  /* папки разделов (если включены) — горизонтальная лента; первая стоит по центру, соседние выглядывают по бокам */
   .folders{ inset:auto 0 var(--bar) 0; display:flex; align-items:flex-start; gap:22px; padding:calc(var(--mfw,170px) * .4) calc(50% - var(--mfw,170px) / 2) 8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; pointer-events:auto; -webkit-overflow-scrolling:touch; }
   .folders::-webkit-scrollbar{ display:none; }
   .folders .gf,.folders .gf.is-open{ position:static; flex:none; transform:none; scroll-snap-align:center; scroll-snap-stop:always; cursor:pointer; touch-action:pan-x; }

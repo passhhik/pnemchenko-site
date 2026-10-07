@@ -69,5 +69,15 @@ export function peekItems(p) {
   return [...arts.filter((a) => !cut(a)), ...(thumbOf(p) ? [thumbOf(p)] : []), ...arts.filter(cut)].slice(0, 3);
 }
 
+// Папки разделов на главной: на компьютере они стоят вокруг головы, на телефоне главный экран чистый — логотип,
+// голова, реплика и кнопки. Меняется в админке («Настройки сайта» → «Папки разделов на главной»);
+// в содержимом это site.heroFolders: нет значения — «только на компьютере», 'all' — везде, 'none' — нигде.
+export function heroFolders() {
+  const v = content.site && content.site.heroFolders;
+  if (v === 'all') return true;
+  if (v === 'none') return false;
+  return !isStack();
+}
+
 export const sectionById = (id) => (content.site.sections || []).find((s) => s.id === id) || null;
 export const projectsOf = (id) => content.projects.filter((p) => id === 'all' || p.section === id);

@@ -35,12 +35,16 @@ export function folderHTML({ href, title, pill = '', items = [], stickers = [], 
     return { slot: SLOTS[i], html: `<img class="gf-item s-${SLOTS[i]}${cut ? ' is-cut' : ''}" src="${esc(srcOf(a))}" alt="" ${lazy ? 'loading="lazy" ' : ''}decoding="async" draggable="false">` };
   }).sort((x, y) => (x.slot === 'c') - (y.slot === 'c')).map((x) => x.html).join('');     // центральная — поверх боковых
   const st = stickers.filter(Boolean).slice(0, 2).map((s) => `<img class="gf-sticker" src="${esc(s)}" alt="" ${lazy ? 'loading="lazy" ' : ''}decoding="async" draggable="false">`).join('');
+  // Телефон и планшет: «матовость» стекла — не размытие всего, что под ним (это дорого и в Safari мигает), а размытый
+  // двойник нутра папки — задней стенки и тех же работ, — вложенный под стекло и обрезанный по его контуру.
+  // Двигают его те же правила, что и сами работы (см. стили, .gf-ghost).
+  const ghost = document.documentElement.classList.contains('is-touch') ? `<span class="gf-ghost" aria-hidden="true"><span class="gf-ghost-in"><span class="gf-back"></span>${imgs}</span></span>` : '';
   const css = tintStyle(tint) + style;
   return `<a class="gf ${cls}" href="${esc(href)}" draggable="false" ${attrs}${css ? ` style="${esc(css)}"` : ''}>
     <span class="gf-body">
       <span class="gf-ground"></span>
       <span class="gf-back"></span>
-      <span class="gf-items" aria-hidden="true">${imgs}</span>
+      <span class="gf-items" aria-hidden="true">${imgs}</span>${ghost}
       <span class="gf-front">${st}</span>
       <svg class="gf-edge" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="e1" d="${FRONT_100}"/><path class="e2" d="${FRONT_100}"/></svg>
     </span>

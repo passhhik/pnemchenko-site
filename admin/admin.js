@@ -574,6 +574,8 @@ function sitePane() {
       ${IMG('Логотип', 'logo', { kind: 'logo', hint: 'SVG или PNG с прозрачным фоном.' })}
     </fieldset>
     <fieldset class="fs"><legend>Разделы</legend>
+      ${F('Папки разделов на главной', 'heroFolders', { type: 'select', kind: 'opt', options: [['', 'На компьютере — да, на телефоне — нет'], ['all', 'Везде: на телефоне — лентой над кнопками'], ['none', 'Нигде'] ],
+        hint: 'Без папок главный экран чище: логотип, голова, реплика и кнопки. В разделы посетитель попадает через «Все работы».' })}
       <p class="hint">Папки на главной можно расставить мышью прямо в предпросмотре — положение запомнится.</p>
       ${(s.sections || []).map((sec, i) => `<fieldset class="fs"><legend>${esc(txAny(sec.label) || 'Раздел')}</legend>
         ${F('Название', `sections.${i}.label`, { l: 1 })}

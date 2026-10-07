@@ -171,6 +171,7 @@ export class Voice {
       target = this.flap;
     }
     this.flap *= Math.exp(-dt * 13);
-    this.head.setMouth(target);
+    if (this.flap < 0.002) this.flap = 0;      // затухло — значит, ноль: по нему голова понимает, что договорила (спокойный режим, см. head.js)
+    this.head.setMouth(target < 0.002 ? 0 : target);
   }
 }

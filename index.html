@@ -37,15 +37,13 @@
   <link rel="modulepreload" href="js/burst.js">
   <link rel="modulepreload" href="js/subtitles.js">
   <link rel="modulepreload" href="js/voice.js">
-  <!-- 3D-голова подгружается после интерфейса; её модули начинаем качать заранее -->
+  <link rel="modulepreload" href="js/model.js">
+  <!-- 3D-голова подгружается после интерфейса; движок начинаем качать заранее. Саму модель и её загрузчики здесь
+       не трогаем: их запускает js/app.js, когда движок уже скачан, — иначе они делят с ним канал, и на мобильной
+       сети первым на экране появляется не мозг, а долгое ожидание -->
   <link rel="modulepreload" href="vendor/three/three.module.js">
   <link rel="modulepreload" href="js/head.js">
   <link rel="modulepreload" href="js/brain.js">
-  <link rel="modulepreload" href="vendor/three/addons/loaders/GLTFLoader.js">
-  <link rel="modulepreload" href="vendor/three/addons/utils/BufferGeometryUtils.js">
-  <link rel="modulepreload" href="vendor/three/addons/libs/meshopt_decoder.module.js">
-  <link rel="preload" href="assets/head.glb" as="fetch" type="model/gltf-binary" crossorigin>
-  <link rel="preload" href="assets/face.jpg" as="image" crossorigin>
 </head>
 <body data-view="hero" data-tone="light">
   <a class="skip-link" href="#/work" data-t="skip">Сразу к работам</a>
