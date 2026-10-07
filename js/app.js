@@ -651,16 +651,38 @@ function parallax() {
 // системным окном «из ниоткуда». Плашка появляется сразу, вместе со страницей (голова ей не нужна): пока та
 // собирается, посетитель уже может разрешить наклон. Датчик браузеры отдают только сайту, открытому по https:
 // по http события не приходят вовсе, и голова на телефоне следит только за папками.
+// Safari помнит разрешение, только пока его не закрыли. Поэтому у того, кто уже разрешал, возможны два случая:
+// помнит — наклон включается сам, с первой секунды и без касаний; забыл — снова показываем плашку, и тоже сразу.
 let tiltTip = null, tiltAsk = false, tiltOk = false, tiltWanted = false, tiltHello = false;      // tiltWanted — наклон разрешён, а головы ещё нет
-const tiltLog = { asked: 0, state: '', err: '' };          // что ответил браузер — для справки ?diag
+let tiltLost = false;            // разрешение давали, но браузер его уже не помнит — нужна плашка
+const tiltLog = { asked: 0, state: '', err: '', quiet: '' };          // что ответил браузер — для справки ?diag
 const TIP_SLOT = 56;             // сколько высоты плашка занимает над кнопками на телефоне: сама плашка (48) и зазор до кнопок (8)
 function enableTilt() { tiltWanted = true; if (head) head.enableTilt(); }
+// Вопрос браузеру без касания. Разрешение, данное раньше в этом же сеансе, он подтверждает молча. Если же нужно
+// системное окно, без касания он его не покажет — запрос просто отклоняется. Это не ответ посетителя: ничего не запоминаем.
+function quietTilt() {
+  let p;
+  try { p = DeviceOrientationEvent.requestPermission(); } catch (_) { p = null; }
+  return Promise.resolve(p).then((st) => (st === 'granted' ? 'granted' : 'prompt'), () => 'prompt');
+}
+// Тому, кто уже разрешал наклон, а браузер это забыл, кроме плашки помогаем ещё так: пока плашка на экране, разрешение
+// спросит и нажатие на голову или на пустое место вокруг неё. Кнопки и ссылки не спрашивают: у них своё дело, системное
+// окно поверх перехода ни к чему. Слушаем нажатие (click), а не любое касание: голову потянули — это ещё не повод
+// для системного окна. И слушаем на самом слое с головой: Safari на iPhone присылает нажатие только туда, где его ждут.
+let tiltTap = null;
+function armTiltTap(on) {
+  if (tiltTap) { els.stage.removeEventListener('click', tiltTap); tiltTap = null; }
+  if (!on) return;
+  tiltTap = () => { askTilt().then(() => showTip(false)); };
+  els.stage.addEventListener('click', tiltTap);
+}
 async function askTilt() {
   let state = '';
+  armTiltTap(false);
   tiltLog.asked++; tiltLog.err = '';
   try { state = await DeviceOrientationEvent.requestPermission(); } catch (e) { tiltLog.err = String((e && e.message) || e); }
   tiltLog.state = state || 'сбой';
-  if (state) store.set('tilt', state);                      // сбой — не отказ: его не запоминаем, в следующий раз спросим снова
+  if (state) { store.set('tilt', state); tiltLost = false; }      // сбой — не отказ: его не запоминаем, в следующий раз спросим снова
   if (state === 'granted') {
     enableTilt();
     if (greeted) say('tilt_on', { force: true }); else tiltHello = true;      // голова ещё собирается — скажет после приветствия
@@ -686,6 +708,7 @@ function tipSlot(to, instant) {
 function showTip(on, instant = false) {
   if (!tiltTip) return;
   clearTimeout(tipT); clearTimeout(tipHideT);
+  if (!on) armTiltTap(false);                // вопрос по нажатию живёт, только пока плашка на экране
   if (on) { tiltTip.hidden = false; tiltTip.classList.remove('is-out'); }
   else if (instant || reduced || tiltTip.hidden) tiltTip.hidden = true;
   else { tiltTip.classList.add('is-out'); tipT = setTimeout(() => { tiltTip.hidden = true; }, 260); }
@@ -710,25 +733,35 @@ function setupTilt() {
     `<button class="tip-close" type="button" aria-label="${esc(t('tiltNo'))}">×</button>`;
   document.body.appendChild(tiltTip);
   tiltTip.querySelector('.tip-btn').addEventListener('click', async () => { await askTilt(); showTip(false); });
-  tiltTip.querySelector('.tip-close').addEventListener('click', () => { store.set('tilt', 'dismissed'); track('tilt_permission', { state: 'dismissed' }); showTip(false); });
-  if (store.get('tilt') === 'granted') {
-    // разрешение уже давали: браузер всё равно ждёт касания — спрашиваем на первом же, окно при этом не появляется
-    const again = () => {
-      window.removeEventListener('touchend', again); window.removeEventListener('click', again);
-      tiltLog.asked++;
-      DeviceOrientationEvent.requestPermission().then((st) => { tiltLog.state = st; if (st === 'granted') enableTilt(); }).catch((e) => { tiltLog.state = 'сбой'; tiltLog.err = String((e && e.message) || e); });
-    };
-    window.addEventListener('touchend', again); window.addEventListener('click', again);
-  }
-  offerTilt(true);
+  tiltTip.querySelector('.tip-close').addEventListener('click', () => {
+    armTiltTap(false); tiltLost = false;
+    store.set('tilt', 'dismissed'); track('tilt_permission', { state: 'dismissed' }); showTip(false);
+  });
+  const was = store.get('tilt');
+  offerTilt(true);                                           // ещё не спрашивали — плашка сразу
+  if (was === 'denied' || was === 'dismissed') return;      // отказались — не пристаём (в режиме ?diag плашка есть и так)
+  // давали, но браузер забыл: плашка — и тоже сразу
+  const lost = () => { if (was !== 'granted' || tiltWanted || tiltLost) return; tiltLost = true; offerTilt(true); };
+  const slow = setTimeout(lost, 1500);                       // браузер молчит — вечно его не ждём
+  quietTilt().then((st) => {
+    clearTimeout(slow);
+    tiltLog.quiet = st;
+    if (tiltWanted) return;                                  // пока ждали ответа, наклон уже разрешили плашкой
+    if (st !== 'granted') { lost(); return; }
+    tiltLost = false;                                        // браузер помнит разрешение: наклон сразу, плашка не нужна
+    enableTilt();
+    if (!tiltTip.hidden && !query.has('diag')) showTip(false, true);
+  });
 }
-// Показываем плашку сразу — один раз за визит и только на главной. В режиме ?diag она видна, даже если раньше от неё
-// отказались (так наклон можно включить заново), и сама не уходит.
+// Показываем плашку сразу — один раз за визит и только на главной: тому, кого ещё не спрашивали, и тому, чьё разрешение
+// браузер забыл. В режиме ?diag она видна, даже если раньше от неё отказались (так наклон можно включить заново),
+// и сама не уходит.
 let tipOffered = false;
 function offerTilt(instant = false) {
-  if (!tiltTip || tipOffered || view !== 'hero' || !(query.has('diag') || store.get('tilt') == null)) return;
+  if (!tiltTip || tipOffered || view !== 'hero' || !(query.has('diag') || store.get('tilt') == null || tiltLost)) return;
   tipOffered = true;
   showTip(true, instant);
+  if (tiltLost) armTiltTap(true);            // уже разрешал: пока плашка на экране, спросим и по нажатию на голову
   if (greeted && !query.has('diag')) tipHideT = setTimeout(() => showTip(false), 20000);
 }
 
@@ -997,7 +1030,7 @@ function diag() {
       netLine(),
       stageLine(),
       `датчик наклона: ${'DeviceOrientationEvent' in window ? 'есть' : 'нет'}; разрешение: ${tiltAsk ? (store.get('tilt') || 'не спрошено') : 'не нужно'}`,
-      `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}`,
+      `запрос разрешения: ${tiltLog.asked ? `${tiltLog.asked} раз, ответ: ${tiltLog.state || 'ждём'}${tiltLog.err ? ` (${tiltLog.err})` : ''}` : 'не отправлялся'}${tiltLog.quiet ? `; без касания: ${tiltLog.quiet === 'granted' ? 'разрешено' : 'нужно окно'}` : ''}`,
       `наклон: ${tl && tl.on ? 'включён, событий пока нет' : 'выключен'}`,
       `касание: ${yes(window.matchMedia('(pointer: coarse)').matches)}; меньше движения: ${yes(reduced)}; плевки: ${Number.isFinite(SPIT_AFTER) ? `через ${SPIT_AFTER} с` : 'выключены'}`,
     ]).join('\n');

@@ -113,7 +113,7 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 .lang[aria-pressed="true"]{ color:var(--fg); text-decoration:underline; text-underline-offset:.2em; text-decoration-thickness:1px; }
 
 /* ---------- голова ---------- */
-.stage{ position:fixed; top:0; left:0; width:100%; height:100%; z-index:1; transition:top .7s var(--ease), left .7s var(--ease), width .7s var(--ease), height .7s var(--ease), border-radius .7s var(--ease); }
+.stage{ position:fixed; top:0; left:0; width:100%; height:100%; z-index:1; -webkit-tap-highlight-color:transparent; transition:top .7s var(--ease), left .7s var(--ease), width .7s var(--ease), height .7s var(--ease), border-radius .7s var(--ease); }
 .stage canvas{ display:block; width:100% !important; height:100% !important; }
 /* каталог и кейс: сцена сжимается в кружок в углу; серый диск проявляется, когда она уже почти доехала */
 .stage.is-corner,.corner-probe{ top:calc(100% - var(--corner) - var(--corner-b)); left:calc(100% - var(--corner) - var(--corner-r)); width:var(--corner); height:var(--corner); }
