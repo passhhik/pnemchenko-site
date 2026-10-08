@@ -40,8 +40,6 @@ body[data-tone="dark"]{ --fg:#FFFFFF; --on-fg:#000000; --mute:rgba(255,255,255,.
 
 *,*::before,*::after{ box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
-html.is-arc{ scroll-snap-type:y proximity; }      /* каталог на компьютере: прокрутка мягко останавливается на проекте */
-html.is-arc.is-touch,html.is-list{ scroll-snap-type:y mandatory; }      /* на телефоне и планшете — защёлкивается на папке */
 body{ margin:0; background:var(--paper); color:var(--fg); font:400 19px/1.45 var(--font); -webkit-font-smoothing:antialiased; transition:color .35s; }
 body[data-view="hero"]{ overflow:hidden; height:100vh; height:100dvh; }
 a{ color:inherit; }
@@ -72,9 +70,7 @@ body:not([data-view="hero"]) .topbar{ padding-bottom:var(--pad-top); }
 /* в кейсе под шапкой подложка, чтобы текст и картинки не просвечивали при прокрутке: цвета проекта над его шапкой, белая — над листом */
 .topbar::before{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; opacity:0; background:var(--bar-bg, rgba(255,255,255,.9)); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); transition:opacity .3s; }
 body[data-view="case"].is-scrolled .topbar::before{ opacity:1; }
-/* каталог: папки проезжают под шапкой — сверху лёгкая дымка цвета фона, чтобы логотип и кнопки оставались читаемыми */
-body[data-view="work"] .topbar::before{ opacity:1; inset:0 0 -34px 0; background:var(--theme-c, #fff); -webkit-backdrop-filter:none; backdrop-filter:none; transition:background-color .6s ease, opacity .3s;
-  -webkit-mask-image:linear-gradient(180deg, #000 0, rgba(0,0,0,.88) 48%, transparent); mask-image:linear-gradient(180deg, #000 0, rgba(0,0,0,.88) 48%, transparent); }
+/* в каталоге шапка без подложки: логотип и кнопки лежат прямо на фоне проекта */
 .topbar-side{ grid-column:1; justify-self:start; display:flex; gap:2px; }
 /* Логотип — свой слой. На главной он лежит под головой (z-index ниже сцены): голова может его перекрывать,
    когда её тянут вверх или она подпрыгивает. Внутри сайта он часть шапки и стоит над содержимым. Место задаёт скрипт. */
@@ -265,35 +261,71 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 @keyframes view-in{ from{ opacity:0; } to{ opacity:1; } }
 .catalog:not([hidden]),.case:not([hidden]),.hero:not([hidden]) .folders{ animation:view-in .4s ease both; }
 
-/* ---------- каталог: папки на дуге ---------- */
+/* ---------- каталог: проекты лентой, выбранный — крупно (js/catalog.js) ----------
+   Слои снизу вверх: фон проекта (цвет, картинка или видео) → его визуал → лента карточек → градиент снизу → текст.
+   Размеры ленты (--cw, --ch, --cb, --cpad) задаёт скрипт; --strip-top — где кончается лента. */
+html.is-cat,html.is-cat body{ overflow:hidden; height:100%; overscroll-behavior:none; }
+html.is-cat .site-footer{ display:none; }
+/* кружок с головой — над правым краем ленты, поменьше, чтобы не спорить с визуалом проекта */
+body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 12), 220px); --corner-b:calc(var(--strip-top, 300px) + clamp(12px, 2vh, 28px)); }
 .catalog{ position:relative; z-index:20; }
-.arc{ position:fixed; inset:0; z-index:20; margin:0; padding:0; list-style:none; pointer-events:none; overflow:hidden; overflow:clip; }
-.arc-item{ position:absolute; left:0; top:0; will-change:transform; }
-/* папка не в фокусе и так размыта целиком — матовое стекло ей заменяет просто более плотная заливка: размытие
-   того, что под стеклом, — самая дорогая часть папки, а под общим размытием его всё равно не видно */
-.arc-item.is-soft .gf-front{ -webkit-backdrop-filter:none; backdrop-filter:none; background:linear-gradient(180deg, rgba(var(--gf-glass),.93), rgba(var(--gf-glass),.84)); }
-.arc-item .gf{ pointer-events:auto; transform:translate(-50%,-50%); }
-.arc-item.is-far .gf{ pointer-events:none; }
-.arc-title{ width:max-content; max-width:calc(var(--fw) * 1.5); margin:0; color:var(--fg); }
-.arc-title p{ margin:0; transform:translate(-50%,-50%); }
-.arc-h{ font:400 calc(var(--fw) * .25)/.95 var(--font); letter-spacing:-.015em; text-wrap:balance; }
-.arc-n{ margin-top:.5em !important; font-size:calc(var(--fw) * .085); color:var(--mute); }
-.arc-track{ position:relative; pointer-events:none; }
-.arc-track i{ position:absolute; left:0; width:1px; height:1px; scroll-snap-align:start; }
-/* слева внизу — разделы и список названий: наведи на название, и дуга доедет до проекта */
-.arc-side{ position:fixed; z-index:30; left:var(--pad-x); bottom:clamp(18px, calc(var(--u) * 2.6), 56px); width:min(calc(var(--u) * 46), calc(100vw - var(--pad-x) * 2)); pointer-events:none; }
-.arc-side > *{ pointer-events:auto; }
-.filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:clamp(12px, calc(var(--u) * 1.5), 30px); }
-.chip{ display:inline-flex; align-items:center; gap:.45em; height:clamp(32px, calc(var(--u) * 2.4), 46px); padding:0 .85em; border:0; border-radius:999px; background:transparent; color:var(--fg); font:400 clamp(15px, calc(var(--u) * 1.25), 23px)/1 var(--font); cursor:pointer; box-shadow:inset 0 0 0 1.5px var(--fg); transition:background-color .2s, color .2s; }
-.chip:hover{ background:var(--pill); }
-.chip[aria-pressed="true"]{ background:var(--fg); color:var(--on-fg); }
-.chip-n{ opacity:.6; }
-.arc-index{ width:fit-content; max-width:calc(var(--u) * 30); max-height:calc(1.28em * 9); overflow:hidden; font-size:clamp(15px, calc(var(--u) * 1.35), 26px); line-height:1.28; }
-.arc-index ol{ margin:0; padding:0; list-style:none; transition:transform .35s var(--ease); }
-.arc-index a{ display:block; overflow:hidden; color:var(--mute); text-decoration:none; text-overflow:ellipsis; white-space:nowrap; transition:color .2s; }
-.arc-index a:hover,.arc-index a.is-current{ color:var(--fg); }
-.arc-index a.is-current{ text-decoration:underline; text-underline-offset:.18em; text-decoration-thickness:1px; }
-.empty{ position:fixed; z-index:21; left:var(--pad-x); top:42%; margin:0; font-size:clamp(20px, calc(var(--u) * 2.2), 44px); }
+.cat{ position:fixed; inset:0; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; color:var(--fg); }
+.cat.is-dragging,.cat.is-dragging .cat-card{ cursor:grabbing; }
+.cat-bg,.cat-hero,.cat-fade{ position:absolute; inset:0; pointer-events:none; }
+.cat-bg-l{ position:absolute; inset:0; overflow:hidden; opacity:0; transition:opacity .7s var(--ease); }
+.cat-bg-l.is-on{ opacity:1; }
+.cat-bg-m{ position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; animation:bg-in 1.6s var(--ease) both; }
+@keyframes bg-in{ from{ transform:scale(1.08); } }
+/* визуал проекта: место и размер — из админки (в долях экрана), появляется с мягкой пружинкой и чуть «дышит» */
+.cat-hero{ z-index:0; }
+.cat-hero-l{ position:absolute; inset:0; transition:opacity .35s ease, transform .45s var(--ease); }
+.cat-hero-l.is-out{ opacity:0; transform:scale(1.035); }
+.cat-hero-m{ position:absolute; transform:translate(-50%,-50%); }
+.cat-hero-l.is-in .cat-hero-m{ animation:hero-in 1s var(--spring) both; }
+@keyframes hero-in{ from{ opacity:0; transform:translate(-50%,-43%) scale(.9); } }
+.cat-hero-media{ display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 28px 56px rgba(0,0,0,.2)); animation:hero-float 7s ease-in-out infinite; }
+@keyframes hero-float{ 50%{ transform:translateY(-1.4%); } }
+/* предпросмотр в админке: визуал двигают мышью, колёсико — размер */
+.cat-hero-m.is-edit{ pointer-events:auto; cursor:grab; outline:2px dashed currentColor; outline-offset:8px; }
+.cat-hero-m.is-edit .cat-hero-media{ animation:none; }
+.cat-hero-m.is-moving{ cursor:grabbing; }
+/* …и пунктиром — где текст проекта и где будет кружок с головой (в предпросмотре головы нет): туда визуал лучше не ставить */
+.cat.is-edit-hero .cat-info-in{ outline:1px dashed currentColor; outline-offset:10px; }
+body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35; border:2px dashed var(--fg); border-radius:50%; opacity:.6; }
+/* текст выбранного проекта */
+.cat-info{ position:absolute; z-index:3; left:var(--cpad); top:calc(var(--hdr) + clamp(8px, 3.5vh, 56px)); width:min(47vw, 900px); bottom:calc(var(--strip-top, 300px) + clamp(16px, 4vh, 48px)); pointer-events:none; }
+.cat-info-in{ position:absolute; left:0; top:0; width:100%; pointer-events:auto; }
+.cat-info-in.is-out{ opacity:0; transform:translateY(-10px); transition:opacity .2s ease, transform .26s var(--ease); pointer-events:none; }
+.cat-info-in.is-in > *{ animation:info-in .62s var(--ease) both; }
+.cat-info-in.is-in > :nth-child(2){ animation-delay:.045s; }
+.cat-info-in.is-in > :nth-child(3){ animation-delay:.09s; }
+.cat-info-in.is-in > :nth-child(4){ animation-delay:.135s; }
+@keyframes info-in{ from{ opacity:0; transform:translateY(18px); } }
+.cat-chip{ display:inline-flex; align-items:center; height:clamp(32px, calc(var(--u) * 2.6), 50px); margin:0 0 clamp(14px, calc(var(--u) * 1.8), 34px); padding:0 1em; border-radius:999px; background:var(--pill); font-size:clamp(15px, calc(var(--u) * 1.3), 24px); line-height:1; }
+.cat-title{ margin:0; font:400 clamp(34px, calc(var(--u) * 4.4), 100px)/1.02 var(--font); letter-spacing:-.012em; text-wrap:balance; }
+.cat-sum{ max-width:34em; margin:clamp(14px, calc(var(--u) * 2), 36px) 0 0; color:var(--mute); font-size:clamp(17px, calc(var(--u) * 1.55), 30px); line-height:1.3; text-wrap:pretty; }
+.cat-acts{ display:flex; flex-wrap:wrap; gap:12px; margin-top:clamp(18px, calc(var(--u) * 2.4), 44px); }
+.cat-likeb{ background:transparent; color:var(--fg); }
+.cat-likeb .heart{ width:1.05em; height:1.05em; fill:none; stroke:currentColor; stroke-width:2; transition:fill .2s, stroke .2s; }
+.cat-likeb[aria-pressed="true"] .heart{ fill:#FF4D6A; stroke:#FF4D6A; }
+.cat-likeb.is-pop .heart{ animation:heart-pop .55s var(--spring); }
+@keyframes heart-pop{ 35%{ transform:scale(1.5); } }
+/* лента карточек */
+.cat-strip{ position:absolute; z-index:1; left:0; right:0; bottom:var(--cb); height:var(--ch); }
+.cat-card{ position:absolute; left:0; top:0; width:var(--cw); height:var(--ch); padding:0; border:0; border-radius:calc(var(--ch) * .12); overflow:hidden; background:rgba(255,255,255,.16); cursor:pointer;
+  transform-origin:0 50%; will-change:transform; box-shadow:0 18px 40px rgba(0,0,0,.18); transition:box-shadow .4s var(--ease); -webkit-tap-highlight-color:transparent; }
+.cat-card-m{ position:absolute; inset:0; }
+.cat-card-media{ display:block; width:100%; height:100%; object-fit:cover; transition:transform .9s var(--ease); pointer-events:none; }
+.cat-card.is-active{ box-shadow:0 0 0 3px var(--fg), 0 24px 52px rgba(0,0,0,.26); }
+.cat-card.is-active .cat-card-media{ transform:scale(1.035); }
+.cat-card:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--fg), 0 0 0 6px rgba(0,0,0,.35); }
+/* сердечко на карточке — только там, где посетитель сам поставил лайк */
+.cat-like{ position:absolute; z-index:1; top:clamp(8px, calc(var(--ch) * .06), 16px); right:clamp(8px, calc(var(--ch) * .06), 16px); display:grid; place-items:center; width:clamp(30px, calc(var(--ch) * .15), 46px); aspect-ratio:1; border-radius:50%; background:rgba(255,255,255,.95); box-shadow:0 4px 14px rgba(0,0,0,.18); }
+.cat-like .heart{ width:56%; height:56%; fill:#FF4D6A; }
+.cat-like.is-pop{ animation:heart-pop .55s var(--spring); }
+/* снизу лёгкий градиент: чуть ложится на карточки и затемняет их — глубина */
+.cat-fade{ z-index:2; top:auto; height:min(64vh, calc(var(--strip-top, 300px) * 2.1)); background:linear-gradient(to top, rgba(0,0,0,.4), rgba(0,0,0,.16) 40%, rgba(0,0,0,0)); }
+.cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-size:clamp(20px, calc(var(--u) * 2.2), 44px); }
 
 /* ---------- кейс ---------- */
 .case{ position:relative; z-index:20; }
@@ -407,22 +439,17 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .folders .gf:last-child:nth-child(n+3){ order:-1; }
   .folders .gf-title{ margin-left:-14%; margin-right:-14%; color:var(--mute); transition:color .25s; }      /* подпись может быть чуть шире маленькой папки */
   .folders .gf.is-cur .gf-title{ color:var(--fg); }      /* папка в центре ленты — текущая, соседние приглушены */
-  /* каталог — обычная лента сверху вниз */
-  .arc-side{ position:static; width:auto; padding-top:calc(var(--hdr) + 10px); }
-  .filters{ flex-wrap:nowrap; margin:0; padding:0 var(--pad-x); overflow-x:auto; scrollbar-width:none; }
-  .filters::-webkit-scrollbar{ display:none; }
-  .chip{ flex:none; height:38px; font-size:16px; }
-  .arc-index,.arc-track{ display:none; }
-  .arc{ position:static; display:flex; flex-direction:column; align-items:center; gap:64px; padding:30px 0 calc(var(--bar) + 120px); overflow:visible; pointer-events:auto; }
-  .arc-item{ position:static; will-change:auto; }
-  /* прокрутка защёлкивается на папке: она встаёт в центр экрана и раскрывается. Самый верх — тоже остановка,
-     там первая папка и так на виду, поэтому своей точки у неё нет */
-  .arc-side{ scroll-snap-align:start; }
-  .arc-item:not(.arc-title):not(:nth-child(2)){ scroll-snap-align:center; }
-  .arc-title{ align-self:stretch; width:auto; max-width:none; margin-bottom:-24px; padding:0 var(--pad-x) 14px; --fw:160px; }      /* первая папка — ближе к заголовку: её подпись не уходит под кружок с головой */
-  .arc-title p{ transform:none; }
-  .arc-item .gf{ --fw:min(72vw, 320px); transform:none; }
-  .empty{ position:static; padding:140px var(--pad-x); }
+  /* каталог: визуал сверху, под ним текст проекта, ниже лента карточек; нижняя панель прозрачная — лежит на фоне проекта */
+  body[data-view="work"]{ --corner:64px; }
+  body[data-view="work"] .topnav{ background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; --fg:inherit; --on-fg:inherit; }
+  .cat-info{ top:auto; bottom:calc(var(--strip-top, 300px) + 18px); left:16px; width:calc(100% - 32px); }
+  .cat-info-in{ top:auto; bottom:0; }
+  .cat-chip{ height:30px; margin-bottom:10px; font-size:14px; }
+  .cat-title{ font-size:clamp(26px, 7.6vw, 40px); }
+  .cat-sum{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-top:8px; font-size:16px; }
+  .cat-acts{ gap:8px; margin-top:14px; }
+  .cat-acts .btn{ height:44px; font-size:16px; }
+  .cat-fade{ height:calc(var(--strip-top, 300px) + 30vh); }
   .case-hero{ padding-top:calc(var(--hdr) + 22px); }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
   .site-footer{ padding-bottom:calc(var(--bar) + 24px); }

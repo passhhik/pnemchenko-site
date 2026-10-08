@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /tools/
+Disallow: /server/

@@ -20,7 +20,9 @@ export const LINES = {
     drag_face: 'Э! Мне так не видно.',
     cv: 'Резюме уже скачивается. Там всё то же, только без головы.',
     sound_on: 'О, звук. Теперь меня ещё и слышно.',
-    catalog_hi: 'Я тут, в уголке. Крути — проекты поедут по кругу.',
+    catalog_hi: 'Я тут, в уголке. Крути — проекты поедут лентой.',
+    like_1: 'О, отметил. Мне он тоже нравится.',
+    like_2: 'Лайк засчитан. Павел будет рад.',
     catalog_hi_touch: 'Я тут, в уголке. Листай — тут все проекты.',
     open_project: 'Хороший выбор. Этот проект я помню в лицо.',
     filter_all: 'Всё сразу. Смело.',
@@ -92,7 +94,9 @@ export const LINES = {
     drag_face: 'Hey! I can’t see like this.',
     cv: 'The CV is downloading. Same story, minus the head.',
     sound_on: 'Oh, sound. Now you can hear me too.',
-    catalog_hi: 'I’m over here, in the corner. Scroll — the projects go round.',
+    catalog_hi: 'I’m over here, in the corner. Scroll — the projects slide by.',
+    like_1: 'Oh, noted. I like that one too.',
+    like_2: 'Like counted. Pavel will be pleased.',
     catalog_hi_touch: 'I’m over here, in the corner. Scroll — all the projects are here.',
     open_project: 'Good pick. I know this one by heart. Well — by head.',
     filter_all: 'Everything at once. Bold.',
@@ -160,6 +164,8 @@ export const REACTIONS = {
   idle: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_4', 'idle_hey_3', 'idle_3', 'idle_1'],
   // то же, когда папок на главной нет (телефон): вместо подсказки про папки — про кнопку «Все работы»
   idleClean: ['idle_hey_1', 'idle_2', 'idle_hey_2', 'idle_5', 'idle_hey_3', 'idle_3', 'idle_1'],
+  // посетитель поставил лайк в каталоге
+  like: ['like_1', 'like_2'],
 };
 
 // Какие реплики получит посетитель: исходные русские → свои русские → (для другого языка) исходные на нём → свои на нём.
@@ -195,9 +201,8 @@ export const LINE_INFO = [
   { title: 'Каталог и кейсы', items: [
     ['catalog_hi', 'Первый раз зашли в каталог — на компьютере'],
     ['catalog_hi_touch', 'Первый раз зашли в каталог — на телефоне или планшете'],
-    ['filter_all', 'В каталоге выбрали «Все»'],
-    ['filter_*', 'В каталоге выбрали раздел «{section}»'],
-    ['empty', 'В выбранном разделе нет проектов'],
+    ['like_1', 'В каталоге поставили лайк'], ['like_2', 'В каталоге поставили лайк (вторая)'],
+    ['empty', 'В каталоге пока нет ни одного проекта'],
     ['open_project', 'Открыли кейс'],
   ] },
   { title: 'Посетитель затих', note: 'Оклики на главной: первый — через 7 секунд тишины, следующие — каждые 13 секунд, не больше трёх за одно затишье. Идут по кругу в этом порядке.', items: [

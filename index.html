@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <!-- Защита страницы: скрипты, стили, картинки и запросы — только со своего адреса. Чужой или вставленный в страницу
        скрипт браузер не выполнит. 'unsafe-eval' нужен только затем, чтобы старые Safari разрешили распаковщик 3D-модели (WebAssembly). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data:; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Павел Немченко — продуктовый дизайнер</title>
@@ -32,7 +32,8 @@
   <link rel="modulepreload" href="js/lines.js">
   <link rel="modulepreload" href="js/folders.js">
   <link rel="modulepreload" href="js/theme.js">
-  <link rel="modulepreload" href="js/arc.js">
+  <link rel="modulepreload" href="js/catalog.js">
+  <link rel="modulepreload" href="js/likes.js">
   <link rel="modulepreload" href="js/case.js">
   <link rel="modulepreload" href="js/burst.js">
   <link rel="modulepreload" href="js/subtitles.js">

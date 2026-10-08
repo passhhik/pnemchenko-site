@@ -1,0 +1,9 @@
+{
+  "name": "pnemchenko-likes",
+  "private": true,
+  "description": "Счётчик лайков портфолио: Yandex Cloud Functions + YDB (Document API)",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0"
+  }
+}

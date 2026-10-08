@@ -221,3 +221,9 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .login{ width:min(380px, 100%); }
 .login .f{ margin-top:22px; }
 .login .error{ margin-top:10px; }
+
+/* ---------- место визуала проекта в каталоге ---------- */
+.heropos{ margin-top:14px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--r); }
+.heropos-h{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.grid3{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.pitem-likes{ color:#C2185B; white-space:nowrap; }

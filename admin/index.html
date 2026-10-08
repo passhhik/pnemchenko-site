@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <!-- Админка хранит токен доступа к сайту, поэтому странице разрешено ходить только к себе и к GitHub -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://raw.githubusercontent.com; media-src 'self' blob: https://raw.githubusercontent.com; font-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://raw.githubusercontent.com; media-src 'self' blob: https://raw.githubusercontent.com; font-src 'self'; connect-src 'self' https://api.github.com https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Админка портфолио</title>
   <link rel="icon" href="../favicon.ico" sizes="48x48">
   <link rel="stylesheet" href="admin.css">
@@ -60,6 +60,8 @@
         <div class="seg" role="group" aria-label="Что показывать" data-views></div>
         <div class="seg" role="group" aria-label="Устройство">
           <button type="button" data-act="device" data-device="desktop" aria-pressed="true">Компьютер</button>
+          <button type="button" data-act="device" data-device="laptop" aria-pressed="false">Ноутбук</button>
+          <button type="button" data-act="device" data-device="tablet" aria-pressed="false">Планшет</button>
           <button type="button" data-act="device" data-device="phone" aria-pressed="false">Телефон</button>
         </div>
       </div>

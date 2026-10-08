@@ -5,6 +5,8 @@
 import { toneOf, contrastOf } from '../js/theme.js';
 import { gh, gitSha, GhError, DEFAULT_REPO } from './github.js';
 import { LINES, LINE_INFO } from '../js/lines.js';
+import { HERO_DEFAULT } from '../js/catalog.js';
+import { likesApi, likeCounts } from '../js/likes.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -142,6 +144,7 @@ function init(site, projects) {
   $('[data-app]').hidden = false;
   renderAll();
   sendPreview(true);
+  loadLikes();
 }
 async function loadFromDir(dir) {
   st.dir = dir;
@@ -339,6 +342,14 @@ function IMG(label, path, o = {}) {
       ${src ? `<button class="btn btn--line btn--sm" type="button" data-act="clear" data-path="${path}"${o.l ? ' data-l="1"' : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}>Убрать</button>` : ''}</div>
     </div></div>`;
 }
+function HEROPOS(layout, label) {
+  const h = cur().hero || {}, own = h[layout] && typeof h[layout] === 'object';
+  const pos = { ...HERO_DEFAULT[layout], ...(own ? h[layout] : {}) };
+  const r = (name, key, min, max, v) => `<label class="f"><span>${name}</span><span class="range"><input type="range" data-path="hero.${layout}.${key}" data-kind="${key === 's' ? 'num' : 'pct'}" min="${min}" max="${max}" step="${key === 's' ? 0.5 : 0.5}" value="${v}" data-unit="%"><output>${v}%</output></span></label>`;
+  return `<div class="heropos" data-heropos="${layout}"><div class="heropos-h"><span class="lbl">${esc(label)}</span>
+      ${own ? `<button class="btn btn--line btn--sm" type="button" data-act="hero-reset" data-layout="${layout}">Как по умолчанию</button>` : '<span class="hint">по умолчанию</span>'}</div>
+    <div class="grid3">${r('По горизонтали', 'x', -20, 120, +(pos.x * 100).toFixed(1))}${r('По вертикали', 'y', -20, 120, +(pos.y * 100).toFixed(1))}${r('Размер', 's', 4, 160, pos.s)}</div></div>`;
+}
 function tools(path, i, n, what) {
   return `<span class="tools"><button class="ico" type="button" data-act="item-up" data-path="${path}" data-i="${i}" aria-label="Выше"${i ? '' : ' disabled'}>${I.up}</button>
     <button class="ico" type="button" data-act="item-down" data-path="${path}" data-i="${i}" aria-label="Ниже"${i < n - 1 ? '' : ' disabled'}>${I.down}</button>
@@ -494,7 +505,7 @@ function renderSide() {
         <button class="pitem-main" type="button" data-act="open" data-i="${i}"${i === st.idx ? ' aria-current="true"' : ''}>
           <span class="pitem-thumb">${p.sticker ? `<img data-src="${esc(p.sticker)}" alt="">` : ''}</span>
           <span class="pitem-text"><span class="pitem-title">${esc(txAny(p.title) || 'Без названия')}</span>
-            <span class="pitem-meta">${esc(secName(p.section))}${p.year ? `, ${esc(p.year)}` : ''}${p.published === false ? ' — черновик' : ''}</span></span>
+            <span class="pitem-meta">${esc(secName(p.section))}${p.year ? `, ${esc(p.year)}` : ''}${p.published === false ? ' — черновик' : ''}${st.likes && p.slug in st.likes ? ` · <span class="pitem-likes" title="Лайков на сайте">♥ ${st.likes[p.slug]}</span>` : ''}</span></span>
         </button>
         <span class="pitem-move"><button class="ico" type="button" data-act="up" data-i="${i}" aria-label="Поднять в списке"${i ? '' : ' disabled'}>${I.up}</button>
           <button class="ico" type="button" data-act="down" data-i="${i}" aria-label="Опустить в списке"${i < st.projects.length - 1 ? '' : ' disabled'}>${I.down}</button></span>
@@ -514,13 +525,31 @@ const PANES = {
     ${F('Адрес страницы', 'slug', { kind: 'slug', attrs: 'spellcheck="false"', hint: 'Латиницей. Кейс открывается по адресу …/#/work/адрес. Если поменять его после публикации, старые ссылки перестанут работать.' })}`,
   look: (p) => {
     const c = contrastHTML(p);
+    const kind = (p.bg && p.bg.kind) || 'color';
     return `
-    ${IMG('Обложка', 'cover', { thumb: 'thumb', hint: 'Главная картинка кейса, лучше 4:3. Она же — размытый фон проекта.' })}
-    ${IMG('Наклейка на папке', 'sticker', { small: 1, max: 480, hint: 'Знак или иконка проекта на прозрачном фоне: PNG или SVG.' })}
-    <fieldset class="fs"><legend>Фон проекта</legend>
-      <div class="grid2">${COLOR('Цвет', 'theme.color')}${F('Текст на фоне', 'theme.tone', { type: 'select', kind: 'opt', options: [['', 'Подобрать автоматически'], ['dark', 'Белый'], ['light', 'Чёрный']] })}</div>
-      <p class="contrast ${c.cls}" data-contrast>${c.html}</p>
+    <fieldset class="fs"><legend>Карточка в каталоге</legend>
+      <p class="hint">Карточка в ленте внизу каталога. Картинка или короткое видео без звука (оно крутится по кругу, пока карточка видна). Нет ни того ни другого — берётся малая копия обложки.</p>
+      ${IMG('Картинка карточки', 'card.image', { max: 1400, hint: 'Горизонтальная, примерно 3:2. Главное — по центру.' })}
+      ${IMG('Видео карточки', 'card.video', { kind: 'video', hint: 'MP4 или WebM без звука, 3–8 секунд, до 3 МБ.' })}
     </fieldset>
+    <fieldset class="fs"><legend>Фон в каталоге</legend>
+      <p class="hint">Весь экран каталога, пока выбран этот проект.</p>
+      ${F('Фон', 'bg.kind', { type: 'select', kind: 'opt', options: [['', 'Цвет'], ['image', 'Картинка'], ['video', 'Видео']] })}
+      <div class="grid2">${COLOR('Цвет фона', 'theme.color')}${F('Текст на фоне', 'theme.tone', { type: 'select', kind: 'opt', options: [['', 'Подобрать по цвету'], ['dark', 'Белый'], ['light', 'Чёрный']] })}</div>
+      <p class="contrast ${c.cls}" data-contrast>${c.html}</p>
+      ${kind === 'image' || kind === 'video' ? IMG('Картинка фона', 'bg.image', { max: 2400, hint: kind === 'video' ? 'Кадр, который виден, пока видео грузится.' : 'Во весь экран, лучше 16:9, от 1920 px.' }) : ''}
+      ${kind === 'video' ? IMG('Видео фона', 'bg.video', { kind: 'video', hint: 'MP4 или WebM без звука, 5–15 секунд, до 6 МБ. Цвет фона виден, пока видео грузится.' }) : ''}
+      ${kind !== 'color' ? '<p class="hint">Цвет фона всё равно задайте: по нему выбирается цвет текста, им же закрашен экран, пока картинка или видео грузятся.</p>' : ''}
+    </fieldset>
+    <fieldset class="fs"><legend>Визуал на фоне</legend>
+      <p class="hint">Картинка (лучше PNG без фона) или короткое видео поверх фона каталога. Расставьте его прямо в предпросмотре: вид «Каталог», визуал тянется мышью, колёсико — размер. Для широких экранов и для телефона место своё — переключите устройство над предпросмотром. Пунктиром там показаны текст проекта и место головы: на них визуал лучше не заводить. Пусто — берётся первая работа проекта без фона.</p>
+      ${IMG('Картинка', 'hero.image', { max: 1800 })}
+      ${IMG('Видео', 'hero.video', { kind: 'video', hint: 'MP4 или WebM без звука, до 4 МБ.' })}
+      ${HEROPOS('desk', 'Компьютер и планшет горизонтально')}
+      ${HEROPOS('phone', 'Телефон и планшет вертикально')}
+    </fieldset>
+    ${IMG('Обложка', 'cover', { thumb: 'thumb', hint: 'Главная картинка кейса, лучше 4:3. Её малая копия — карточка в каталоге, если своей картинки у карточки нет.' })}
+    ${IMG('Наклейка на папке', 'sticker', { small: 1, max: 480, hint: 'Знак или иконка проекта на прозрачном фоне: PNG или SVG.' })}
     ${COLOR('Цвет папки', 'folder', { optional: 1, hint: 'Пусто — нейтральное матовое стекло.' })}
     <fieldset class="fs"><legend>Работы проекта</legend>
       <p class="hint">Разлетаются по главной при наведении на раздел и выглядывают из папки. По центру папки встаёт первая картинка с фоном, за ней — обложка.</p>
@@ -588,6 +617,11 @@ function sitePane() {
       <p class="hint">Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.</p>
       ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: 'Отсчёт — от последнего действия посетителя. 0 — выключить. Плевки идут неторопливо, примерно раз в минуту. В предпросмотре админки головы нет, поэтому плевков там не видно: смотрите на сайте после «Опубликовать». Посмотреть, не меняя настройку, — адрес сайта с ?spit=5 (через 5 секунд).' })}
     </fieldset>
+    <fieldset class="fs"><legend>Лайки</legend>
+      <p class="hint">Посетитель ставит лайк проекту в каталоге; сердечко на карточке видит только он сам. Сколько лайков у каждого проекта, считает свой счётчик — облачная функция (как её завести — server/likes/README.md в репозитории сайта). Вставьте сюда её адрес и опубликуйте: числа появятся в списке проектов слева.</p>
+      ${F('Адрес счётчика', 'likesApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
+      <div class="row">${likesApi(s) ? '<button class="btn btn--line btn--sm" type="button" data-act="likes-refresh">Обновить числа</button>' : ''}<span class="hint" data-likes-note>${esc(st.likesNote || '')}</span></div>
+    </fieldset>
     <fieldset class="fs"><legend>Пароль админки</legend>
       <p class="hint">${s.adminLock ? 'Пароль задан: без него админка не открывается.' : 'Пароля нет: админку откроет любой, кто знает адрес. Изменить сайт без токена GitHub он всё равно не сможет.'}</p>
       <div class="row">
@@ -637,7 +671,7 @@ function renderEdit() {
     root.innerHTML = `<div class="edit-head"><h1>Настройки сайта</h1></div><div class="pane" style="margin-top:16px">${sitePane()}</div>`;
   } else {
     const p = cur();
-    const tabs = [['main', 'Основное'], ['look', 'Папка и фон'], ['results', 'Результаты'], ['blocks', `Блоки: ${(p.blocks || []).length}`]];
+    const tabs = [['main', 'Основное'], ['look', 'Каталог и обложка'], ['results', 'Результаты'], ['blocks', `Блоки: ${(p.blocks || []).length}`]];
     root.innerHTML = `
       <div class="edit-head">
         <h1 data-h1>${esc(txAny(p.title) || 'Без названия')}</h1>
@@ -656,7 +690,7 @@ function renderEdit() {
   hydrate(root);
 }
 function renderViews() {
-  const list = st.idx < 0 ? [['home', 'Главная']] : [['case', 'Кейс'], ['folder', 'Папка в каталоге']];
+  const list = st.idx < 0 ? [['home', 'Главная']] : [['catalog', 'Каталог'], ['case', 'Кейс']];
   if (!list.some(([k]) => k === st.view)) st.view = list[0][0];
   $('[data-views]').innerHTML = list.map(([k, n]) => `<button type="button" data-act="view" data-view="${k}" aria-pressed="${k === st.view}">${n}</button>`).join('');
 }
@@ -694,13 +728,13 @@ async function draftForPreview() {
   await Promise.all(jobs);
   return d;
 }
-const previewHash = () => (st.idx < 0 ? '#/' : st.view === 'folder' ? '#/work' : `#/work/${encodeURIComponent(cur().slug || '')}`);
+const previewHash = () => (st.idx < 0 ? '#/' : st.view === 'catalog' ? '#/work' : `#/work/${encodeURIComponent(cur().slug || '')}`);
 async function sendPreview(reload) {
   if (!st.site) return;
   const frame = $('[data-frame]');
   try { localStorage.setItem('ph:draft', JSON.stringify(await draftForPreview())); } catch (_) { /* noop */ }
   const hash = previewHash();
-  const focus = st.idx >= 0 && st.view === 'folder' ? cur().slug : null;
+  const focus = st.idx >= 0 && st.view === 'catalog' ? cur().slug : null;
   if (reload || frame.dataset.key !== st.lang) {
     frame.dataset.key = st.lang; frame.dataset.ready = '';
     frame.src = `../index.html?preview=1&lang=${st.lang}${hash}`;
@@ -714,6 +748,17 @@ window.addEventListener('message', (e) => {
   if (e.origin !== location.origin || !e.data) return;
   const frame = $('[data-frame]');
   if (e.data.type === 'ph:ready') { frame.dataset.ready = '1'; sendPreview(false); }
+  // визуал проекта передвинули или увеличили в предпросмотре каталога — запоминаем для этого типа экрана
+  if (e.data.type === 'ph:hero' && st.site) {
+    const p = st.projects.find((x) => x.slug === e.data.slug);
+    const L = e.data.layout === 'phone' ? 'phone' : 'desk', pos = e.data.pos || {};
+    if (!p || ![pos.x, pos.y, pos.s].every(Number.isFinite)) return;
+    p.hero = p.hero || {};
+    p.hero[L] = { x: pos.x, y: pos.y, s: pos.s };
+    if (cur() === p && st.tab === 'look') renderEdit();
+    changed('hero');
+    return;
+  }
   // папку на главной перетащили в предпросмотре — запоминаем её место
   if (e.data.type === 'ph:folder' && st.site) {
     const sec = (st.site.sections || []).find((s) => s.id === e.data.id);
@@ -727,10 +772,12 @@ function fitFrame() {
   const wrap = $('[data-frame-wrap]'), frame = $('[data-frame]');
   const W = wrap.clientWidth, H = wrap.clientHeight;
   if (!W || !H) return;
-  wrap.classList.toggle('is-phone', st.device === 'phone');
-  if (st.device === 'phone') {
-    const w = 390, h = Math.min(H - 40, 844);
-    frame.style.cssText = `width:${w}px;height:${h}px;left:${Math.round((W - w) / 2)}px;top:20px;transform:none`;
+  wrap.classList.toggle('is-phone', st.device !== 'desktop');
+  const SIZES = { phone: [390, 844], tablet: [820, 1180], laptop: [1280, 720] };
+  if (SIZES[st.device]) {
+    // устройство показывается в настоящем размере экрана, уменьшенным, если не помещается
+    const [w, h] = SIZES[st.device], k = Math.min(1, (W - 24) / w, (H - 40) / h);
+    frame.style.cssText = `width:${w}px;height:${h}px;left:${Math.round((W - w * k) / 2)}px;top:20px;transform:scale(${k});transform-origin:0 0`;
   } else {
     // компьютерная вёрстка показывается целиком, просто уменьшенной
     const w = Math.max(1280, W), k = W / w;
@@ -1057,6 +1104,8 @@ const ACT = {
   },
   'sec-del'(el) { st.site.sections.splice(Number(el.dataset.i), 1); renderEdit(); changed('sections'); },
   'pass-set'() { openPassDialog(); },
+  'hero-reset'(el) { const h = cur().hero; if (h) { delete h[el.dataset.layout]; if (!Object.keys(h).length) delete cur().hero; } renderEdit(); changed('hero'); },
+  'likes-refresh'() { loadLikes(true); },
   'pass-cancel'() { passDlg.close(); },
   'pass-off'() {
     if (!window.confirm('Убрать пароль? После публикации админка будет открываться без него.')) return;
@@ -1099,6 +1148,7 @@ document.addEventListener('input', (e) => {
   let v = el.value;
   if (kind === 'bool') v = el.checked;
   else if (kind === 'num') v = el.value === '' ? '' : Number(el.value);
+  else if (kind === 'pct') v = el.value === '' ? '' : Math.round(Number(el.value) * 10) / 1000;
   else if (kind === 'color') { v = el.value.toUpperCase(); const t = el.parentNode.querySelector('[data-kind="hex"]'); if (t) t.value = v; }
   else if (kind === 'hex') {
     const m = /^#?([0-9a-f]{6})$/i.exec(el.value.trim());
@@ -1111,6 +1161,7 @@ document.addEventListener('input', (e) => {
   } else if (kind === 'slug') { v = slugify(el.value); autoSlug.delete(obj); }
   if (el.dataset.l && kind !== 'list') v = setL(getPath(obj, path), v);
   if (kind === 'opt' && v === '') delPath(obj, path); else setPath(obj, path, v);
+  if (path === 'bg.kind') { renderEdit(); changed(path); return; }
   if (path === 'title' && autoSlug.has(obj)) {
     obj.slug = uniqueSlug(slugify(txAny(obj.title)) || 'project', obj);
     const s = $('[data-path="slug"]');
@@ -1226,6 +1277,23 @@ function ghGateError(e) {
 function gateButtons() {
   const b = $('[data-gate-site]');
   b.textContent = gh.on ? `Открыть с сайта ${gh.name}` : 'Подключить сайт';
+}
+
+// ---------- лайки: числа со счётчика ----------
+async function loadLikes(loud = false) {
+  const url = st.site && likesApi(st.site);
+  if (!url) { st.likes = null; return; }
+  try {
+    st.likes = await likeCounts(url);
+    const total = Object.values(st.likes).reduce((a, b) => a + b, 0);
+    st.likesNote = `Всего лайков: ${total}. Обновлено в ${clock()}`;
+  } catch (e) {
+    st.likes = null;
+    st.likesNote = 'Счётчик не ответил. Проверьте адрес и что функция публичная.';
+  }
+  renderSide();
+  const n = $('[data-likes-note]'); if (n) n.textContent = st.likesNote;
+  if (loud) toast(st.likesNote);
 }
 
 // ---------- пароль админки ----------

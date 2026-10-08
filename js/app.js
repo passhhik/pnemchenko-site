@@ -8,7 +8,7 @@ import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf
 import { linesFor, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
-import { createCatalog } from './arc.js';
+import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
 
@@ -584,7 +584,7 @@ function show(next, opts = {}) {
   const name = tx(content.site.name);
   if (next === 'work') {
     catalog.setCategory(opts.cat, true);
-    catalog.activate(true, { restore: prev === 'case' });
+    catalog.activate(true, { restore: prev === 'case' || prev === 'work' });      // из кейса и при обновлении предпросмотра — на том же проекте
     document.title = `${t('work')} — ${name}`;
     if (prev && prev !== 'work') $('#work-title').focus({ preventScroll: true });
     if (!catalogHi) { catalogHi = true; say(touchUI ? 'catalog_hi_touch' : 'catalog_hi', { force: true }); }
@@ -1101,12 +1101,13 @@ async function boot() {
   installFolderDefs();                       // контур стекла папки: он нужен и каталогу, и кейсу
   catalog = createCatalog(els.views.work, {
     reduced, onHover: lookAtEl,
-    onFilter(cat, n) {
-      history.replaceState(null, '', cat === 'all' ? '#/work' : `#/work?cat=${encodeURIComponent(cat)}`);
-      say(n ? `filter_${cat}` : 'empty', { force: true });
-      track('filter', { cat });
+    onLike(p, on) {
+      track('like', { slug: p.slug, on });
+      if (on) say(REACTIONS.like, { force: true, pick: true });
     },
+    onEmpty() { say('empty', { force: true }); },
   });
+  if (debug) window.__cat = catalog.state;
   layout();
   route();                                   // шапка, папки и каталог уже работают — голова догружается следом
   if (!content.preview) setupTilt();         // плашка про наклон (iPhone) — сразу, не дожидаясь головы
