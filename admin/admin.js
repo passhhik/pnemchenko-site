@@ -586,7 +586,14 @@ function sitePane() {
     </fieldset>
     <fieldset class="fs"><legend>Пасхалка: плевки</legend>
       <p class="hint">Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.</p>
-      ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: '0 — выключить. Чтобы посмотреть, как это выглядит, поставьте 0,1 (шесть секунд) — и не забудьте вернуть.' })}
+      ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: 'Отсчёт — от последнего действия посетителя. 0 — выключить. Плевки идут неторопливо, примерно раз в минуту. В предпросмотре админки головы нет, поэтому плевков там не видно: смотрите на сайте после «Опубликовать». Посмотреть, не меняя настройку, — адрес сайта с ?spit=5 (через 5 секунд).' })}
+    </fieldset>
+    <fieldset class="fs"><legend>Пароль админки</legend>
+      <p class="hint">${s.adminLock ? 'Пароль задан: без него админка не открывается.' : 'Пароля нет: админку откроет любой, кто знает адрес. Изменить сайт без токена GitHub он всё равно не сможет.'}</p>
+      <div class="row">
+        <button class="btn btn--line btn--sm" type="button" data-act="pass-set">${s.adminLock ? 'Сменить пароль' : 'Задать пароль'}</button>
+        ${s.adminLock ? '<button class="btn btn--line btn--sm" type="button" data-act="pass-off">Убрать пароль</button>' : ''}
+      </div>
     </fieldset>
     <fieldset class="fs"><legend>Языки</legend>
       <div class="f"><label class="switch"><input type="checkbox" data-toggle="en"${en ? ' checked' : ''}><span>Английская версия сайта</span></label>
@@ -1049,6 +1056,13 @@ const ACT = {
     renderEdit(); changed('sections');
   },
   'sec-del'(el) { st.site.sections.splice(Number(el.dataset.i), 1); renderEdit(); changed('sections'); },
+  'pass-set'() { openPassDialog(); },
+  'pass-cancel'() { passDlg.close(); },
+  'pass-off'() {
+    if (!window.confirm('Убрать пароль? После публикации админка будет открываться без него.')) return;
+    delete st.site.adminLock; renderEdit(); changed('adminLock');
+    toast(st.dir && !gh.on ? 'Пароль уберётся после «Сохранить»' : 'Пароль уберётся после «Опубликовать»');
+  },
 };
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
@@ -1214,9 +1228,100 @@ function gateButtons() {
   b.textContent = gh.on ? `Открыть с сайта ${gh.name}` : 'Подключить сайт';
 }
 
+// ---------- пароль админки ----------
+// Простая дверь: пока пароль не введён, админка не открывается. Хранится не пароль, а его «отпечаток» (PBKDF2-SHA-256,
+// 310 000 повторов, своя соль) — в настройках сайта, site.adminLock: так он сам доезжает до сайта при публикации.
+// Это защита от случайного посетителя, а не от взломщика: файлы сайта открыты всем, а код страницы можно прочитать.
+// Изменить сайт по-прежнему можно только с токеном GitHub — он и есть настоящий ключ. Вход помнится до закрытия вкладки.
+const LOCK_ITER = 310000, LOCK_KEY = 'ph:admin-ok';
+const b64 = (u8) => btoa(String.fromCharCode(...u8));
+const unb64 = (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+async function lockHash(pass, salt, iter) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass.normalize('NFC')), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256);
+  return b64(new Uint8Array(bits));
+}
+async function makeLock(pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { v: 1, salt: b64(salt), iter: LOCK_ITER, hash: await lockHash(pass, salt, LOCK_ITER) };
+}
+const validLock = (l) => !!(l && typeof l.hash === 'string' && typeof l.salt === 'string' && Number(l.iter) > 0);
+const sessionOk = (l) => { try { return sessionStorage.getItem(LOCK_KEY) === l.hash; } catch (_) { return false; } };
+const rememberOk = (l) => { try { sessionStorage.setItem(LOCK_KEY, l.hash); } catch (_) { /* не запомнится — спросим снова */ } };
+async function readLock() {
+  try {
+    const r = await fetch('../content/site.json', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const site = await r.json();
+    return validLock(site.adminLock) ? site.adminLock : null;
+  } catch (_) { return null; }
+}
+function showLogin(lock) {
+  document.body.classList.add('is-locked');
+  const box = $('[data-login]'), form = $('[data-login-form]'), err = $('[data-login-error]'), btn = $('[data-login-submit]');
+  box.hidden = false;
+  if (!(window.crypto && crypto.subtle)) {
+    err.textContent = 'Пароль можно проверить только по защищённому адресу: откройте админку по https.'; err.hidden = false; btn.disabled = true; return;
+  }
+  let fails = 0;
+  form.pass.focus();
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = 'Проверяю…'; err.hidden = true;
+    let ok = false;
+    try { ok = (await lockHash(form.pass.value, unb64(lock.salt), Number(lock.iter))) === lock.hash; } catch (_) { ok = false; }
+    if (ok) {
+      rememberOk(lock);
+      form.pass.value = '';
+      box.hidden = true;
+      document.body.classList.remove('is-locked');
+      start();
+      return;
+    }
+    fails++;
+    err.textContent = 'Неверный пароль'; err.hidden = false;
+    form.pass.select();
+    // каждая ошибка — чуть дольше ждать следующей попытки
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Войти'; }, Math.min(8000, 400 * fails * fails));
+  });
+}
+const passDlg = $('[data-pass-dlg]'), passForm = $('[data-pass-form]');
+function openPassDialog() {
+  passForm.p1.value = ''; passForm.p2.value = '';
+  $('[data-pass-error]').hidden = true;
+  if (passDlg.showModal) passDlg.showModal(); else passDlg.setAttribute('open', '');
+  passForm.p1.focus();
+}
+passForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = $('[data-pass-error]'), btn = $('[data-pass-submit]');
+  const p1 = passForm.p1.value, p2 = passForm.p2.value;
+  const fail = (t) => { err.textContent = t; err.hidden = false; };
+  if (!(window.crypto && crypto.subtle)) return fail('Задать пароль можно только по защищённому адресу (https) или на localhost.');
+  if (p1.length < 8) return fail('Пароль короче 8 знаков.');
+  if (p1 !== p2) return fail('Пароли не совпадают.');
+  btn.disabled = true;
+  try {
+    st.site.adminLock = await makeLock(p1);
+    rememberOk(st.site.adminLock);              // в этой вкладке заново не спросим
+    passForm.p1.value = ''; passForm.p2.value = '';
+    passDlg.close();
+    renderEdit(); changed('adminLock');
+    toast(st.dir && !gh.on ? 'Пароль задан. Он заработает после «Сохранить»' : 'Пароль задан. Он заработает после «Опубликовать»');
+  } catch (_) { fail('Не получилось задать пароль. Попробуйте ещё раз.'); }
+  btn.disabled = false;
+});
+
 // ---------- старт ----------
 function gateError(text) { const el = $('[data-gate-error]'); el.textContent = text; el.hidden = false; }
+async function boot() {
+  const lock = await readLock();
+  if (lock && !sessionOk(lock)) { showLogin(lock); return; }
+  start();
+}
 async function start() {
+  $('[data-gate]').hidden = false;
   gh.restore();
   gateButtons();
   if (!HAS_FS) {
@@ -1242,4 +1347,4 @@ async function start() {
   $('[data-gate-site]').className = 'btn btn--line';
   $('[data-need-fs]').textContent = 'Выбрать другую папку';
 }
-start();
+boot();

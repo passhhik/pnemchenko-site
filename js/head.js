@@ -20,6 +20,8 @@ const CORNER_FIT = 0.86;         // какую долю кружка в углу
 // по самой модели — если модель заметно изменят, обновите их (см. _measureHead и _measureSilhouette).
 const DEFAULT_BOX = { cx: 0, cy: -0.131, w: 1.603, h: 2.248 };
 const DEFAULT_SIL = { xr: 0.7348, zr: -0.0741, xl: -0.731, zl: -0.0185, yt: 0.904, zt: 0.3049, yb: -0.9276, zb: 0.5203, w: 1.4658, zx: -0.0463, ar: 1.3281 };
+// Курсор замер — через сколько миллисекунд голова начинает смотреть прямо и за сколько доворачивается
+const LOOK_HOME_AFTER = 3000, LOOK_HOME_FOR = 1600;
 const EYE_FAR = 9;               // глаза сводятся на далёкой точке по линии взгляда — без косоглазия
 const EYE_YAW = 0.3, EYE_UP = 0.1, EYE_DOWN = 0.2;   // пределы поворота глаз, рад (≈17° / 6° / 11°)
 // Эффект присутствия на телефоне (датчик наклона). Телефон — коробка с головой внутри, зритель стоит на месте.
@@ -470,6 +472,7 @@ export class Head extends EventTarget {
     this.drags = new Map();
     this.raycaster = new THREE.Raycaster();
     this.pointer = { x: 0, y: 0, has: false, lastMove: performance.now() };
+    this._home = new THREE.Vector3();
     this.lookOverride = null;
     this.rot = { yaw: 0, pitch: 0 };
     this.mouth = 0; this.mouthTarget = 0;
@@ -1722,6 +1725,12 @@ export class Head extends EventTarget {
     if (!src) return out.set(0, 0.05, this.camera.position.z);
     this.raycaster.setFromCamera(this._ndc(src.x, src.y), this.camera);
     if (!this.raycaster.ray.intersectPlane(this._plane, out)) out.set(0, 0, 2);
+    // Курсор замер — через LOOK_HOME_AFTER голова плавно возвращает взгляд прямо на зрителя. Шевельнули мышью — снова следит.
+    // Папка, плевок или голову тянут — тут командует не курсор, возврата нет.
+    if (src === this.pointer && !this.drags.size) {
+      const k = smoothstep(LOOK_HOME_AFTER, LOOK_HOME_AFTER + LOOK_HOME_FOR, performance.now() - this.pointer.lastMove);
+      if (k > 0) out.lerp(this._home.set(0, 0.05, this.camera.position.z), k);
+    }
     return out;
   }
 

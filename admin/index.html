@@ -26,7 +26,18 @@
   </header>
 
   <!-- первый экран: откуда брать и куда сохранять содержимое -->
-  <section class="gate" data-gate>
+  <!-- вход по паролю: показывается, если пароль задан (site.adminLock), до всего остального -->
+  <section class="gate" data-login hidden>
+    <form class="gate-card login" data-login-form novalidate>
+      <h1>Вход в админку</h1>
+      <label class="f"><span>Пароль</span><input class="inp" type="password" name="pass" autocomplete="current-password" spellcheck="false" autocapitalize="off"></label>
+      <p class="error" data-login-error role="alert" hidden></p>
+      <div class="row"><button class="btn" type="submit" data-login-submit>Войти</button></div>
+      <p class="hint">Забыли пароль — откройте в репозитории сайта на GitHub файл content/site.json и удалите блок «adminLock». Админка снова откроется без пароля.</p>
+    </form>
+  </section>
+
+  <section class="gate" data-gate hidden>
     <div class="gate-card">
       <h1>Здесь добавляются и настраиваются кейсы</h1>
       <p data-gate-text>Подключите сайт — правки будут публиковаться прямо отсюда. Или работайте с папкой сайта на компьютере: админка читает и сохраняет файлы прямо в ней.</p>
@@ -76,6 +87,22 @@
       <div class="row">
         <button class="btn" type="submit" data-gh-submit>Подключить</button>
         <button class="btn btn--line" type="button" data-act="gh-cancel">Отмена</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- пароль админки: задать или сменить -->
+  <dialog class="dlg" data-pass-dlg aria-labelledby="pass-title">
+    <form class="dlg-card" data-pass-form novalidate>
+      <h2 id="pass-title">Пароль админки</h2>
+      <p>Без него админка не откроется. Заработает после «Опубликовать» (с папкой — после «Сохранить»).</p>
+      <label class="f"><span>Новый пароль</span><input class="inp" type="password" name="p1" autocomplete="new-password" spellcheck="false" autocapitalize="off" minlength="8"></label>
+      <label class="f"><span>Ещё раз</span><input class="inp" type="password" name="p2" autocomplete="new-password" spellcheck="false" autocapitalize="off"></label>
+      <p class="hint">Не короче 8 знаков. Не берите пароль от GitHub или почты.</p>
+      <p class="error" data-pass-error role="alert" hidden></p>
+      <div class="row">
+        <button class="btn" type="submit" data-pass-submit>Задать пароль</button>
+        <button class="btn btn--line" type="button" data-act="pass-cancel">Отмена</button>
       </div>
     </form>
   </dialog>

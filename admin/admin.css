@@ -215,3 +215,9 @@ button,input,select,textarea{ font:inherit; color:inherit; }
   .prev{ display:none; }
 }
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+
+/* ---------- вход по паролю ---------- */
+.is-locked .bar-r{ display:none; }
+.login{ width:min(380px, 100%); }
+.login .f{ margin-top:22px; }
+.login .error{ margin-top:10px; }

@@ -892,12 +892,14 @@ document.addEventListener('visibilitychange', () => { spit.input = performance.n
 setInterval(() => {
   if (spit.state !== 'off' || !head || !head.loaded || !booted || reduced || document.hidden) return;
   if (head.drags.size || dragging || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
-  // отсчёт — с последнего действия посетителя или с конца последней реплики: голова не плюёт, едва договорив
-  if (performance.now() - Math.max(spit.input, spokeUntil()) > SPIT_AFTER * 1000 && !speaking()) startSpit();
+  // отсчёт — с последнего действия посетителя: сколько задано в админке, столько и ждём. Оклики головы его не продлевают;
+  // если время вышло, а она говорит, — дожидаемся конца реплики и ещё полторы секунды, чтобы не плевать, едва договорив
+  const now = performance.now();
+  if (now - spit.input > SPIT_AFTER * 1000 && !speaking() && now - spokeUntil() > 1500) startSpit();
 }, 250);
 
 async function startSpit() {
-  spit.state = 'on'; spit.n = 0; spit.almost = false;
+  spit.state = 'on'; spit.n = 0; spit.almost = false; spit.quick = false;
   try {
     if (!spit.fx) { const { SpitScreen } = await import('./spit.js'); spit.fx = new SpitScreen(); spit.fx.onResize = userInput; }   // окно повернули или растянули — стекло вытирается
   } catch (e) { console.warn('Плевки недоступны', e); spit.state = 'dead'; return; }
@@ -909,8 +911,15 @@ async function startSpit() {
 }
 // Голова шкодничает, а не строчит очередями. Один плевок — маленькая сценка: присмотрелась к чистому месту, набрала
 // в щёки, плюнула, проводила плевок взглядом и глянула на посетителя — ну как? Пауза — и всё сначала.
-// Стекло заполняется понемногу: десяток-полтора плевков примерно за минуту.
+// Темп неторопливый: в среднем плевок в минуту, изредка — «вдогонку», через 8–14 секунд (примерно каждый четвёртый,
+// и не два раза подряд). Стекло заполняется за десяток-полтора плевков — минут за десять.
 const spitRnd = (a, b) => a + Math.random() * (b - a);
+const SPIT_GAP = [40, 75], SPIT_QUICK = [8, 14], SPIT_QUICK_P = 0.25;      // секунды между плевками
+function spitGap() {
+  const quick = !spit.quick && Math.random() < SPIT_QUICK_P;
+  spit.quick = quick;
+  return spitRnd(...(quick ? SPIT_QUICK : SPIT_GAP)) * 1000;
+}
 function spitAim() {
   if (spit.state !== 'on' || !head) return;
   if (speaking()) { spit.t = setTimeout(spitAim, 250); return; }          // договорит — тогда и плюнет
@@ -955,7 +964,7 @@ function onSpit({ from }) {
     if (!spit.almost && spit.fx.coverage > SPIT_ALMOST) { spit.almost = true; line = 'spit_7'; }
     else if (n % 2 === 0) line = SPIT_SAY[n / 2 - 1] || null;
     if (line) setTimeout(() => { if (spit.state === 'on') say(line, { force: true }); }, 450);
-    spit.t = setTimeout(spitAim, n < 4 ? spitRnd(2400, 3800) : spitRnd(1700, 3200));
+    spit.t = setTimeout(spitAim, spitGap());
   });
 }
 function stopSpit() {
