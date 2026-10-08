@@ -121,7 +121,14 @@
     "Исследования",
     "A/B-тесты"
    ],
-   "published": true
+   "published": true,
+   "hero": {
+    "desk": {
+     "x": 0.757,
+     "y": 0.411,
+     "s": 34
+    }
+   }
   },
   {
    "slug": "delivery-checkout",
