@@ -45,7 +45,8 @@ const els = {
 const HEAD_AR = 1.33;             // пропорции головы, пока модель не загрузилась (потом берутся с самой модели)
 const MOBILE_HEAD = 0.76;         // телефон, папки лентой: голова (от уха до уха) занимает не больше этой доли ширины экрана
 // Телефон без папок на главной («чистый» экран): логотип, голова, реплика, кнопки — и воздух между ними.
-const CLEAN_LOGO = 1.3 / 3;       // ширина логотипа в долях ширины экрана: на треть крупнее прежнего (был треть экрана)
+const CLEAN_LOGO = 0.56;          // ширина логотипа в долях ширины экрана (было: треть, потом 43%)
+const CLEAN_LOGO_MAX = 480;       // …но не шире: на планшете в портрете
 const CLEAN_HEAD = [0.72, 0.78];   // голова от уха до уха — не больше этой доли ширины экрана: на обычном экране и на вытянутом (там больше высоты)
 const CLEAN_HEAD_MAX = 540;       // …и не больше стольких точек (планшет в портрете)
 const CLEAN_DROP = 0.56;          // какая доля свободной высоты уходит над голову (остальное — под реплику): голова стоит чуть ниже середины
@@ -218,7 +219,7 @@ function layout() {
     rs.setProperty('--pad-top', hero ? '12px' : '8px');
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
     // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее)
-    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, 420) : W / 3) : Math.min(W / 3, 36 * logoAR);
+    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, CLEAN_LOGO_MAX) : W / 3) : Math.min(W / 3, 36 * logoAR);
     const row = hero ? logoW / logoAR : Math.max(36, logoW / logoAR);
     hdr = hero ? padTop + row + 4 : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
@@ -286,7 +287,10 @@ function layout() {
     // пока она на экране и когда уходит, голова остаётся того же размера и только сдвигается
     const tall = clamp(((room + geo.tip) / W - 1.2) / 0.3, 0, 1);
     const cap = Math.min((CLEAN_HEAD[0] + (CLEAN_HEAD[1] - CLEAN_HEAD[0]) * tall) * W, CLEAN_HEAD_MAX);
-    width = clamp(room / (ar * 1.06), 110, cap);
+    // размер головы считаем так, будто место под плашку занято всегда (на iPhone, где она бывает): тогда, пока плашка
+    // на экране и когда она уходит, голова не меняет размер — только сдвигается
+    const fit = room + geo.tip - (tiltAsk ? TIP_SLOT : 0);
+    width = clamp(Math.min(room, fit) / (ar * 1.06), 110, cap);
     const hh = width * ar;
     top = hdr + gap + Math.max(0, room - hh - chin(hh)) * CLEAN_DROP;
     subsY = top + hh + chin(hh);
@@ -633,19 +637,6 @@ function updateVeil() {
   st.clipPath = cp; st.webkitClipPath = cp;
 }
 
-// Наклон телефона, эффект присутствия. Логотип лежит «в глубине» за головой: телефон повернули — он смещается
-// в сторону зрителя, и голова отделяется от фона, как предмет за стеклом. Сдвигаем знак внутри ссылки: место самой
-// ссылки-логотипа участвует в раскладке папок и меняться не должно.
-let parX = 0, parY = 0;
-function parallax() {
-  const tl = head.tilt;
-  const on = tl.w > 0.001 && view === 'hero';
-  const k = Math.min(window.innerWidth, 520) * 0.07;           // «глубина» логотипа: пикселей на единицу тангенса угла
-  const x = on ? Math.round(tl.px * k * 2) / 2 : 0, y = on ? Math.round(-tl.py * k * 2) / 2 : 0;
-  if (x === parX && y === parY) return;
-  parX = x; parY = y;
-  els.mark.style.transform = x || y ? `translate3d(${x}px, ${y}px, 0)` : '';
-}
 
 // Наклон телефона (гироскоп). Android: включается сразу. iPhone/iPad: нужно разрешение — просим плашкой, а не
 // системным окном «из ниоткуда». Плашка появляется сразу, вместе со страницей (голова ей не нужна): пока та
@@ -800,7 +791,7 @@ function wireHead() {
   head.addEventListener('introstep', (e) => { if (e.detail.part === 'brain') { stage('brain'); els.ph.classList.add('is-out'); setTimeout(() => { els.ph.hidden = true; }, 320); } });
   head.addEventListener('model', () => stage('model'));
   head.onTick = (dt) => { voice.tick(dt); };
-  head.onFrame = () => { updateVeil(); parallax(); };
+  head.onFrame = () => { updateVeil(); };            // логотип при наклоне неподвижен — двигается только голова
 
   if (tiltWanted) head.enableTilt();                          // наклон уже разрешён (Android — сразу, iPhone — плашкой)
   head.addEventListener('tiltstart', () => {

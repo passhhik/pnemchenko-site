@@ -1185,7 +1185,8 @@ export class Head extends EventTarget {
   // (см. _updateLook): на плоском экране взгляд «в камеру» — это взгляд на зрителя под любым углом.
   _updateTilt(dt) {
     const t = this.tilt, C = this.tiltCfg;
-    const live = t.has && !!t.base && !this.intro.on;
+    // в углу (каталог, кейс) голова маленькая и наклон ей ни к чему: эффект плавно гаснет и возвращается на главной
+    const live = t.has && !!t.base && !this.intro.on && this.mode !== 'corner';
     t.w += ((live ? 1 : 0) - t.w) * damp(dt, 3);         // включается и выключается плавно
     if (!t.has || !t.base) return;
     // 1. Опорная поза — та, в которой зритель прямо перед экраном. Пока телефон крутят, она почти не меняется;
@@ -1612,7 +1613,8 @@ export class Head extends EventTarget {
   // моргание и лёгкое покачивание выглядят так же, а устройство греется вдвое меньше.
   _calm(now) {
     if (this.intro.on || this.drags.size || this.lookOverride || this.spitS.t >= 0 || this.glasses.grabbed || this.blind > 0) return false;
-    if (now - Math.max(this.pointer.lastMove, this.tilt.lastMove, this._stir || 0) < 1400 || this.tilt.speed > 0.06) return false;
+    const tilt = this.mode !== 'corner';                 // в углу наклон голову не двигает — и покою не мешает
+    if (now - Math.max(this.pointer.lastMove, tilt ? this.tilt.lastMove : 0, this._stir || 0) < 1400 || (tilt && this.tilt.speed > 0.06)) return false;
     if (this.mouthTarget > 0.004 || this.mouth > 0.01 || this.glasses.offset.lengthSq() > 1e-5) return false;
     if (Math.abs(this.sq.v) > 0.02 || Math.abs(1 - this.sq.s) > 0.004 || Math.abs(1 - this.pop.s) > 0.004) return false;
     for (const h of this.handles) if (h.active) return false;
