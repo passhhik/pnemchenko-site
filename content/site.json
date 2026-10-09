@@ -74,5 +74,8 @@
   "salt": "1boWEhDvsJS/5aqseuXX0A==",
   "iter": 310000,
   "hash": "7yzKxGvUDKAP8QblVZ3FML4jfYxWEwAwDdYOnNbwhvI="
+ },
+ "style": {
+  "textWeight": 300
  }
 }
