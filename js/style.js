@@ -21,7 +21,7 @@ export const STYLE_GROUPS = [
     { key: 'titleTracking', label: 'Трекинг заголовков', type: 'range', def: -1.2, min: -6, max: 6, step: 0.2, unit: '%', css: '--tr-title', map: (v) => `${Number(v) / 100}em` },
     { key: 'textSize', label: 'Размер текста', type: 'range', def: 100, min: 80, max: 130, step: 1, unit: '%', css: '--k-text', map: pct },
     { key: 'textWeight', label: 'Насыщенность текста', type: 'select', def: 400, options: W, css: '--w-text' },
-    { key: 'leadWeight', label: 'Описание проекта (каталог, шапка кейса)', type: 'select', def: 400, options: W, css: '--w-lead' },
+    { key: 'leadWeight', label: 'Описание проекта (каталог, шапка кейса)', type: 'select', def: 300, options: W, css: '--w-lead' },
     { key: 'btnSize', label: 'Размер кнопок', type: 'range', def: 100, min: 80, max: 130, step: 1, unit: '%', css: '--k-btn', map: pct },
     { key: 'btnWeight', label: 'Насыщенность кнопок', type: 'select', def: 400, options: W, css: '--w-btn' },
   ] },

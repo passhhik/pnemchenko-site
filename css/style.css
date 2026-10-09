@@ -24,7 +24,7 @@
   --heart:#FF4D6A;                      /* лайк */
   --k-title:1; --k-text:1; --k-btn:1;   /* размер заголовков, текста, кнопок — множители */
   --tr-title:-.012em;                   /* трекинг заголовков */
-  --w-text:400; --w-lead:400; --w-btn:400;
+  --w-text:400; --w-lead:300; --w-btn:400;       /* описание проекта — Light, как в макетах */
   --r-btn:.5; --r-card:.12;             /* скругления — доля высоты: у кнопки .5 — капсула */
   /* ---- производные ---- */
   --fg:var(--ink);                      /* текст, кнопки, логотип */
@@ -355,6 +355,22 @@ html.is-cat .site-footer{ display:none; }
 .cat-play:active{ transform:scale(.94); }
 .cat-play:focus-visible{ outline:2px solid var(--fg); outline-offset:3px; }
 @media (hover:hover){ .cat-play:hover{ background:color-mix(in srgb, var(--fg) 24%, transparent); } }
+/* телефон: точки — какой проект из скольких (кнопки: нажатие ведёт к проекту); лайк — круглая кнопка справа вверху */
+.cat-dots{ position:absolute; z-index:4; left:0; right:0; bottom:var(--dots-b, 26px); display:none; justify-content:center; height:24px; color:var(--fg); }
+.cat-dot{ display:grid; place-items:center; width:14px; height:24px; padding:0; border:0; background:none; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.cat-dot i{ display:block; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.42; transition:opacity .3s, transform .3s var(--ease); }
+.cat-dot.is-active i{ opacity:1; }
+.cat-dot.is-edge i{ transform:scale(.66); }
+.cat-dot.is-far{ display:none; }
+.cat-dot:focus-visible{ outline:none; }
+.cat-dot:focus-visible i{ outline:2px solid currentColor; outline-offset:3px; }
+.cat-likefab{ position:absolute; z-index:4; top:calc(var(--hdr) + 20px); right:20px; display:none; place-items:center; width:56px; aspect-ratio:1; padding:0; border:0; border-radius:50%; background:transparent; color:var(--fg);
+  box-shadow:inset 0 0 0 1.5px var(--fg); cursor:pointer; transition:transform .12s, background-color .2s; -webkit-tap-highlight-color:transparent; }
+.cat-likefab .heart{ width:36%; height:36%; fill:none; stroke:currentColor; stroke-width:2; overflow:visible; transition:fill .2s, stroke .2s; }
+.cat-likefab[aria-pressed="true"] .heart{ fill:var(--heart); stroke:var(--heart); }
+.cat-likefab.is-pop .heart{ animation:heart-pop .55s var(--spring); }
+.cat-likefab:active{ transform:scale(.94); }
+.cat-likefab:focus-visible{ outline:2px solid var(--fg); outline-offset:3px; }
 /* снизу лёгкий градиент: чуть ложится на карточки и затемняет их — глубина */
 .cat-fade{ z-index:2; top:auto; height:min(64vh, calc(var(--strip-top, 300px) * 2.1)); background:linear-gradient(to top, rgba(0,0,0,.4), rgba(0,0,0,.16) 40%, rgba(0,0,0,0)); }
 .cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-family:var(--font); font-size:clamp(20px, calc(var(--u) * 2.2), 44px); }
@@ -469,22 +485,34 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .folders .gf:last-child:nth-child(n+3){ order:-1; }
   .folders .gf-title{ margin-left:-14%; margin-right:-14%; color:var(--mute); transition:color .25s; }      /* подпись может быть чуть шире маленькой папки */
   .folders .gf.is-cur .gf-title{ color:var(--fg); }      /* папка в центре ленты — текущая, соседние приглушены */
-  /* каталог: визуал сверху, под ним текст проекта, ниже лента карточек; нижняя панель прозрачная — лежит на фоне проекта */
-  body[data-view="work"] .topnav{ background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; --fg:inherit; --on-fg:inherit; }
-  .cat-info{ top:auto; bottom:calc(var(--strip-top, 300px) + 18px); left:16px; width:calc(100% - 32px); }
+  /* каталог — по мобильному макету: проект на весь экран (логотип, визуал, текст, «Смотреть проект» во всю ширину контуром),
+     лайк — кружком справа вверху, внизу точки. Ленты карточек и нижней панели здесь нет: проекты листаются свайпом (js/catalog.js) */
+  body[data-view="work"] .topnav{ display:none; }
+  .cat{ --dots-b:max(26px, calc(env(safe-area-inset-bottom) + 10px)); }      /* низ ряда точек */
+  .cat-strip{ display:none; }
+  .cat-dots{ display:flex; }
+  .cat-likefab{ display:grid; }
+  .cat-info{ top:auto; bottom:calc(var(--dots-b) + 24px + 38px); left:20px; width:calc(100% - 40px); will-change:transform, opacity; }
   .cat-info-in{ top:auto; bottom:0; }
-  .cat-chip{ height:30px; margin-bottom:10px; font-size:15px; }
-  .cat-title{ font-size:calc(clamp(26px, 7.6vw, 40px) * var(--k-title)); }
-  .cat-sum{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-top:8px; font-size:calc(15px * var(--k-text)); line-height:1.45; }
-  .cat-acts{ gap:8px; margin-top:14px; }
-  .cat-acts .btn{ --btn-h:calc(46px * var(--k-btn)); --btn-fs:calc(16px * var(--k-btn)); padding:0 1.4em; }
-  .cat-fade{ height:calc(var(--strip-top, 300px) + 30vh); }
-  .cat-play{ right:16px; width:40px; }
+  .cat-chip{ height:30px; margin-bottom:16px; padding:0 .85em; font-size:14px; }
+  .cat-title{ font-size:calc(clamp(26px, 8.4vw, 46px) * var(--k-title)); line-height:1.1; text-wrap:pretty; }      /* как в макете: первая строка полная */
+  .cat-sum{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; margin-top:10px; font-size:calc(16px * var(--k-text)); line-height:1.38; }
+  .cat-acts{ margin-top:24px; }
+  .cat-acts .btn.cat-open{ --btn-h:calc(56px * var(--k-btn)); --btn-fs:calc(16px * var(--k-btn)); flex:1 1 100%; background:transparent; color:var(--fg); box-shadow:inset 0 0 0 1.5px var(--fg); }
+  .cat-acts .btn.cat-likeb{ display:none; }
+  .cat-fade{ height:62%; background:linear-gradient(to top, rgba(0,0,0,.3), rgba(0,0,0,.1) 45%, rgba(0,0,0,0)); }
+  .cat-hero{ will-change:transform; }
+  .cat-play{ right:20px; bottom:calc(var(--dots-b) - 8px); width:40px; }
   .case-hero{ padding-top:calc(var(--hdr) + 22px); }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
   .site-footer{ padding-bottom:calc(var(--bar) + 24px); }
 }
 /* ---------- узкий экран: содержимое кейса в одну колонку ---------- */
+/* планшет в портрете: та же раскладка, что на телефоне, но текст проекта не растягивается на всю ширину */
+@media (min-width:600px) and (max-width:1024px) and (max-aspect-ratio:17/20){
+  .cat-info{ width:min(calc(100% - 40px), 560px); }
+  .cat-sum{ font-size:calc(18px * var(--k-text)); }
+}
 @media (max-width:760px){
   :root{ --pad-x:16px; }
   body{ font-size:18px; }

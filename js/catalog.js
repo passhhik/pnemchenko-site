@@ -17,7 +17,7 @@ const SPRING_K = 150;                 // жёсткость «пружины» �
 const SETTLE_MS = 150;                // столько тишины после колёсика — и лента встаёт на проект
 // Визуал проекта, если в админке место не задано: на широком экране — справа, на узком — над текстом
 // x, y — центр в долях экрана; s — сторона квадрата, в который вписан визуал (длинная сторона картинки), в процентах
-export const HERO_DEFAULT = { desk: { x: 0.66, y: 0.4, s: 34 }, phone: { x: 0.5, y: 0.25, s: 50 } };
+export const HERO_DEFAULT = { desk: { x: 0.66, y: 0.4, s: 34 }, phone: { x: 0.5, y: 0.36, s: 80 } };
 
 // ---- что показывать у проекта ----
 const firstCut = (p) => (p.artifacts || []).find((a) => a && typeof a === 'object' && a.cut && a.src);
@@ -68,6 +68,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <div class="cat-info" data-info></div>
       <div class="cat-fade" aria-hidden="true"></div>
       <div class="cat-strip" data-strip role="group" aria-label="${esc(t('work'))}"></div>
+      <div class="cat-dots" data-dots role="group" aria-label="${esc(t('work'))}"></div>
+      <button class="cat-likefab" type="button" data-like aria-pressed="false" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       <button class="cat-play" type="button" data-play hidden><svg class="cat-play-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20.5" pathLength="100"/></svg><svg class="cat-play-i" viewBox="0 0 44 44" aria-hidden="true"></svg></button>
       <p class="empty" data-empty hidden>${esc(t('empty'))}</p>
     </div>`;
@@ -78,6 +80,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   const strip = root.querySelector('[data-strip]');
   const empty = root.querySelector('[data-empty]');
   const ctl = root.querySelector('[data-play]');
+  const dots = root.querySelector('[data-dots]');
+  const fab = root.querySelector('.cat-likefab');
+  const phone = () => S.layout === 'phone';
 
   const S = {
     list: [], cards: [], active: false, idx: -1, p: 0, target: 0, v: 0, settled: 0, raf: 0, last: 0,
@@ -97,6 +102,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       </button>`;
     }).join('');
     S.cards = [...strip.children];
+    // телефон (по макету): карточек нет — проект на весь экран, внизу точки; точка — кнопка, нажатие ведёт к проекту
+    dots.innerHTML = S.list.map((p, i) => `<button class="cat-dot" type="button" data-dot="${i}" aria-label="${esc(tx(p.title))}"><i></i></button>`).join('');
+    S.dots = [...dots.children];
     empty.hidden = S.list.length > 0;
     S.idx = -1; S.bgKey = ''; S.heroKey = '';
     heroBox.innerHTML = '';
@@ -115,7 +123,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const u = Math.min(W, 1.5 * H) / 100;
     let cw, ch, gap, bottom;
     if (S.layout === 'phone') {
-      S.pad = 16;
+      S.pad = 20;
       cw = Math.min(W * 0.5, 260); ch = cw / 1.45; gap = 12;
       const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar')) || 70;
       bottom = bar + 12;
@@ -152,18 +160,27 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       // на последнем кадре; уехала посреди ролика — встаёт и доигрывает, когда вернётся. Выбрали проект — с начала (select)
       const vid = el._v === undefined ? (el._v = el.querySelector('video')) : el._v;
       if (vid) {
-        const seen = S.active && o > 0.05 && x < S.W && x + S.cw * s > 0;
+        const seen = S.active && !phone() && o > 0.05 && x < S.W && x + S.cw * s > 0;
         if (!seen) pause(vid);
         else if (!el._ran) { el._ran = true; if (vid.preload === 'none') vid.preload = 'auto'; start(vid); }
         else if (!vid._held) play(vid);
       }
       // картинка карточки начинает грузиться за пару карточек до того, как та выедет на экран
-      if (!el._near && S.active && x < S.W + S.step * 2) {
+      if (!el._near && S.active && !phone() && x < S.W + S.step * 2) {
         el._near = true;
         const im = el.querySelector('img[loading="lazy"]');
         if (im) im.loading = 'eager';
         if (vid && vid.preload === 'none') vid.preload = 'metadata';
       }
+    }
+    // телефон: ленты не видно — за пальцем идут сами текст и визуал: уезжают влево и гаснут, новый проект въезжает справа
+    const f = phone() && S.idx >= 0 ? clamp(S.p - S.idx, -0.6, 0.6) : 0;
+    const fk = f.toFixed(3);
+    if (S.fk !== fk) {
+      S.fk = fk;
+      info.style.transform = f ? `translate3d(${(-f * 72).toFixed(1)}px,0,0)` : '';
+      info.style.opacity = f ? (1 - Math.abs(f) * 1.3).toFixed(3) : '';
+      heroBox.style.transform = f ? `translate3d(${(-f * 36).toFixed(1)}px,0,0)` : '';
     }
   }
   function tick(now) {
@@ -209,8 +226,17 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.classList.toggle('is-active', k === i);
       if (k === i) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
     });
-    // видео выбранной карточки — с начала, один раз
-    const cv = S.cards[i] && S.cards[i].querySelector('video');
+    (S.dots || []).forEach((el, k) => {
+      el.classList.toggle('is-active', k === i);
+      if (k === i) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+      // проектов много — по краям видны не все точки: дальние прячутся, ближние к краю мельче
+      const d = Math.abs(k - i), many = S.dots.length > 11;
+      el.classList.toggle('is-far', many && d > 5);
+      el.classList.toggle('is-edge', many && d >= 4 && d <= 5);
+    });
+    fab.setAttribute('aria-pressed', String(liked(p.slug)));
+    // видео выбранной карточки — с начала, один раз (на телефоне карточек нет)
+    const cv = !phone() && S.cards[i] && S.cards[i].querySelector('video');
     if (cv) { cv._held = false; S.cards[i]._ran = true; }
     if (cv) { if (cv.preload === 'none') cv.preload = 'auto'; start(cv); }
     syncCtl();
@@ -233,7 +259,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <h2 class="cat-title">${esc(tx(p.title))}</h2>
       ${tx(p.summary) ? `<p class="cat-sum">${esc(tx(p.summary))}</p>` : ''}
       <div class="cat-acts">
-        <a class="btn cat-open" href="#/work/${encodeURIComponent(p.slug)}">${esc(t('openProject'))}</a>
+        <a class="btn cat-open" href="#/work/${encodeURIComponent(p.slug)}" draggable="false">${esc(t('openProject'))}</a>
         <button class="btn cat-likeb" type="button" data-like aria-pressed="${on}" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       </div>
     </div>`;
@@ -268,9 +294,27 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     setTimeout(() => { pause(pv); if (!prev.classList.contains('is-on')) prev.innerHTML = ''; }, 800);
   }
 
+  // Где стоит визуал. На телефоне высота экранов разная (664–930 px), а текст проекта прижат к низу — поэтому визуал
+  // вписывается в просвет между логотипом и текстом: если не помещается — уменьшается, если наезжает — сдвигается
+  function heroRect(pos) {
+    let w = heroW(pos.s), y = pos.y * S.H;
+    const x = pos.x * S.W;
+    if (phone()) {
+      const ii = info.querySelector('.cat-info-in:not(.is-out)');
+      const top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 90) + 8;
+      const bottom = ii ? info.offsetTop + ii.offsetTop - 16 : S.H * 0.6;
+      if (bottom - top > 60) { w = Math.min(w, bottom - top); y = clamp(y, top + w / 2, bottom - w / 2); }
+    }
+    return { x, y, w };
+  }
   function heroStyle(pos) {
-    const w = heroW(pos.s).toFixed(1);
-    return `left:${(pos.x * 100).toFixed(2)}%;top:${(pos.y * 100).toFixed(2)}%;width:${w}px;height:${w}px`;
+    const r = heroRect(pos), w = r.w.toFixed(1);
+    return `left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;width:${w}px;height:${w}px`;
+  }
+  // экран поменял размер (повернули, на телефоне спряталась строка адреса) — визуал встаёт заново
+  function refitHero() {
+    const m = heroBox.querySelector('.cat-hero-l:not(.is-out) .cat-hero-m'), p = S.list[S.idx];
+    if (m && p && !m.classList.contains('is-moving')) m.setAttribute('style', heroStyle(heroOf(p, S.layout).pos));
   }
   // размер визуала — в долях экрана: на широком экране от меньшей из ширины и полуторной высоты, на узком — от ширины
   const heroW = (s) => (S.layout === 'phone' ? S.W : Math.min(S.W, 1.6 * S.H)) * (Number(s) || 0) / 100;
@@ -304,7 +348,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     return [
       mine(hero) && hero.querySelector('video'),
       mine(bg) && bg.querySelector('video'),
-      S.cards[S.idx] && S.cards[S.idx].querySelector('video'),
+      !phone() && S.cards[S.idx] && S.cards[S.idx].querySelector('video'),
     ].filter((v) => v && !v.error);
   }
   function syncCtl() {
@@ -342,18 +386,21 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     if (i === S.idx && S.p === S.target) location.hash = `#/work/${encodeURIComponent(S.list[i].slug)}`;
     else goTo(i);
   });
-  info.addEventListener('click', (e) => {
+  const onLikeClick = (e) => {
     const b = e.target.closest('[data-like]');
     if (!b) return;
     const p = S.list[S.idx];
     if (!p) return;
     const on = toggleLike(p.slug);
-    b.setAttribute('aria-pressed', String(on));
+    [fab, info.querySelector('.cat-info-in:not(.is-out) [data-like]')].forEach((x) => { if (x) x.setAttribute('aria-pressed', String(on)); });
     b.classList.remove('is-pop'); void b.offsetWidth; if (on && !reduced) b.classList.add('is-pop');
     const badge = S.cards[S.idx] && S.cards[S.idx].querySelector('.cat-like');
     if (badge) { badge.hidden = !on; badge.classList.remove('is-pop'); void badge.offsetWidth; if (on && !reduced) badge.classList.add('is-pop'); }
     if (onLike) onLike(p, on);
-  });
+  };
+  info.addEventListener('click', onLikeClick);
+  fab.addEventListener('click', onLikeClick);
+  dots.addEventListener('click', (e) => { const d = e.target.closest('[data-dot]'); if (d) goTo(Number(d.dataset.dot)); });
 
   // ---------- прокрутка ----------
   cat.addEventListener('wheel', (e) => {
@@ -372,7 +419,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   // (вверх — дальше) тоже листает. Отпустили с разгона — лента пролетает дальше и встаёт на проект.
   cat.addEventListener('pointerdown', (e) => {
     if (!S.active || !S.list.length || e.button > 0) return;
-    if (e.target.closest('a, [data-like], [data-play], .cat-hero-m.is-edit')) return;
+    // листать можно откуда угодно, в том числе начав с «Смотреть проект» (на телефоне она во всю ширину — прямо под пальцем);
+    // нажатие, которым кончилось перетаскивание, ссылку не открывает (ниже). Не листают только маленькие кнопки
+    if (e.target.closest('[data-like], [data-play], [data-dots], .cat-hero-m.is-edit')) return;
     S.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, p0: S.p, axis: '', moved: false, hist: [[performance.now(), S.p]] };
     S.dragged = false;
   });
@@ -415,9 +464,12 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     // разгон пальца переходит в ленту, но не больше, чем нужно, чтобы доехать без проскока и раскачки
     const gap = S.target - S.p, w = Math.sqrt(SPRING_K);
     S.v = Math.sign(vel) === Math.sign(gap) ? Math.sign(gap) * Math.min(Math.abs(vel), w * Math.abs(gap)) : 0;
+    S.dragEndT = performance.now();
     setTimeout(() => { S.dragged = false; }, 0);                       // нажатие, которым кончилось перетаскивание, — не нажатие
   };
   window.addEventListener('pointerup', endDrag);
+  // …ни карточку, ни ссылку: «клик» сразу после перетаскивания гасим
+  cat.addEventListener('click', (e) => { if (performance.now() - (S.dragEndT || 0) < 350) { e.preventDefault(); e.stopPropagation(); } }, true);
   window.addEventListener('pointercancel', endDrag);
 
   window.addEventListener('keydown', (e) => {
@@ -436,7 +488,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     if (!S.active) return;
     const was = S.layout;
     measure(); place();
-    if (was !== S.layout && S.list[S.idx]) { S.heroKey = ''; showHero(S.list[S.idx]); }
+    if (was !== S.layout && S.list[S.idx]) { S.heroKey = ''; showHero(S.list[S.idx]); syncCtl(); } else refitHero();
   });
 
   // ---------- вход и выход ----------
@@ -477,7 +529,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     if (warmed || S.active) return;
     warmed = true;
     const urls = [];
-    S.list.slice(0, 5).forEach((p) => { const c = cardOf(p); if (!c.video && c.image) urls.push(c.image); });
+    if (!isStack()) S.list.slice(0, 5).forEach((p) => { const c = cardOf(p); if (!c.video && c.image) urls.push(c.image); });
     const p0 = S.list[0];
     if (p0) { const h = heroOf(p0, isStack() ? 'phone' : 'desk'); if (h.image) urls.push(h.image); const b = bgOf(p0); if (b.kind === 'image') urls.push(b.image); }
     let k = 0;
@@ -533,6 +585,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   }
   const round = (pos) => ({ x: Math.round(pos.x * 1000) / 1000, y: Math.round(pos.y * 1000) / 1000, s: Math.round(pos.s * 10) / 10 });
 
+  // шрифты догрузились — высота текста могла измениться, а визуал на телефоне от неё зависит
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.active) refitHero(); });
   render();
   return { setCategory, activate, render, focus, warm, goTo, state: S };
 }

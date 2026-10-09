@@ -227,12 +227,13 @@ function layout() {
     hdr = hero ? padTop + row : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else {
-    rs.setProperty('--pad-top', hero ? '12px' : '8px');
+    const workM = view === 'work';
+    rs.setProperty('--pad-top', hero ? '12px' : workM ? `${Math.round(clamp(H * 0.06, 24, 56))}px` : '8px');      // каталог: над логотипом воздух, как в макете
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
-    // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее)
-    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, CLEAN_LOGO_MAX) : W / 3) : Math.min(W / 3, 36 * logoAR);
-    const row = hero ? logoW / logoAR : Math.max(36, logoW / logoAR);
-    hdr = hero ? padTop + row + 4 : padTop * 2 + row;
+    // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее); в каталоге — по макету, почти половина
+    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, CLEAN_LOGO_MAX) : W / 3) : workM ? Math.min(W * 0.48, 280) : Math.min(W / 3, 36 * logoAR);
+    const row = hero || workM ? logoW / logoAR : Math.max(36, logoW / logoAR);
+    hdr = hero ? padTop + row + 4 : workM ? padTop + row + 8 : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
   }
   if (!mobile) rs.setProperty('--pad-top', `${padTop.toFixed(1)}px`);
