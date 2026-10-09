@@ -128,8 +128,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar')) || 70;
       bottom = bar + 12;
     } else {
-      S.pad = clamp(u * 3.45, 16, 80);      // отступ слева — как в макете: текст и лента ближе к краю, чем кнопки шапки
-      gap = clamp(W * 0.013, 12, 30);
+      const tok = (n, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || fb;
+      S.pad = tok('--cat-pad', 50);      // отступ слева и шаг ленты — из css/tokens.css
+      gap = tok('--gap-cards', 20);
       ch = Math.min(clamp(W * 0.245, 230, 560) / 1.53, H * 0.3);
       cw = ch * 1.53;
       bottom = clamp(H * 0.035, 14, 44);

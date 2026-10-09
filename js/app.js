@@ -94,6 +94,7 @@ function applyContent() {
   const cv = tx(site.cv);
   $$('[data-cv]').forEach((a) => { if (cv) a.href = cv; if (site.cvFileName) a.download = site.cvFileName; });
   document.body.classList.toggle('no-cv', !cv);
+  document.body.classList.toggle('no-likes', site.likesOn !== true);      // лайки включаются в админке («Лайки»); пока выключены
   if (cv && !content.preview) {
     fetch(cv, { method: 'HEAD', cache: 'no-cache' })
       .then((r) => { if (!r.ok) document.body.classList.add('no-cv'); })
@@ -201,6 +202,10 @@ function buildFolders() {
 
 // ---------- раскладка: шапка и главный экран ----------
 const geo = { subs: null, mobile: false, fw: 220, centered: false, tip: 0 };      // tip — высота, занятая плашкой наклона над кнопками (телефон без папок)
+// значение токена из css/tokens.css в пикселях (токены там — простые числа в px)
+const tokPx = (name, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fb;
+// высота кнопки шапки — по самой кнопке: в ней уже учтён множитель размера из админки
+const btnH = () => { const b = els.topbar ? [...els.topbar.querySelectorAll('.topnav .btn')].find((x) => x.offsetHeight) : null; return (b && b.offsetHeight) || tokPx('--button-height', 44); };
 function layout() {
   const W = window.innerWidth, H = window.innerHeight, mobile = isStack();
   const u = Math.min(W, 1.5 * H) / 100;                       // единица макета, как --u в стилях
@@ -214,16 +219,16 @@ function layout() {
   let padTop, logoW, hdr, logoY, padBot = null;
   if (!mobile && view === 'work') {
     // каталог — по макету: шапка просторнее, логотип крупнее, кнопки на его уровне
-    padTop = clamp(4.2 * u, 14, 72);
-    logoW = clamp(16.4 * u, 150, 330);
-    const row = Math.max(clamp(3.7 * u, 40, 70), logoW / logoAR);
-    padBot = clamp(1.2 * u, 10, 22);
+    padTop = tokPx('--hdr-top-cat', 50);                      // отступы и размеры — из css/tokens.css
+    logoW = tokPx('--logo-cat', 220);
+    const row = Math.max(btnH(), logoW / logoAR);
+    padBot = tokPx('--hdr-bottom-cat', 20);
     hdr = padTop + row + padBot;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else if (!mobile) {
-    padTop = hero ? clamp(H * 0.042, 12, 60) : clamp(1.2 * u, 10, 22);
-    logoW = hero ? clamp(27 * u, 200, 640) : clamp(13 * u, 132, 250);
-    const row = hero ? logoW / logoAR : Math.max(clamp(3.3 * u, 40, 66), logoW / logoAR);
+    padTop = hero ? clamp(H * 0.042, 12, 60) : tokPx('--hdr-top', 20);
+    logoW = hero ? clamp(27 * u, 200, 640) : tokPx('--logo-case', 170);      // на главной логотип — часть композиции с головой, он резиновый
+    const row = hero ? logoW / logoAR : Math.max(btnH(), logoW / logoAR);
     hdr = hero ? padTop + row : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else {

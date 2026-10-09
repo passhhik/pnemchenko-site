@@ -640,6 +640,7 @@ function sitePane() {
     </fieldset>
     <fieldset class="fs"><legend>Лайки</legend>
       <p class="hint">Посетитель ставит лайк проекту в каталоге; сердечко на карточке видит только он сам. Сколько лайков у каждого проекта, считает свой счётчик — облачная функция (как её завести — server/likes/README.md в репозитории сайта). Вставьте сюда её адрес и опубликуйте: числа появятся в списке проектов слева.</p>
+      ${CHECK('Показывать лайки на сайте', 'likesOn')}
       ${F('Адрес счётчика', 'likesApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
       <div class="row">${likesApi(s) ? '<button class="btn btn--line btn--sm" type="button" data-act="likes-refresh">Обновить числа</button>' : ''}<span class="hint" data-likes-note>${esc(st.likesNote || '')}</span></div>
     </fieldset>
