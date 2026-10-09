@@ -76,6 +76,7 @@
   "hash": "7yzKxGvUDKAP8QblVZ3FML4jfYxWEwAwDdYOnNbwhvI="
  },
  "style": {
-  "textWeight": 300
+  "textWeight": 300,
+  "titleTracking": 0
  }
 }
