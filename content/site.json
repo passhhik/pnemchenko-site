@@ -68,11 +68,5 @@
  "description": {
   "ru": "Портфолио Павла Немченко: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.",
   "en": "Pavel Nemchenko’s portfolio: digital products, marketing and communication, identity and branding."
- },
- "adminLock": {
-  "v": 1,
-  "salt": "C/Fi/sKn9+1OmXWgsjvChA==",
-  "iter": 310000,
-  "hash": "9As0RRBYJDs0nimy8MUNcI1E1Uo0XCTteV0wrO2fbOI="
  }
 }
