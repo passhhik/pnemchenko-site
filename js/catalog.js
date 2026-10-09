@@ -8,6 +8,7 @@
 import { content, tx, t, esc, srcOf, thumbOf, sectionById, isStack } from './content.js';
 import { setTheme, toneOf } from './theme.js';
 import { liked, toggleLike } from './likes.js';
+import { styleValue } from './style.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Сердечко по умолчанию (своё пришлёт Павел — заменить здесь и в админке ничего не нужно)
@@ -22,11 +23,12 @@ export const HERO_DEFAULT = { desk: { x: 0.66, y: 0.4, s: 34 }, phone: { x: 0.5,
 const firstCut = (p) => (p.artifacts || []).find((a) => a && typeof a === 'object' && a.cut && a.src);
 export function cardOf(p) {
   const c = p.card || {};
-  return { video: c.video || '', image: c.image || thumbOf(p) };
+  const image = c.image || thumbOf(p);
+  return { video: c.video || '', image, poster: image };       // до запуска видео — картинка карточки
 }
 export function bgOf(p) {
   const b = p.bg || {}, th = p.theme || {};
-  const color = th.color || '#E9E9EC';
+  const color = th.color || styleValue(content.site.style, 'projectBg');
   const kind = b.kind === 'image' && b.image ? 'image' : b.kind === 'video' && b.video ? 'video' : 'color';
   return { kind, color, tone: th.tone || toneOf(color), image: b.image || '', video: b.video || '', poster: b.poster || b.image || '' };
 }
@@ -38,15 +40,24 @@ export function heroOf(p, layout) {
   return { image, video: h.video || '', poster: h.poster || h.image || '', pos, alt: (cut && cut.alt) || '' };
 }
 
+// Видео — как анимации на страницах Apple: проигрывается один раз и замирает на последнем кадре (без петли)
 const mediaHTML = ({ video, image, poster = '' }, { cls = '', lazy = false, alt = '' } = {}) => {
-  if (video) return `<video class="${cls}" muted loop playsinline preload="${lazy ? 'none' : 'metadata'}"${poster ? ` poster="${esc(poster)}"` : ''} src="${esc(video)}" aria-hidden="true" disablepictureinpicture></video>`;
+  if (video) return `<video class="${cls}" muted playsinline preload="${lazy ? 'none' : 'metadata'}"${poster ? ` poster="${esc(poster)}"` : ''} src="${esc(video)}" aria-hidden="true" disablepictureinpicture></video>`;
   if (image) return `<img class="${cls}" src="${esc(image)}" alt="${esc(alt)}" draggable="false" decoding="async"${lazy ? ' loading="lazy"' : ''}>`;
   return '';
 };
-// видео играют, только пока нужны: при «меньше движения» и экономии трафика — стоят на первом кадре
+// Сами видео запускаются, только если можно: при «меньше движения» и экономии трафика стоят на первом кадре —
+// запустить их можно кнопкой. Кнопка (пауза / воспроизвести / повторить) — у выбранного проекта, если у него есть видео
 const motionOk = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches && !(navigator.connection && navigator.connection.saveData);
-const play = (v) => { if (v && v.paused && motionOk()) { const r = v.play(); if (r && r.catch) r.catch(() => {}); } };
+const run = (v) => { const r = v.play(); if (r && r.catch) r.catch(() => {}); };
+const play = (v) => { if (v && v.paused && !v.ended && motionOk()) run(v); };
+const start = (v) => { if (!v) return; try { v.currentTime = 0; } catch (_) { /* ещё не загрузилось */ } if (motionOk()) run(v); };
 const pause = (v) => { if (v && !v.paused) v.pause(); };
+const ICONS = {
+  pause: '<path d="M15 13h4.5v18H15zM24.5 13H29v18h-4.5z"/>',
+  play: '<path d="M17 12.5v19L32 22z"/>',
+  replay: '<path d="M22 12.5a9.5 9.5 0 1 1-9.1 12.3l2.9-.9A6.5 6.5 0 1 0 22 15.5v3.6l-5.2-5.1L22 8.9z"/>',
+};
 
 export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false } = {}) {
   root.innerHTML = `
@@ -57,6 +68,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <div class="cat-info" data-info></div>
       <div class="cat-fade" aria-hidden="true"></div>
       <div class="cat-strip" data-strip role="group" aria-label="${esc(t('work'))}"></div>
+      <button class="cat-play" type="button" data-play hidden><svg class="cat-play-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20.5" pathLength="100"/></svg><svg class="cat-play-i" viewBox="0 0 44 44" aria-hidden="true"></svg></button>
       <p class="empty" data-empty hidden>${esc(t('empty'))}</p>
     </div>`;
   const cat = root.querySelector('[data-cat]');
@@ -65,6 +77,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   const info = root.querySelector('[data-info]');
   const strip = root.querySelector('[data-strip]');
   const empty = root.querySelector('[data-empty]');
+  const ctl = root.querySelector('[data-play]');
 
   const S = {
     list: [], cards: [], active: false, idx: -1, p: 0, target: 0, v: 0, settled: 0, raf: 0, last: 0,
@@ -107,13 +120,13 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar')) || 70;
       bottom = bar + 12;
     } else {
-      S.pad = clamp(u * 5.2, 16, 110);
+      S.pad = clamp(u * 3.45, 16, 80);      // отступ слева — как в макете: текст и лента ближе к краю, чем кнопки шапки
       gap = clamp(W * 0.013, 12, 30);
       ch = Math.min(clamp(W * 0.245, 230, 560) / 1.53, H * 0.3);
       cw = ch * 1.53;
       bottom = clamp(H * 0.035, 14, 44);
     }
-    S.step = cw + gap;
+    S.step = cw + gap; S.cw = cw;
     const rs = cat.style;
     rs.setProperty('--cw', `${cw.toFixed(1)}px`);
     rs.setProperty('--ch', `${ch.toFixed(1)}px`);
@@ -135,9 +148,15 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${s.toFixed(3)})`;
       const op = o.toFixed(2);
       if (el._o !== op) { el._o = op; el.style.opacity = op; el.style.visibility = o < 0.02 ? 'hidden' : ''; }
-      // видео на карточке играет, только пока карточка видна
+      // видео на карточке — как у Apple: карточка впервые выехала на экран — проигрывается один раз и замирает
+      // на последнем кадре; уехала посреди ролика — встаёт и доигрывает, когда вернётся. Выбрали проект — с начала (select)
       const vid = el._v === undefined ? (el._v = el.querySelector('video')) : el._v;
-      if (vid) { if (o > 0.05 && x < S.W) play(vid); else pause(vid); }
+      if (vid) {
+        const seen = S.active && o > 0.05 && x < S.W && x + S.cw * s > 0;
+        if (!seen) pause(vid);
+        else if (!el._ran) { el._ran = true; if (vid.preload === 'none') vid.preload = 'auto'; start(vid); }
+        else if (!vid._held) play(vid);
+      }
       // картинка карточки начинает грузиться за пару карточек до того, как та выедет на экран
       if (!el._near && S.active && x < S.W + S.step * 2) {
         el._near = true;
@@ -190,6 +209,11 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.classList.toggle('is-active', k === i);
       if (k === i) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
     });
+    // видео выбранной карточки — с начала, один раз
+    const cv = S.cards[i] && S.cards[i].querySelector('video');
+    if (cv) { cv._held = false; S.cards[i]._ran = true; }
+    if (cv) { if (cv.preload === 'none') cv.preload = 'auto'; start(cv); }
+    syncCtl();
     showInfo(p);
     // фон и визуал меняются чуть позже текста: пока ленту крутят быстро, экран не мигает на каждом проекте
     clearTimeout(S.swapT);
@@ -210,7 +234,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       ${tx(p.summary) ? `<p class="cat-sum">${esc(tx(p.summary))}</p>` : ''}
       <div class="cat-acts">
         <a class="btn cat-open" href="#/work/${encodeURIComponent(p.slug)}">${esc(t('openProject'))}</a>
-        <button class="btn cat-likeb" type="button" data-like aria-pressed="${on}">${HEART}<span>${esc(t('like'))}</span></button>
+        <button class="btn cat-likeb" type="button" data-like aria-pressed="${on}" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       </div>
     </div>`;
   }
@@ -226,18 +250,20 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const b = bgOf(p);
     const key = `${b.kind}|${b.color}|${b.image}|${b.video}`;
     setTheme({ color: b.color, tone: b.tone });       // тон интерфейса (белый или чёрный текст) и цвет полосы браузера
-    if (key === S.bgKey) return;
+    if (key === S.bgKey) { bgLayers[S.bgOn].dataset.slug = p.slug; syncCtl(); return; }      // фон тот же, что у прежнего проекта
     S.bgKey = key;
     const prev = bgLayers[S.bgOn], next = bgLayers[1 - S.bgOn];
     S.bgOn = 1 - S.bgOn;
     next.style.backgroundColor = b.color;
+    next.dataset.slug = p.slug;
     next.innerHTML = b.kind === 'image' ? mediaHTML({ image: b.image }, { cls: 'cat-bg-m' })
       : b.kind === 'video' ? mediaHTML({ video: b.video, poster: b.poster }, { cls: 'cat-bg-m' }) : '';
     next.classList.remove('is-on');
     void next.offsetWidth;
     next.classList.add('is-on');
     prev.classList.remove('is-on');
-    play(next.querySelector('video'));
+    start(next.querySelector('video'));
+    syncCtl();
     const pv = prev.querySelector('video');
     setTimeout(() => { pause(pv); if (!prev.classList.contains('is-on')) prev.innerHTML = ''; }, 800);
   }
@@ -257,13 +283,56 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const cur = heroBox.querySelector('.cat-hero-l:not(.is-out)');
     // в предпросмотре двигают и масштабируют — тот же проект просто встаёт на новое место, без смены
     if (same && cur) { const m = cur.querySelector('.cat-hero-m'); if (m) m.setAttribute('style', heroStyle(h.pos)); return; }
-    if (cur) { cur.classList.add('is-out'); setTimeout(() => cur.remove(), reduced ? 0 : 450); }
-    if (!h.image && !h.video) return;
+    if (cur) { cur.classList.add('is-out'); pause(cur.querySelector('video')); setTimeout(() => cur.remove(), reduced ? 0 : 450); }
+    if (!h.image && !h.video) { syncCtl(); return; }
     heroBox.insertAdjacentHTML('beforeend', `<div class="cat-hero-l" data-slug="${esc(p.slug)}"><div class="cat-hero-m" style="${heroStyle(h.pos)}">${mediaHTML(h, { cls: 'cat-hero-media', alt: '' })}</div></div>`);
     const el = heroBox.lastElementChild;
     if (!reduced) el.classList.add('is-in');
-    play(el.querySelector('video'));
+    start(el.querySelector('video'));
+    syncCtl();
   }
+
+  // ---------- видео выбранного проекта: одна кнопка на все его ролики (визуал, фон, карточка) ----------
+  // Как на страницах Apple: идёт — «пауза», стоит — «воспроизвести», доиграло и замерло на последнем кадре — «повторить».
+  // Вокруг кнопки тонкое кольцо — сколько уже проиграно (по самому длинному ролику).
+  // только ролики выбранного проекта: пока его фон и визуал ещё не сменились (0,1 с), прежние не в счёт; сломанный файл — тоже
+  function activeMedia() {
+    const p = S.list[S.idx];
+    if (!p) return [];
+    const mine = (el) => el && el.dataset.slug === p.slug;
+    const hero = heroBox.querySelector('.cat-hero-l:not(.is-out)'), bg = cat.querySelector('.cat-bg-l.is-on');
+    return [
+      mine(hero) && hero.querySelector('video'),
+      mine(bg) && bg.querySelector('video'),
+      S.cards[S.idx] && S.cards[S.idx].querySelector('video'),
+    ].filter((v) => v && !v.error);
+  }
+  function syncCtl() {
+    const list = S.active ? activeMedia() : [];
+    if (!list.length) { ctl.hidden = true; return; }
+    ctl.hidden = false;
+    const state = list.some((v) => !v.paused && !v.ended) ? 'pause' : list.every((v) => v.ended) ? 'replay' : 'play';
+    if (ctl.dataset.state !== state) {
+      ctl.dataset.state = state;
+      ctl.querySelector('.cat-play-i').innerHTML = ICONS[state];
+      ctl.setAttribute('aria-label', t(state));
+      ctl.title = t(state);
+    }
+    const long = list.reduce((a, v) => ((v.duration || 0) > (a.duration || 0) ? v : a), list[0]);
+    const k = long.duration ? Math.min(1, long.currentTime / long.duration) : 0;
+    ctl.style.setProperty('--k', k.toFixed(3));
+  }
+  ctl.addEventListener('click', () => {
+    const list = activeMedia();
+    const st = ctl.dataset.state;
+    if (st === 'pause') list.forEach((v) => { v._held = true; pause(v); });       // поставили на паузу — лента её не снимает
+    else if (st === 'replay') list.forEach((v) => { v._held = false; try { v.currentTime = 0; } catch (_) { /* noop */ } run(v); });
+    else list.forEach((v) => { v._held = false; if (v.ended) { try { v.currentTime = 0; } catch (_) { /* noop */ } } run(v); });
+  });
+  // события роликов не всплывают — ловим их на погружении
+  ['play', 'pause', 'ended', 'timeupdate', 'loadedmetadata', 'error'].forEach((ev) => cat.addEventListener(ev, (e) => {
+    if (e.target.tagName === 'VIDEO' && S.active) syncCtl();
+  }, true));
 
   // ---------- нажатия ----------
   strip.addEventListener('click', (e) => {
@@ -303,7 +372,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   // (вверх — дальше) тоже листает. Отпустили с разгона — лента пролетает дальше и встаёт на проект.
   cat.addEventListener('pointerdown', (e) => {
     if (!S.active || !S.list.length || e.button > 0) return;
-    if (e.target.closest('a, [data-like], .cat-hero-m.is-edit')) return;
+    if (e.target.closest('a, [data-like], [data-play], .cat-hero-m.is-edit')) return;
     S.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, p0: S.p, axis: '', moved: false, hist: [[performance.now(), S.p]] };
     S.dragged = false;
   });
@@ -373,7 +442,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   // ---------- вход и выход ----------
   const indexOfSection = (id) => S.list.findIndex((p) => p.section === id);
   function setCategory(c) { const n = c || 'all'; S.catNew = n !== S.cat; S.cat = n; }
-  function activate(on, { restore = false } = {}) {
+  function activate(on, { restore = false, fresh = true } = {}) {
     if (!on) {
       if (S.active) S.saved = S.settled;
       S.active = false;
@@ -381,11 +450,15 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       clearTimeout(S.swapT); clearTimeout(S.lookT);
       document.documentElement.classList.remove('is-cat');
       root.querySelectorAll('video').forEach(pause);
+      ctl.hidden = true;
       setTheme(null);
       return;
     }
     const was = S.active;
     S.active = true;
+    // пришли с другого экрана — фон и визуал проекта выстраиваются заново, и его ролики идут с начала (как при выборе проекта);
+    // при обновлении предпросмотра в админке — нет: визуал, который двигают мышью, не должен заново «въезжать»
+    if (fresh) { S.bgKey = ''; S.heroKey = ''; }
     document.documentElement.classList.add('is-cat');
     measure();
     root.querySelectorAll('img[loading="lazy"]').forEach((im, k) => { if (k < 6) im.loading = 'eager'; });
@@ -425,7 +498,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const m = heroBox.querySelector('.cat-hero-l:not(.is-out) .cat-hero-m');
     if (!m || m.classList.contains('is-edit')) return;
     m.classList.add('is-edit');
-    cat.classList.add('is-edit-hero');      // пунктиром видно, где текст и где будет голова: туда визуал лучше не ставить
+    cat.classList.add('is-edit-hero');      // пунктиром видно, где текст проекта: туда визуал лучше не ставить
     const p = S.list[S.idx];
     const post = (pos) => {
       if (window.parent !== window) window.parent.postMessage({ type: 'ph:hero', slug: p.slug, layout: S.layout, pos }, location.origin);

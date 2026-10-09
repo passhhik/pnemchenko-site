@@ -4,10 +4,11 @@ import { Voice } from './voice.js';
 import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
-import { content, loadContent, reloadDraft, tx, t, count, esc, srcOf, projectsOf, peekItems, thumbOf, isStack, heroFolders } from './content.js';
+import { content, loadContent, reloadDraft, tx, t, esc, srcOf, projectsOf, peekItems, thumbOf, isStack, heroFolders } from './content.js';
 import { linesFor, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
+import { applyStyle } from './style.js';
 import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
@@ -65,7 +66,8 @@ cornerProbe.setAttribute('aria-hidden', 'true');
 document.body.appendChild(cornerProbe);
 
 const hasLine = (id) => !!(subs && subs.lines[id]);
-const say = (ids, opts) => { if (subs && !content.preview) subs.say((Array.isArray(ids) ? ids : [ids]).filter(hasLine), opts); };
+// в каталоге головы нет — и реплик тоже
+const say = (ids, opts) => { if (subs && !content.preview && view !== 'work') subs.say((Array.isArray(ids) ? ids : [ids]).filter(hasLine), opts); };
 const lookAtEl = (el) => {
   if (!head) return;
   if (!el) { head.clearLook(); return; }
@@ -76,6 +78,7 @@ const lookAtEl = (el) => {
 // ---------- тексты и шапка ----------
 function applyContent() {
   const site = content.site, name = tx(site.name), role = tx(site.role);
+  applyStyle(site.style);                    // дизайн-токены из админки поверх значений по умолчанию (css/style.css)
   $$('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
   $$('[data-name]').forEach((el) => { el.textContent = name; });
   $$('[data-role]').forEach((el) => { el.textContent = role; });
@@ -186,7 +189,7 @@ function buildFolders() {
   els.folders.innerHTML = (content.site.sections || []).map((s) => {
     const ps = sectionProjects(s.id);
     return folderHTML({
-      href: `#/work?cat=${encodeURIComponent(s.id)}`, title: tx(s.label), pill: count(ps.length, 'project'),
+      href: `#/work?cat=${encodeURIComponent(s.id)}`, title: tx(s.label),
       items: peekOf(s.id), stickers: ps.map((p) => p.sticker).filter(Boolean), tint: s.folder,
       cls: 'gf--section', attrs: `data-section="${esc(s.id)}"`, lazy: false,
     });
@@ -208,8 +211,16 @@ function layout() {
 
   // шапка: на главной логотип крупный (как в макете), внутри сайта — компактный.
   // Логотип — отдельный слой (на главной он лежит под головой), поэтому его место считаем здесь, а не сеткой шапки.
-  let padTop, logoW, hdr, logoY;
-  if (!mobile) {
+  let padTop, logoW, hdr, logoY, padBot = null;
+  if (!mobile && view === 'work') {
+    // каталог — по макету: шапка просторнее, логотип крупнее, кнопки на его уровне
+    padTop = clamp(4.2 * u, 14, 72);
+    logoW = clamp(16.4 * u, 150, 330);
+    const row = Math.max(clamp(3.7 * u, 40, 70), logoW / logoAR);
+    padBot = clamp(1.2 * u, 10, 22);
+    hdr = padTop + row + padBot;
+    logoY = padTop + (row - logoW / logoAR) / 2;
+  } else if (!mobile) {
     padTop = hero ? clamp(H * 0.042, 12, 60) : clamp(1.2 * u, 10, 22);
     logoW = hero ? clamp(27 * u, 200, 640) : clamp(13 * u, 132, 250);
     const row = hero ? logoW / logoAR : Math.max(clamp(3.3 * u, 40, 66), logoW / logoAR);
@@ -225,6 +236,7 @@ function layout() {
     logoY = padTop + (row - logoW / logoAR) / 2;
   }
   if (!mobile) rs.setProperty('--pad-top', `${padTop.toFixed(1)}px`);
+  if (padBot !== null) rs.setProperty('--pad-bot', `${padBot.toFixed(1)}px`); else rs.removeProperty('--pad-bot');
   rs.setProperty('--logo-w', `${logoW.toFixed(1)}px`);
   rs.setProperty('--logo-y', `${logoY.toFixed(1)}px`);
   rs.setProperty('--hdr', `${Math.ceil(hdr)}px`);
@@ -311,14 +323,8 @@ function layout() {
     });
     // высоту папки с подписью берём по факту: длинное название раздела может занять две строки
     const em = clamp(fw * 0.078, 15, 26);
-    const room = (tight) => {
-      els.folders.classList.toggle('is-tight', tight);
-      const fh = Math.max(fw * 0.795 + em * (tight ? 2.1 : 3.9), ...folderEls.map((el) => el.offsetHeight || 0));
-      return H - hdr - 12 - subsH - 12 - fh - 6 - bar;
-    };
-    // на невысоком экране (телефон с панелями браузера) счётчик проектов под папкой уступает место голове
-    let avail = room(false);
-    if (avail / ar < 0.6 * W) avail = room(true);
+    const fh = Math.max(fw * 0.795 + em * 2.1, ...folderEls.map((el) => el.offsetHeight || 0));
+    const avail = H - hdr - 12 - subsH - 12 - fh - 6 - bar;
     width = clamp(avail / ar, 110, MOBILE_HEAD * W);
     const hh = width * ar;
     top = hdr + Math.max(0, (avail - hh) * 0.5);
@@ -550,7 +556,7 @@ const vibrate = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } 
 if (debug) window.__strip = () => ({ armed: stripArmed, openId, mobile: geo.mobile, view });
 
 // ---------- роутинг ----------
-let catalogHi = false, switchT = 0, greeted = false, booted = false;
+let switchT = 0, sleepT = 0, greeted = false, booted = false;
 function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [path, qs] = raw.split('?');
@@ -579,15 +585,18 @@ function show(next, opts = {}) {
   for (const [k, el] of Object.entries(els.views)) el.hidden = k !== next;
   if (next === 'work') els.allWork.setAttribute('aria-current', 'page'); else els.allWork.removeAttribute('aria-current');
   if (head) { head.setMode(next === 'hero' ? 'hero' : 'corner'); head.clearLook(); head.setSceneColor(next === 'hero' ? '#FFFFFF' : '#D9D9D9'); }
+  // в каталоге головы нет: кружок гаснет (стили), а когда погас — голова перестаёт рисоваться; в кейсе она снова в углу
+  clearTimeout(sleepT);
+  if (next === 'work') { if (subs) subs.clear(); if (head) sleepT = setTimeout(() => { if (view === 'work' && head) head.sleep(true); }, prev ? 400 : 0); }
+  else if (head) head.sleep(false);
   if (next !== 'case') setTheme(null);
   layout();
   const name = tx(content.site.name);
   if (next === 'work') {
     catalog.setCategory(opts.cat, true);
-    catalog.activate(true, { restore: prev === 'case' || prev === 'work' });      // из кейса и при обновлении предпросмотра — на том же проекте
+    catalog.activate(true, { restore: prev === 'case' || prev === 'work', fresh: prev !== 'work' });      // из кейса и при обновлении предпросмотра — на том же проекте
     document.title = `${t('work')} — ${name}`;
     if (prev && prev !== 'work') $('#work-title').focus({ preventScroll: true });
-    if (!catalogHi) { catalogHi = true; say(touchUI ? 'catalog_hi_touch' : 'catalog_hi', { force: true }); }
     track('view_catalog', { cat: opts.cat });
   } else if (next === 'case') {
     const p = content.projects.find((x) => x.slug === opts.slug);
@@ -891,6 +900,7 @@ window.addEventListener('pointermove', (e) => {
 document.addEventListener('visibilitychange', () => { spit.input = performance.now(); });      // считаем только время, когда вкладка на виду
 setInterval(() => {
   if (spit.state !== 'off' || !head || !head.loaded || !booted || reduced || document.hidden) return;
+  if (view === 'work') { spit.input = performance.now(); return; }      // в каталоге головы нет — и плевков
   if (head.drags.size || dragging || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
   // отсчёт — с последнего действия посетителя: сколько задано в админке, столько и ждём. Оклики головы его не продлевают;
   // если время вышло, а она говорит, — дожидаемся конца реплики и ещё полторы секунды, чтобы не плевать, едва договорив
@@ -1100,12 +1110,8 @@ async function boot() {
   applyContent();
   installFolderDefs();                       // контур стекла папки: он нужен и каталогу, и кейсу
   catalog = createCatalog(els.views.work, {
-    reduced, onHover: lookAtEl,
-    onLike(p, on) {
-      track('like', { slug: p.slug, on });
-      if (on) say(REACTIONS.like, { force: true, pick: true });
-    },
-    onEmpty() { say('empty', { force: true }); },
+    reduced,
+    onLike(p, on) { track('like', { slug: p.slug, on }); },
   });
   if (debug) window.__cat = catalog.state;
   layout();
@@ -1141,6 +1147,7 @@ async function boot() {
     head = new Head(els.stage, { reducedMotion: reduced });
     wireHead();
     head.setMode(view === 'hero' ? 'hero' : 'corner');
+    if (view === 'work') head.sleep(true);                // открыли сразу каталог — головы там нет, проснётся в кейсе
     layout();
     // тому, кто здесь уже был, сборку показываем быстрее: он её видел
     await head.load(null, { intro: view === 'hero', rate: store.get('seen', false) ? 1.4 : 1, data: model });

@@ -622,7 +622,7 @@ export class Head extends EventTarget {
     this.clock.getDelta();
     this.q.hold = performance.now() + 2500;              // первые секунды устройство «прогревается» — плотность пикселей пока не трогаем
     if (assemble) this._startIntro(); else { this.intro.on = false; this.intro.pre = false; this.intro.parts.length = 0; this._ready(); }
-    this._loop();
+    if (this.asleep) this.renderer.render(this.scene, this.camera); else this._loop();      // в каталоге голову не показываем — один кадр про запас
     this._warmOverlay();
     return this;
   }
@@ -1137,6 +1137,14 @@ export class Head extends EventTarget {
   }
 
   setLayout(l) { this.layout = l; if (this.mode !== 'corner') this.frame(); }
+  // Голова спрятана (каталог): кадры не считаются вовсе — процессор и батарея остаются странице. Проснулась — продолжает с того же места
+  sleep(on) {
+    if (this.asleep === !!on) return;
+    this.asleep = !!on;
+    if (!this.loaded) return;                         // пока модель качается, мозг живёт своим циклом — его не трогаем
+    if (on) this.renderer.setAnimationLoop(null);
+    else if (!document.hidden) { this.clock.getDelta(); this._loop(); }
+  }
   setMode(mode) { this.mode = mode; this._stir = performance.now() + 900; if (mode === 'corner' && this.intro.on) this._endIntro(); this.frame(); }
   setMouth(v) { this.mouthTarget = clamp(v, 0, 1); }
   lookAtClient(x, y) { this.lookOverride = { x, y }; }
@@ -1458,7 +1466,7 @@ export class Head extends EventTarget {
     window.addEventListener('pointercancel', (e) => this._up(e));
     document.addEventListener('visibilitychange', () => {
       if (!this.loaded) return;
-      if (document.hidden) this.renderer.setAnimationLoop(null); else { this.clock.getDelta(); this._loop(); }
+      if (document.hidden || this.asleep) this.renderer.setAnimationLoop(null); else { this.clock.getDelta(); this._loop(); }
     });
   }
 

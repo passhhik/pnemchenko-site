@@ -7,6 +7,7 @@ import { gh, gitSha, GhError, DEFAULT_REPO } from './github.js';
 import { LINES, LINE_INFO } from '../js/lines.js';
 import { HERO_DEFAULT } from '../js/catalog.js';
 import { likesApi, likeCounts } from '../js/likes.js';
+import { STYLE_GROUPS, STYLE_TOKENS, styleValue } from '../js/style.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -319,11 +320,30 @@ function F(label, path, o = {}) {
 const CHECK = (label, path, on) => `<div class="f"><label class="switch"><input type="checkbox" data-path="${path}" data-kind="bool"${(on ?? val(path)) ? ' checked' : ''}><span>${esc(label)}</span></label></div>`;
 function COLOR(label, path, o = {}) {
   const v = val(path) || '';
-  return `<div class="f"><span>${esc(label)}</span><div class="color">
-    <input type="color" data-path="${path}" data-kind="color" value="${/^#[0-9a-f]{6}$/i.test(v) ? v : '#ffffff'}" aria-label="${esc(label)}: выбрать цвет">
-    <input type="text" class="inp" data-path="${path}" data-kind="hex"${o.optional ? ' data-optional="1"' : ''} value="${esc(v)}" placeholder="${o.optional ? 'не задан' : '#RRGGBB'}" aria-label="${esc(label)}: код цвета" spellcheck="false">
+  const ph = o.def ? o.def : o.optional ? 'не задан' : '#RRGGBB';
+  return `<div class="f"><span>${esc(label)}${o.def ? ` <small class="hint">по умолчанию ${esc(o.def)}</small>` : ''}</span><div class="color">
+    <input type="color" data-path="${path}" data-kind="color" value="${/^#[0-9a-f]{6}$/i.test(v) ? v : (o.def || '#ffffff')}" aria-label="${esc(label)}: выбрать цвет">
+    <input type="text" class="inp" data-path="${path}" data-kind="hex"${o.optional ? ' data-optional="1"' : ''} value="${esc(v)}" placeholder="${esc(ph)}" aria-label="${esc(label)}: код цвета" spellcheck="false">
     ${o.optional && v ? `<button class="ico x" type="button" data-act="clear" data-path="${path}" aria-label="Убрать цвет">${I.x}</button>` : ''}
   </div>${o.hint ? `<small class="hint">${esc(o.hint)}</small>` : ''}</div>`;
+}
+// Дизайн-токен из js/style.js: не задан — в поле значение по умолчанию (подписано), «Сбросить стиль» убирает все свои значения
+function TOKEN(tok) {
+  const path = `style.${tok.key}`, v = styleValue(st.site.style, tok.key);
+  if (tok.type === 'color') return COLOR(tok.label, path, { optional: 1, def: tok.def });
+  if (tok.type === 'select') {
+    const defName = (tok.options.find(([k]) => k === tok.def) || [])[1] || tok.def;
+    return `<label class="f"><span>${esc(tok.label)} <small class="hint">по умолчанию ${esc(defName)}</small></span><select data-path="${path}" data-kind="num">${tok.options.map(([k, n]) => `<option value="${k}"${Number(k) === Number(v) ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
+  }
+  return `<label class="f"><span>${esc(tok.label)} <small class="hint">по умолчанию ${tok.def}${tok.unit}</small></span><span class="range"><input type="range" data-path="${path}" data-kind="num" min="${tok.min}" max="${tok.max}" step="${tok.step}" value="${v}" data-unit="${tok.unit}"><output>${v}${tok.unit}</output></span></label>`;
+}
+function stylePane() {
+  const own = st.site.style && Object.keys(st.site.style).length;
+  return `<fieldset class="fs"><legend>Стиль</legend>
+      <p class="hint">Дизайн-токены сайта. Правки сразу видны в предпросмотре справа; на сайт уходят с «Опубликовать». Пустой цвет — значение по умолчанию.</p>
+      ${STYLE_GROUPS.map((g) => `<fieldset class="fs"><legend>${esc(g.title)}</legend>${g.hint ? `<p class="hint">${esc(g.hint)}</p>` : ''}<div class="grid2">${g.items.map(TOKEN).join('')}</div></fieldset>`).join('')}
+      ${own ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="style-reset">Сбросить стиль</button></div>' : ''}
+    </fieldset>`;
 }
 function RANGE(label, path, min, max, step, unit = '') {
   const v = Number(val(path)) || 0;
@@ -528,9 +548,9 @@ const PANES = {
     const kind = (p.bg && p.bg.kind) || 'color';
     return `
     <fieldset class="fs"><legend>Карточка в каталоге</legend>
-      <p class="hint">Карточка в ленте внизу каталога. Картинка или короткое видео без звука (оно крутится по кругу, пока карточка видна). Нет ни того ни другого — берётся малая копия обложки.</p>
+      <p class="hint">Карточка в ленте внизу каталога. Картинка или короткое видео без звука. Видео — как анимации на сайте Apple: проигрывается один раз, когда карточка впервые выехала на экран, и замирает на последнем кадре; выбрали проект — снова с начала. До запуска видна картинка карточки. Нет ни того ни другого — берётся малая копия обложки.</p>
       ${IMG('Картинка карточки', 'card.image', { max: 1400, hint: 'Горизонтальная, примерно 3:2. Главное — по центру.' })}
-      ${IMG('Видео карточки', 'card.video', { kind: 'video', hint: 'MP4 или WebM без звука, 3–8 секунд, до 3 МБ.' })}
+      ${IMG('Видео карточки', 'card.video', { kind: 'video', hint: 'MP4 или WebM без звука, 3–8 секунд, до 3 МБ. Последний кадр должен быть хорош сам по себе — на нём ролик останавливается.' })}
     </fieldset>
     <fieldset class="fs"><legend>Фон в каталоге</legend>
       <p class="hint">Весь экран каталога, пока выбран этот проект.</p>
@@ -538,13 +558,13 @@ const PANES = {
       <div class="grid2">${COLOR('Цвет фона', 'theme.color')}${F('Текст на фоне', 'theme.tone', { type: 'select', kind: 'opt', options: [['', 'Подобрать по цвету'], ['dark', 'Белый'], ['light', 'Чёрный']] })}</div>
       <p class="contrast ${c.cls}" data-contrast>${c.html}</p>
       ${kind === 'image' || kind === 'video' ? IMG('Картинка фона', 'bg.image', { max: 2400, hint: kind === 'video' ? 'Кадр, который виден, пока видео грузится.' : 'Во весь экран, лучше 16:9, от 1920 px.' }) : ''}
-      ${kind === 'video' ? IMG('Видео фона', 'bg.video', { kind: 'video', hint: 'MP4 или WebM без звука, 5–15 секунд, до 6 МБ. Цвет фона виден, пока видео грузится.' }) : ''}
+      ${kind === 'video' ? IMG('Видео фона', 'bg.video', { kind: 'video', hint: 'MP4 или WebM без звука, 5–15 секунд, до 6 МБ. Играет один раз и замирает на последнем кадре; пока грузится — цвет фона и картинка выше.' }) : ''}
       ${kind !== 'color' ? '<p class="hint">Цвет фона всё равно задайте: по нему выбирается цвет текста, им же закрашен экран, пока картинка или видео грузятся.</p>' : ''}
     </fieldset>
     <fieldset class="fs"><legend>Визуал на фоне</legend>
-      <p class="hint">Картинка (лучше PNG без фона) или короткое видео поверх фона каталога. Расставьте его прямо в предпросмотре: вид «Каталог», визуал тянется мышью, колёсико — размер. Для широких экранов и для телефона место своё — переключите устройство над предпросмотром. Пунктиром там показаны текст проекта и место головы: на них визуал лучше не заводить. Пусто — берётся первая работа проекта без фона.</p>
+      <p class="hint">Картинка (лучше PNG без фона) или короткое видео поверх фона каталога. Расставьте его прямо в предпросмотре: вид «Каталог», визуал тянется мышью, колёсико — размер. Для широких экранов и для телефона место своё — переключите устройство над предпросмотром. Пунктиром там обведён текст проекта: на него визуал лучше не заводить. Пусто — берётся первая работа проекта без фона.</p>
       ${IMG('Картинка', 'hero.image', { max: 1800 })}
-      ${IMG('Видео', 'hero.video', { kind: 'video', hint: 'MP4 или WebM без звука, до 4 МБ.' })}
+      ${IMG('Видео', 'hero.video', { kind: 'video', hint: 'MP4 или WebM без звука, до 4 МБ. Играет один раз и замирает на последнем кадре; до запуска — картинка выше.' })}
       ${HEROPOS('desk', 'Компьютер и планшет горизонтально')}
       ${HEROPOS('phone', 'Телефон и планшет вертикально')}
     </fieldset>
@@ -595,6 +615,7 @@ function sitePane() {
       ${F('Роль', 'role', { l: 1, ph: 'продуктовый дизайнер' })}
       ${F('Описание для поисковиков', 'description', { l: 1, type: 'area', rows: 2 })}
     </fieldset>
+    ${stylePane()}
     <fieldset class="fs"><legend>Контакты и резюме</legend>
       <p class="hint">Почта и Telegram показываются в конце каждого кейса. Пустые поля на сайте не появляются.</p>
       <div class="grid2">${F('Почта для связи', 'email', { ph: 'hello@example.com', attrs: 'spellcheck="false"' })}${F('Telegram', 'telegram', { ph: '@username', attrs: 'spellcheck="false"' })}</div>
@@ -1104,6 +1125,7 @@ const ACT = {
   },
   'sec-del'(el) { st.site.sections.splice(Number(el.dataset.i), 1); renderEdit(); changed('sections'); },
   'pass-set'() { openPassDialog(); },
+  'style-reset'() { delete st.site.style; renderEdit(); changed('style'); },
   'hero-reset'(el) { const h = cur().hero; if (h) { delete h[el.dataset.layout]; if (!Object.keys(h).length) delete cur().hero; } renderEdit(); changed('hero'); },
   'likes-refresh'() { loadLikes(true); },
   'pass-cancel'() { passDlg.close(); },
@@ -1161,6 +1183,12 @@ document.addEventListener('input', (e) => {
   } else if (kind === 'slug') { v = slugify(el.value); autoSlug.delete(obj); }
   if (el.dataset.l && kind !== 'list') v = setL(getPath(obj, path), v);
   if (kind === 'opt' && v === '') delPath(obj, path); else setPath(obj, path, v);
+  if (path.startsWith('style.') && obj.style) {
+    // токен вернули к значению по умолчанию — не храним его (в содержимом только свои значения)
+    const key = path.slice(6), tok = STYLE_TOKENS.find((x) => x.key === key);
+    if (tok && String(styleValue(obj.style, key)) === String(tok.def)) delete obj.style[key];
+    if (!Object.keys(obj.style).length) delete obj.style;
+  }
   if (path === 'bg.kind') { renderEdit(); changed(path); return; }
   if (path === 'title' && autoSlug.has(obj)) {
     obj.slug = uniqueSlug(slugify(txAny(obj.title)) || 'project', obj);

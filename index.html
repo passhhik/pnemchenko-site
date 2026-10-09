@@ -22,6 +22,7 @@
   <link rel="icon" href="assets/favicon.png" type="image/png" sizes="96x96">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="preload" href="assets/fonts/narrow-cyrillic-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/roboto-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="content/site.json" as="fetch" crossorigin>
   <link rel="preload" href="content/projects.json" as="fetch" crossorigin>
   <link rel="stylesheet" href="css/style.css">
@@ -34,6 +35,7 @@
   <link rel="modulepreload" href="js/theme.js">
   <link rel="modulepreload" href="js/catalog.js">
   <link rel="modulepreload" href="js/likes.js">
+  <link rel="modulepreload" href="js/style.js">
   <link rel="modulepreload" href="js/case.js">
   <link rel="modulepreload" href="js/burst.js">
   <link rel="modulepreload" href="js/subtitles.js">
@@ -58,7 +60,7 @@
   <header class="topbar" data-topbar>
     <div class="topbar-side" data-lang></div>
     <nav class="topnav" aria-label="Основное меню">
-      <a class="btn" data-cv href="assets/cv.pdf" download>CV</a>
+      <a class="btn" data-cv href="assets/cv.pdf" download><span class="cv-pre" data-t="download">Скачать</span> CV</a>
       <a class="btn" href="#/work" data-t="allWork">Все работы</a>
       <button class="btn btn--toggle" type="button" data-sound aria-pressed="false"><span data-t="sound">Звук</span></button>
     </nav>

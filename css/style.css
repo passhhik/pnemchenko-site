@@ -10,22 +10,36 @@
 @font-face{ font-family:'Arimo Narrow PN'; font-weight:700; font-display:block; src:url('../assets/fonts/narrow-latin-700.woff2') format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 @font-face{ font-family:'Arimo Narrow PN'; font-weight:400; font-display:block; src:url('../assets/fonts/narrow-latin-ext-400.woff2') format('woff2'); unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
 @font-face{ font-family:'Arimo Narrow PN'; font-weight:700; font-display:block; src:url('../assets/fonts/narrow-latin-ext-700.woff2') format('woff2'); unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+/* Roboto — кнопки и тексты. Переменный шрифт: два файла (кириллица и латиница) на все насыщенности. Лицензия OFL — assets/fonts/OFL-Roboto.txt */
+@font-face{ font-family:'Roboto PN'; font-weight:100 900; font-display:swap; src:url('../assets/fonts/roboto-cyrillic.woff2') format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face{ font-family:'Roboto PN'; font-weight:100 900; font-display:swap; src:url('../assets/fonts/roboto-latin.woff2') format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 
 :root{
   --u:min(1vw, 1.5vh);                 /* единица макета: 1% ширины, но не больше 1,5% высоты — на широких экранах всё считается от высоты */
-  --paper:#FFFFFF;
-  --fg:#000000;                         /* текст, кнопки, логотип */
-  --on-fg:#FFFFFF;                      /* текст на кнопках */
-  --mute:#666666;                       /* вторичный текст: контраст на белом 5,7:1 */
+  /* ---- дизайн-токены: значения по умолчанию; свои Павел задаёт в админке («Настройки сайта» → «Стиль», js/style.js) ---- */
+  --paper:#FFFFFF;                      /* фон сайта */
+  --ink:#000000;                        /* текст и кнопки на светлом */
+  --ink-dark:#FFFFFF;                   /* текст на тёмном фоне проекта */
+  --mute-l:#666666;                     /* вторичный текст: контраст на белом 5,7:1 */
+  --heart:#FF4D6A;                      /* лайк */
+  --k-title:1; --k-text:1; --k-btn:1;   /* размер заголовков, текста, кнопок — множители */
+  --tr-title:-.012em;                   /* трекинг заголовков */
+  --w-text:400; --w-lead:400; --w-btn:400;
+  --r-btn:.5; --r-card:.12;             /* скругления — доля высоты: у кнопки .5 — капсула */
+  /* ---- производные ---- */
+  --fg:var(--ink);                      /* текст, кнопки, логотип */
+  --mute:var(--mute-l);
+  --on-fg:var(--paper);                 /* текст на залитой кнопке */
   --line:rgba(0,0,0,.14);
   --pill:rgba(0,0,0,.07);
-  --font:'Arial Narrow','Arimo Narrow PN',Arial,sans-serif;
+  --font:'Arial Narrow','Arimo Narrow PN',Arial,sans-serif;          /* заголовки, метки разделов, теги, реплики головы */
+  --font-text:'Roboto PN',Roboto,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;     /* кнопки и тексты */
   --ease:cubic-bezier(.2,.9,.2,1);
   --spring:cubic-bezier(.18,1.32,.32,1);
   --pad-x:clamp(16px, calc(var(--u) * 5.2), 110px);
   --pad-top:clamp(12px, 4.2vh, 60px);    /* уточняется скриптом: на главной шапка просторная, внутри сайта — компактная */
-  --btn-h:clamp(40px, calc(var(--u) * 3.3), 66px);
-  --btn-fs:clamp(17px, calc(var(--u) * 1.6), 32px);
+  --btn-h:calc(clamp(40px, calc(var(--u) * 3.7), 70px) * var(--k-btn));
+  --btn-fs:calc(clamp(15px, calc(var(--u) * 1.1), 21px) * var(--k-btn));
   --corner:clamp(120px, calc(var(--u) * 19), 380px);       /* кружок с головой в каталоге и кейсе */
   --corner-r:var(--pad-x);                                  /* его отступ справа — по правому краю кнопок шапки */
   --corner-b:clamp(12px, calc(var(--u) * 1.6), 36px);
@@ -33,14 +47,14 @@
   --fw:240px;                            /* ширина папки; задаётся там, где папка стоит */
   color-scheme:light;
 }
-/* в кейсе голова не должна мешать чтению: кружок меньше и прижат к краю */
-body[data-view="case"]{ --corner:clamp(96px, calc(var(--u) * 11), 200px); --corner-r:clamp(12px, calc(var(--u) * 2), 40px); }
+/* в кейсе голова не должна мешать чтению: кружок меньше и прижат к краю (в каталоге головы нет, кружок там же — погасший) */
+body[data-view="case"],body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 11), 200px); --corner-r:clamp(12px, calc(var(--u) * 2), 40px); }
 /* тёмный фон проекта в каталоге и в шапке кейса: интерфейс становится белым */
-body[data-tone="dark"]{ --fg:#FFFFFF; --on-fg:#000000; --mute:rgba(255,255,255,.84); --line:rgba(255,255,255,.26); --pill:rgba(255,255,255,.18); }
+body[data-tone="dark"]{ --fg:var(--ink-dark); --on-fg:var(--ink); --mute:rgba(255,255,255,.84); --mute:color-mix(in srgb, var(--ink-dark) 84%, transparent); --line:rgba(255,255,255,.26); --pill:rgba(255,255,255,.18); }
 
 *,*::before,*::after{ box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
-body{ margin:0; background:var(--paper); color:var(--fg); font:400 19px/1.45 var(--font); -webkit-font-smoothing:antialiased; transition:color .35s; }
+body{ margin:0; background:var(--paper); color:var(--fg); font:var(--w-text) calc(18px * var(--k-text))/1.5 var(--font-text); -webkit-font-smoothing:antialiased; transition:color .35s; }
 body[data-view="hero"]{ overflow:hidden; height:100vh; height:100dvh; }
 a{ color:inherit; }
 img{ max-width:100%; }
@@ -65,7 +79,7 @@ button{ font:inherit; color:inherit; }
 
 /* ---------- шапка: логотип по центру, кнопки справа ---------- */
 .topbar{ position:fixed; inset:0 0 auto 0; z-index:40; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px; min-height:var(--hdr); padding:var(--pad-top) var(--pad-x) 0; pointer-events:none; color:var(--fg); }
-body:not([data-view="hero"]) .topbar{ padding-bottom:var(--pad-top); }
+body:not([data-view="hero"]) .topbar{ padding-bottom:var(--pad-bot, var(--pad-top)); }      /* --pad-bot: в каталоге шапка снизу плотнее (js/app.js, layout) */
 .topbar > *{ pointer-events:auto; }
 /* в кейсе под шапкой подложка, чтобы текст и картинки не просвечивали при прокрутке: цвета проекта над его шапкой, белая — над листом */
 .topbar::before{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; opacity:0; background:var(--bar-bg, rgba(255,255,255,.9)); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); transition:opacity .3s; }
@@ -78,14 +92,14 @@ body[data-view="case"].is-scrolled .topbar::before{ opacity:1; }
 body:not([data-view="hero"]) .logo{ z-index:42; }
 .logo-mark{ display:block; width:100%; aspect-ratio:var(--logo-ar, 393/95); visibility:hidden; background:currentColor; -webkit-mask:var(--logo-url) center/contain no-repeat; mask:var(--logo-url) center/contain no-repeat; }
 .logo.is-ready .logo-mark{ visibility:visible; }      /* до загрузки содержимого на месте логотипа пусто, а не чёрная плашка */
-.logo.is-text .logo-mark{ aspect-ratio:auto; background:none; -webkit-mask:none; mask:none; font-size:calc(var(--logo-w,27vw) * .15); line-height:1; text-align:center; white-space:nowrap; }
+.logo.is-text .logo-mark{ font-family:var(--font); aspect-ratio:auto; background:none; -webkit-mask:none; mask:none; font-size:calc(var(--logo-w,27vw) * .15); line-height:1; text-align:center; white-space:nowrap; }
 .is-switching .topbar{ transition:min-height .5s var(--ease), padding .5s var(--ease); }
 .is-switching .logo{ transition:width .5s var(--ease), left .5s var(--ease), top .5s var(--ease); }
 .topnav{ grid-column:3; justify-self:end; display:flex; align-items:center; gap:clamp(8px, calc(var(--u) * 1.3), 26px); }
 /* на главной кнопки стоят чуть ниже середины логотипа — как в макете */
 body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 .is-switching .topnav{ transition:transform .5s var(--ease); }
-.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5em; height:var(--btn-h); padding:0 calc(var(--btn-h) * .44); border:0; border-radius:999px; background:var(--fg); color:var(--on-fg); font:400 var(--btn-fs)/1 var(--font); text-decoration:none; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 2px var(--fg); transition:background-color .2s, color .2s, box-shadow .2s, transform .12s; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5em; height:var(--btn-h); padding:0 calc(var(--btn-h) * .44); border:0; border-radius:calc(var(--btn-h) * var(--r-btn)); background:var(--fg); color:var(--on-fg); font:var(--w-btn) var(--btn-fs)/1 var(--font-text); text-decoration:none; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 2px var(--fg); transition:background-color .2s, color .2s, box-shadow .2s, transform .12s; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
 .btn:active{ transform:scale(.97); }      /* кнопка отвечает на нажатие — на телефоне наведения нет, это единственный отклик */
 .btn[aria-current="page"]{ background:transparent; color:var(--fg); }
 .btn--line{ background:transparent; color:var(--fg); }
@@ -93,11 +107,15 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 @media (hover:hover){
   .btn:hover{ background:transparent; color:var(--fg); }
   .btn--line:hover{ background:var(--fg); color:var(--on-fg); }
+  .cat-acts .btn.cat-likeb:hover{ background:var(--pill); color:var(--fg); }
+  body[data-view="work"] .topnav .btn:hover{ background:var(--fg); color:var(--on-fg); }
 }
 /* голова говорит про кнопку и смотрит на неё — кнопка один раз «кивает» в ответ (js/app.js, pointAtWork) */
 .btn.is-nudge{ animation:nudge 1.1s var(--ease) 1; }
 @keyframes nudge{ 0%,72%,100%{ transform:none; } 18%{ transform:scale(1.07); } 36%{ transform:scale(.98); } 54%{ transform:scale(1.03); } }
 .no-cv [data-cv]{ display:none !important; }
+/* каталог (как в макете): кнопки шапки — контуром, поверх фона проекта */
+body[data-view="work"] .topnav .btn{ background:transparent; color:var(--fg); }
 /* «Звук»: когда включён, рядом с надписью три столбика; они пляшут, пока голова говорит */
 .btn--toggle .eq{ display:none; align-items:flex-end; gap:2px; height:.7em; }
 .btn--toggle[aria-pressed="true"] .eq{ display:inline-flex; }
@@ -105,7 +123,7 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 .eq i:nth-child(2){ transform:scaleY(.8); animation-delay:-.3s; } .eq i:nth-child(3){ transform:scaleY(.55); animation-delay:-.6s; }
 .is-speaking .eq i{ animation:eq .9s ease-in-out infinite; }
 @keyframes eq{ 0%,100%{ transform:scaleY(.35); } 50%{ transform:scaleY(1); } }
-.lang{ display:inline-flex; align-items:center; height:var(--btn-h); padding:0 .45em; border:0; background:none; font:400 var(--btn-fs)/1 var(--font); color:var(--mute); cursor:pointer; }
+.lang{ display:inline-flex; align-items:center; height:var(--btn-h); padding:0 .45em; border:0; background:none; font:var(--w-btn) var(--btn-fs)/1 var(--font-text); color:var(--mute); cursor:pointer; }
 .lang[aria-pressed="true"]{ color:var(--fg); text-decoration:underline; text-underline-offset:.2em; text-decoration-thickness:1px; }
 
 /* ---------- голова ---------- */
@@ -114,12 +132,16 @@ body[data-view="hero"] .topnav{ transform:translateY(calc(var(--u) * .9)); }
 /* каталог и кейс: сцена сжимается в кружок в углу; серый диск проявляется, когда она уже почти доехала */
 .stage.is-corner,.corner-probe{ top:calc(100% - var(--corner) - var(--corner-b)); left:calc(100% - var(--corner) - var(--corner-r)); width:var(--corner); height:var(--corner); }
 .stage.is-corner{ border-radius:50%; overflow:hidden; background:#D9D9D9; z-index:35;
-  transition:top .7s var(--ease), left .7s var(--ease), width .7s var(--ease), height .7s var(--ease), border-radius .7s var(--ease), background-color .25s linear .4s; }
+  transition:top .7s var(--ease), left .7s var(--ease), width .7s var(--ease), height .7s var(--ease), border-radius .7s var(--ease), background-color .25s linear .4s, opacity .35s ease; }
+/* каталог: головы нет — кружок гаснет; из каталога в кейс он проявляется на своём месте в углу. Реплик и «Звука» в каталоге тоже нет */
+body[data-view="work"] .stage{ opacity:0; visibility:hidden; pointer-events:none;
+  transition:top .7s var(--ease), left .7s var(--ease), width .7s var(--ease), height .7s var(--ease), border-radius .7s var(--ease), opacity .25s ease, visibility 0s linear .25s; }
+body[data-view="work"] .subs,body[data-view="work"] [data-sound]{ display:none !important; }
 .corner-probe{ position:fixed; visibility:hidden; pointer-events:none; }   /* двойник кружка: по нему голова знает, куда лететь */
 .no-webgl .stage{ display:none; }
 .glasses-layer{ position:fixed; inset:0; z-index:55; width:100%; height:100%; pointer-events:none; }   /* снятые очки рисуются поверх размытия — резкими */
 /* сюда попадает только сообщение, если содержимое сайта не загрузилось; обычная загрузка — без текста и процентов */
-.loader{ position:fixed; inset:0; z-index:5; display:grid; place-content:center; gap:4px; padding:0 24px; text-align:center; font-size:clamp(17px, calc(var(--u) * 1.6), 28px); line-height:1.2; pointer-events:none; }
+.loader{ font-family:var(--font); position:fixed; inset:0; z-index:5; display:grid; place-content:center; gap:4px; padding:0 24px; text-align:center; font-size:clamp(17px, calc(var(--u) * 1.6), 28px); line-height:1.2; pointer-events:none; }
 body:not([data-view="hero"]) .loader{ display:none; }
 /* Пока качается 3D-движок, на месте мозга — розовое размытое пятно: оно «дышит», а когда движок готов, на его месте
    проступает настоящий мозг (с него начинается сборка головы). Место и размер — доли от рамки головы (--ph-*, их считает раскладка). */
@@ -146,7 +168,7 @@ body:not([data-view="hero"]) .loader{ display:none; }
 .folders .gf.is-dragging .gf-ground{ opacity:.55; transform:translateY(34%) scale(1.12); }
 
 /* ---------- папка: матовое стекло, внутри работы; при наведении они выезжают ---------- */
-.gf{ --gf-back:#D5D9DF; --gf-back2:#C9CED6; --gf-glass:246,247,250; display:block; width:var(--fw); color:var(--fg); text-decoration:none; font-size:clamp(15px, calc(var(--fw) * .078), 26px); line-height:1.12; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; -webkit-tap-highlight-color:transparent; }
+.gf{ --gf-back:#D5D9DF; --gf-back2:#C9CED6; --gf-glass:246,247,250; display:block; width:var(--fw); color:var(--fg); text-decoration:none; font-family:var(--font); font-size:clamp(15px, calc(var(--fw) * .078), 26px); line-height:1.12; user-select:none; -webkit-user-select:none; -webkit-user-drag:none; -webkit-tap-highlight-color:transparent; }
 .gf:focus-visible{ outline:none; }
 .gf:focus-visible .gf-body{ outline:2px solid var(--fg); outline-offset:6px; border-radius:8% / 10%; }
 .gf-body{ position:relative; display:block; aspect-ratio:400/318; }
@@ -224,12 +246,12 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 
 /* Плашка «наклон телефона» (iPhone/iPad): светлая, чтобы не спорить с чёрными кнопками. Появляется сразу, вместе со страницей.
    На телефоне стоит над кнопками, раскладка оставляет под неё место (--tip, js/app.js). */
-.tip{ position:fixed; z-index:45; left:50%; bottom:max(20px, env(safe-area-inset-bottom)); transform:translateX(-50%); display:flex; align-items:center; gap:8px; width:max-content; max-width:calc(100vw - 20px); padding:4px 4px 4px 14px; border-radius:999px; background:#EEEEF0; color:#000; font:400 15px/1.2 var(--font); white-space:nowrap; pointer-events:auto; transition:opacity .25s ease, transform .25s var(--ease); animation:tip-in .35s var(--ease); }
+.tip{ position:fixed; z-index:45; left:50%; bottom:max(20px, env(safe-area-inset-bottom)); transform:translateX(-50%); display:flex; align-items:center; gap:8px; width:max-content; max-width:calc(100vw - 20px); padding:4px 4px 4px 14px; border-radius:999px; background:#EEEEF0; color:#000; font:400 14px/1.2 var(--font-text); white-space:nowrap; pointer-events:auto; transition:opacity .25s ease, transform .25s var(--ease); animation:tip-in .35s var(--ease); }
 .tip.is-out{ opacity:0; transform:translateX(-50%) translateY(8px); pointer-events:none; }
 @keyframes tip-in{ from{ opacity:0; transform:translateX(-50%) translateY(8px); } }
 .tip-text{ min-width:0; white-space:normal; text-wrap:balance; line-height:1.12; }      /* на узком экране текст встаёт в две строки, а не обрезается */
 .tip-ico{ width:20px; height:20px; flex:none; }
-.tip-btn{ flex:none; min-height:40px; padding:0 16px; border:0; border-radius:999px; background:#000; color:#fff; font:400 15px/1 var(--font); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .12s; }
+.tip-btn{ flex:none; min-height:40px; padding:0 16px; border:0; border-radius:999px; background:#000; color:#fff; font:400 14px/1 var(--font-text); cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .12s; }
 .tip-btn:active{ transform:scale(.96); }
 .tip-close{ flex:none; width:40px; height:40px; border:0; border-radius:50%; background:transparent; color:#555; font:400 22px/1 var(--font); cursor:pointer; -webkit-tap-highlight-color:transparent; }
 
@@ -266,8 +288,6 @@ body[data-view="case"] .subs-line:empty{ display:none; }
    Размеры ленты (--cw, --ch, --cb, --cpad) задаёт скрипт; --strip-top — где кончается лента. */
 html.is-cat,html.is-cat body{ overflow:hidden; height:100%; overscroll-behavior:none; }
 html.is-cat .site-footer{ display:none; }
-/* кружок с головой — над правым краем ленты, поменьше, чтобы не спорить с визуалом проекта */
-body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 12), 220px); --corner-b:calc(var(--strip-top, 300px) + clamp(12px, 2vh, 28px)); }
 .catalog{ position:relative; z-index:20; }
 .cat{ position:fixed; inset:0; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; color:var(--fg); }
 .cat.is-dragging,.cat.is-dragging .cat-card{ cursor:grabbing; }
@@ -281,19 +301,18 @@ body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 12), 220px); --corn
 .cat-hero-l{ position:absolute; inset:0; transition:opacity .35s ease, transform .45s var(--ease); }
 .cat-hero-l.is-out{ opacity:0; transform:scale(1.035); }
 .cat-hero-m{ position:absolute; transform:translate(-50%,-50%); }
-.cat-hero-l.is-in .cat-hero-m{ animation:hero-in 1s var(--spring) both; }
-@keyframes hero-in{ from{ opacity:0; transform:translate(-50%,-43%) scale(.9); } }
-.cat-hero-media{ display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 28px 56px rgba(0,0,0,.2)); animation:hero-float 7s ease-in-out infinite; }
-@keyframes hero-float{ 50%{ transform:translateY(-1.4%); } }
+/* появление — как на страницах Apple: без пружинки, плавно всплывает и встаёт; дальше стоит спокойно (движение — в самом видео) */
+.cat-hero-l.is-in .cat-hero-m{ animation:hero-in 1.1s cubic-bezier(.28,.11,.32,1) both; }
+@keyframes hero-in{ from{ opacity:0; transform:translate(-50%,-46%) scale(.95); } }
+.cat-hero-media{ display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 28px 56px rgba(0,0,0,.2)); }
 /* предпросмотр в админке: визуал двигают мышью, колёсико — размер */
 .cat-hero-m.is-edit{ pointer-events:auto; cursor:grab; outline:2px dashed currentColor; outline-offset:8px; }
-.cat-hero-m.is-edit .cat-hero-media{ animation:none; }
 .cat-hero-m.is-moving{ cursor:grabbing; }
-/* …и пунктиром — где текст проекта и где будет кружок с головой (в предпросмотре головы нет): туда визуал лучше не ставить */
+/* …и пунктиром — где текст проекта: туда визуал лучше не ставить */
 .cat.is-edit-hero .cat-info-in{ outline:1px dashed currentColor; outline-offset:10px; }
-body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35; border:2px dashed var(--fg); border-radius:50%; opacity:.6; }
+
 /* текст выбранного проекта */
-.cat-info{ position:absolute; z-index:3; left:var(--cpad); top:calc(var(--hdr) + clamp(8px, 3.5vh, 56px)); width:min(47vw, 900px); bottom:calc(var(--strip-top, 300px) + clamp(16px, 4vh, 48px)); pointer-events:none; }
+.cat-info{ position:absolute; z-index:3; left:var(--cpad); top:calc(var(--hdr) + clamp(8px, 2vh, 30px)); width:min(47vw, 900px); bottom:calc(var(--strip-top, 300px) + clamp(16px, 4vh, 48px)); pointer-events:none; }
 .cat-info-in{ position:absolute; left:0; top:0; width:100%; pointer-events:auto; }
 /* прежний текст уходит быстро, новый входит следом, лесенкой — строки не наслаиваются друг на друга */
 .cat-info-in.is-out{ opacity:0; transform:translateY(-10px); transition:opacity .14s ease, transform .22s var(--ease); pointer-events:none; }
@@ -302,18 +321,20 @@ body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35;
 .cat-info-in.is-in > :nth-child(3){ animation-delay:.19s; }
 .cat-info-in.is-in > :nth-child(4){ animation-delay:.235s; }
 @keyframes info-in{ from{ opacity:0; transform:translateY(18px); } }
-.cat-chip{ display:inline-flex; align-items:center; height:clamp(32px, calc(var(--u) * 2.6), 50px); margin:0 0 clamp(14px, calc(var(--u) * 1.8), 34px); padding:0 1em; border-radius:999px; background:var(--pill); font-size:clamp(15px, calc(var(--u) * 1.3), 24px); line-height:1; }
-.cat-title{ margin:0; font:400 clamp(34px, calc(var(--u) * 4.4), 100px)/1.02 var(--font); letter-spacing:-.012em; text-wrap:balance; }
-.cat-sum{ max-width:34em; margin:clamp(14px, calc(var(--u) * 2), 36px) 0 0; color:var(--mute); font-size:clamp(17px, calc(var(--u) * 1.55), 30px); line-height:1.3; text-wrap:pretty; }
-.cat-acts{ display:flex; flex-wrap:wrap; gap:12px; margin-top:clamp(18px, calc(var(--u) * 2.4), 44px); }
-.cat-likeb{ background:transparent; color:var(--fg); }
-.cat-likeb .heart{ width:1.05em; height:1.05em; fill:none; stroke:currentColor; stroke-width:2; transition:fill .2s, stroke .2s; }
-.cat-likeb[aria-pressed="true"] .heart{ fill:#FF4D6A; stroke:#FF4D6A; }
+.cat-chip{ display:inline-flex; align-items:center; height:clamp(32px, calc(var(--u) * 3.4), 60px); margin:0 0 clamp(14px, calc(var(--u) * 1.9), 36px); padding:0 .95em; border-radius:999px; background:var(--pill); font:400 clamp(15px, calc(var(--u) * 1.35), 25px)/1 var(--font); }
+.cat-title{ margin:0; font:400 calc(clamp(34px, calc(var(--u) * 4.6), 104px) * var(--k-title))/1.06 var(--font); letter-spacing:var(--tr-title); text-wrap:balance; }
+.cat-sum{ max-width:27em; margin:clamp(14px, calc(var(--u) * 2.2), 40px) 0 0; color:var(--mute); font-weight:var(--w-lead); font-size:calc(clamp(16px, calc(var(--u) * 1.6), 28px) * var(--k-text)); line-height:1.45; text-wrap:pretty; }
+/* «Смотреть проект» и лайк — крупнее кнопок шапки; лайк — круглая кнопка-иконка */
+.cat-acts{ display:flex; flex-wrap:wrap; gap:clamp(10px, calc(var(--u) * 1.6), 28px); margin-top:clamp(20px, calc(var(--u) * 3.2), 60px); }
+.cat-acts .btn{ --btn-h:calc(clamp(46px, calc(var(--u) * 4.6), 86px) * var(--k-btn)); --btn-fs:calc(clamp(16px, calc(var(--u) * 1.33), 25px) * var(--k-btn)); padding:0 1.9em; }
+.cat-acts .btn.cat-likeb{ width:var(--btn-h); padding:0; background:transparent; color:var(--fg); }
+.cat-likeb .heart{ width:36%; height:36%; fill:none; stroke:currentColor; stroke-width:2; overflow:visible; transition:fill .2s, stroke .2s; }
+.cat-likeb[aria-pressed="true"] .heart{ fill:var(--heart); stroke:var(--heart); }
 .cat-likeb.is-pop .heart{ animation:heart-pop .55s var(--spring); }
 @keyframes heart-pop{ 35%{ transform:scale(1.5); } }
 /* лента карточек */
 .cat-strip{ position:absolute; z-index:1; left:0; right:0; bottom:var(--cb); height:var(--ch); }
-.cat-card{ position:absolute; left:0; top:0; width:var(--cw); height:var(--ch); padding:0; border:0; border-radius:calc(var(--ch) * .12); overflow:hidden; background:rgba(255,255,255,.16); cursor:pointer;
+.cat-card{ position:absolute; left:0; top:0; width:var(--cw); height:var(--ch); padding:0; border:0; border-radius:calc(var(--ch) * var(--r-card)); overflow:hidden; background:rgba(255,255,255,.16); cursor:pointer;
   transform-origin:0 50%; will-change:transform; box-shadow:0 18px 40px rgba(0,0,0,.18); transition:box-shadow .4s var(--ease); -webkit-tap-highlight-color:transparent; }
 .cat-card-m{ position:absolute; inset:0; }
 .cat-card-media{ display:block; width:100%; height:100%; object-fit:cover; transition:transform .9s var(--ease); pointer-events:none; }
@@ -322,11 +343,21 @@ body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35;
 .cat-card:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--fg), 0 0 0 6px rgba(0,0,0,.35); }
 /* сердечко на карточке — только там, где посетитель сам поставил лайк */
 .cat-like{ position:absolute; z-index:1; top:clamp(8px, calc(var(--ch) * .06), 16px); right:clamp(8px, calc(var(--ch) * .06), 16px); display:grid; place-items:center; width:clamp(30px, calc(var(--ch) * .15), 46px); aspect-ratio:1; border-radius:50%; background:rgba(255,255,255,.95); box-shadow:0 4px 14px rgba(0,0,0,.18); }
-.cat-like .heart{ width:56%; height:56%; fill:#FF4D6A; }
+.cat-like .heart{ width:56%; height:56%; fill:var(--heart); }
 .cat-like.is-pop{ animation:heart-pop .55s var(--spring); }
+/* кнопка видео выбранного проекта (как у Apple): пауза / воспроизвести / повторить, кольцо — сколько проиграно */
+.cat-play{ position:absolute; z-index:4; right:var(--cpad); bottom:calc(var(--strip-top, 300px) + clamp(12px, 2vh, 24px)); width:clamp(38px, calc(var(--u) * 3), 52px); aspect-ratio:1; padding:0; border:0; border-radius:50%;
+  background:var(--pill); color:var(--fg); cursor:pointer; -webkit-backdrop-filter:blur(14px) saturate(1.4); backdrop-filter:blur(14px) saturate(1.4); transition:background-color .2s, transform .12s; -webkit-tap-highlight-color:transparent; }
+.cat-play svg{ position:absolute; inset:0; width:100%; height:100%; }
+.cat-play-i{ fill:currentColor; }
+.cat-play-ring circle{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-dasharray:100; stroke-dashoffset:calc(100 - var(--k, 0) * 100); transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset .3s linear; }
+.cat-play[data-state="replay"] .cat-play-ring circle{ opacity:0; }
+.cat-play:active{ transform:scale(.94); }
+.cat-play:focus-visible{ outline:2px solid var(--fg); outline-offset:3px; }
+@media (hover:hover){ .cat-play:hover{ background:color-mix(in srgb, var(--fg) 24%, transparent); } }
 /* снизу лёгкий градиент: чуть ложится на карточки и затемняет их — глубина */
 .cat-fade{ z-index:2; top:auto; height:min(64vh, calc(var(--strip-top, 300px) * 2.1)); background:linear-gradient(to top, rgba(0,0,0,.4), rgba(0,0,0,.16) 40%, rgba(0,0,0,0)); }
-.cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-size:clamp(20px, calc(var(--u) * 2.2), 44px); }
+.cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-family:var(--font); font-size:clamp(20px, calc(var(--u) * 2.2), 44px); }
 
 /* ---------- кейс ---------- */
 .case{ position:relative; z-index:20; }
@@ -334,29 +365,29 @@ body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35;
 .case-back{ display:inline-flex; align-items:center; gap:.35em; text-decoration:none; line-height:1.2; }
 .case-back span{ border-bottom:1px solid currentColor; }
 .case-back svg{ width:.85em; height:.85em; flex:none; }
-.case-title{ max-width:14em; margin:clamp(18px, 3.4vh, 40px) 0 0; font:400 clamp(40px, 6.4vw, 104px)/.96 var(--font); letter-spacing:-.012em; text-wrap:balance; outline:none; }
-.case-lead{ max-width:30em; margin:.7em 0 0; font-size:clamp(21px, 2vw, 30px); line-height:1.3; text-wrap:pretty; }
+.case-title{ max-width:14em; margin:clamp(18px, 3.4vh, 40px) 0 0; font:400 calc(clamp(40px, 6.4vw, 104px) * var(--k-title))/.96 var(--font); letter-spacing:var(--tr-title); text-wrap:balance; outline:none; }
+.case-lead{ max-width:28em; margin:.8em 0 0; font-weight:var(--w-lead); font-size:calc(clamp(19px, 1.5vw, 27px) * var(--k-text)); line-height:1.42; text-wrap:pretty; }
 .case-facts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:16px clamp(16px, 3vw, 40px); margin:clamp(28px, 5vh, 52px) 0 0; padding:18px 0 0; border-top:1px solid var(--line); }
 .case-facts dt{ color:var(--mute); font-size:.84em; }
 .case-facts dd{ margin:2px 0 0; }
 .case-cover{ display:block; width:100%; height:auto; aspect-ratio:4/3; max-height:min(78vh, 900px); margin:clamp(28px, 5vh, 56px) 0 0; object-fit:cover; border-radius:clamp(14px, 1.6vw, 26px); background:rgba(0,0,0,.08) center/cover no-repeat; box-shadow:0 30px 60px -30px rgba(0,0,0,.45); }   /* пока грузится большая обложка, под ней — её малая копия (js/case.js) */
 /* белый лист с содержанием наезжает на цветную шапку */
-.case-sheet{ position:relative; background:#fff; color:#000; --fg:#000; --on-fg:#fff; --mute:#666; --line:rgba(0,0,0,.14); --pill:rgba(0,0,0,.07); border-radius:clamp(20px, 3vw, 44px) clamp(20px, 3vw, 44px) 0 0; padding:clamp(36px, 7vh, 84px) 0 0; }
+.case-sheet{ position:relative; background:var(--paper); color:var(--ink); --fg:var(--ink); --on-fg:var(--paper); --mute:var(--mute-l); --line:rgba(0,0,0,.14); --pill:rgba(0,0,0,.07); border-radius:clamp(20px, 3vw, 44px) clamp(20px, 3vw, 44px) 0 0; padding:clamp(36px, 7vh, 84px) 0 0; }
 .case-in{ max-width:1280px; margin:0 auto; padding:0 var(--pad-x); }
 .case-results{ display:grid; grid-template-columns:repeat(var(--n,3),minmax(0,1fr)); gap:clamp(16px, 3vw, 40px); }
-.result-v{ margin:0; font:400 clamp(44px, 7vw, 112px)/.95 var(--font); letter-spacing:-.02em; white-space:nowrap; }
+.result-v{ margin:0; font:400 calc(clamp(44px, 7vw, 112px) * var(--k-title))/.95 var(--font); letter-spacing:calc(var(--tr-title) - .008em); white-space:nowrap; }
 .case-results[style*="--n:4"] .result-v,.blk-metrics[style*="--n:4"] .result-v{ font-size:clamp(38px, 5.2vw, 86px); }
 .result-l{ margin:.35em 0 0; color:var(--mute); max-width:16em; line-height:1.25; }
 .case-tldr{ display:grid; grid-template-columns:repeat(var(--n,3),minmax(0,1fr)); gap:clamp(16px, 3vw, 40px); margin-top:clamp(36px, 7vh, 84px); padding-top:22px; border-top:1px solid #000; }
 .case-tldr.is-first{ margin-top:0; padding-top:0; border-top:0; }
 .case-tldr h2{ margin:0 0 .5em; font:400 1em/1.2 var(--font); color:var(--mute); }
-.case-tldr p{ margin:0; font-size:clamp(19px, 1.6vw, 24px); line-height:1.32; text-wrap:pretty; }
+.case-tldr p{ margin:0; font-size:calc(clamp(17px, 1.3vw, 21px) * var(--k-text)); line-height:1.5; text-wrap:pretty; }
 .case-blocks{ margin-top:clamp(44px, 9vh, 110px); display:flex; flex-direction:column; gap:clamp(44px, 9vh, 110px); }
 .blk{ margin:0; min-width:0; }
-.blk h2{ margin:0 0 .55em; font:400 clamp(28px, 3.4vw, 52px)/1.02 var(--font); letter-spacing:-.01em; text-wrap:balance; }
+.blk h2{ margin:0 0 .55em; font:400 calc(clamp(28px, 3.4vw, 52px) * var(--k-title))/1.02 var(--font); letter-spacing:var(--tr-title); text-wrap:balance; }
 .blk--text,.blk-text,.blk-steps{ max-width:700px; }
 .blk-quote{ max-width:900px; }
-.prose p{ margin:0 0 .8em; font-size:clamp(19px, 1.5vw, 23px); line-height:1.45; text-wrap:pretty; }
+.prose p{ margin:0 0 .9em; font-size:calc(clamp(17px, 1.25vw, 21px) * var(--k-text)); line-height:1.55; text-wrap:pretty; }
 .prose p:last-child{ margin-bottom:0; }
 .blk figcaption,.tile figcaption{ margin-top:.7em; color:var(--mute); font-size:.9em; line-height:1.3; max-width:42em; }
 .blk-image img{ display:block; width:100%; height:auto; border-radius:clamp(10px, 1.2vw, 20px); }
@@ -373,13 +404,13 @@ body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35;
 .tile-box img{ position:absolute; left:9%; top:9%; width:82%; height:82%; max-width:none; object-fit:contain; filter:drop-shadow(0 10px 18px rgba(0,0,0,.14)); }
 .tile-box.is-cover img{ left:0; top:0; width:100%; height:100%; object-fit:cover; filter:none; }
 .blk-metrics{ display:grid; grid-template-columns:repeat(var(--n,3),minmax(0,1fr)); gap:clamp(16px, 3vw, 40px); padding:clamp(22px, 4vh, 40px) 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-.blk-quote blockquote{ margin:0; font-size:clamp(24px, 2.8vw, 42px); line-height:1.16; text-wrap:balance; }
+.blk-quote blockquote{ margin:0; font-family:var(--font); font-size:clamp(24px, 2.8vw, 42px); line-height:1.16; text-wrap:balance; }
 .blk-quote blockquote p{ margin:0 0 .5em; } .blk-quote blockquote p:last-child{ margin:0; }
 .blk-quote figcaption{ margin-top:1em; font-size:1em; }
 .blk-steps ol{ margin:0; padding:0; list-style:none; counter-reset:step; }
 .blk-steps li{ display:grid; grid-template-columns:2.2em 1fr; gap:0 .4em; padding:.8em 0; border-top:1px solid var(--line); counter-increment:step; }
 .blk-steps li::before{ content:counter(step); color:var(--mute); }
-.blk-steps h3{ margin:0; font:400 1.12em/1.25 var(--font); }
+.blk-steps h3{ margin:0; font:400 1.2em/1.25 var(--font); }
 .blk-steps p{ grid-column:2; margin:.25em 0 0; color:var(--mute); line-height:1.38; text-wrap:pretty; }
 .blk-palette ul{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:clamp(8px, 1vw, 14px); margin:0; padding:0; list-style:none; }
 .blk-palette li{ display:flex; flex-direction:column; justify-content:flex-end; min-height:clamp(120px, 16vw, 220px); padding:12px 14px; border-radius:clamp(12px, 1.4vw, 22px); background:var(--sw); color:var(--sw-fg,#fff); font-size:.9em; line-height:1.2; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
@@ -390,21 +421,21 @@ body.is-preview[data-view="work"] .corner-probe{ visibility:visible; z-index:35;
 .cmp img{ display:block; width:100%; height:auto; }
 .cmp-after{ position:absolute; inset:0; clip-path:inset(0 0 0 var(--at,50%)); }
 .cmp-after img{ width:100%; height:100%; object-fit:cover; }
-.cmp-tag{ position:absolute; top:12px; padding:.2em .7em .25em; border-radius:999px; background:rgba(0,0,0,.6); color:#fff; font-size:.8em; line-height:1.2; pointer-events:none; }
+.cmp-tag{ position:absolute; top:12px; padding:.2em .7em .25em; border-radius:999px; background:rgba(0,0,0,.6); color:#fff; font-family:var(--font); font-size:.85em; line-height:1.2; pointer-events:none; }
 .cmp-tag--a{ left:12px; } .cmp-tag--b{ right:12px; }
 .cmp-bar{ position:absolute; top:0; bottom:0; left:var(--at,50%); width:2px; margin-left:-1px; background:#fff; box-shadow:0 0 0 1px rgba(0,0,0,.25); pointer-events:none; }
 .cmp-bar::after{ content:''; position:absolute; left:50%; top:50%; width:40px; height:40px; margin:-20px; border-radius:50%; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.3); }
 .cmp input{ position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:ew-resize; }
 .cmp input:focus-visible + .cmp-bar::after{ outline:2px solid #000; outline-offset:2px; }
 .case-tags{ display:flex; flex-wrap:wrap; gap:8px; margin:clamp(44px, 9vh, 110px) 0 0; padding:0; list-style:none; }
-.case-tags li{ padding:.3em .8em .34em; border-radius:999px; background:var(--pill); color:var(--mute); font-size:.9em; line-height:1.15; }
+.case-tags li{ padding:.3em .8em .34em; border-radius:999px; background:var(--pill); color:var(--mute); font-family:var(--font); font-size:.95em; line-height:1.15; }
 .case-end{ display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:clamp(24px, 5vw, 80px); margin-top:clamp(56px, 11vh, 140px); padding:clamp(28px, 5vh, 56px) 0 clamp(120px, 20vh, 220px); border-top:1px solid #000; }
-.case-contact p{ max-width:18em; margin:0 0 .8em; font-size:clamp(26px, 3.2vw, 50px); line-height:1.04; text-wrap:balance; }
+.case-contact p{ max-width:18em; margin:0 0 .8em; font-family:var(--font); font-size:clamp(26px, 3.2vw, 50px); line-height:1.04; text-wrap:balance; }
 .case-contact .row{ display:flex; flex-wrap:wrap; gap:10px; }
 .case-next{ padding:calc(var(--u) * 6) calc(var(--corner) * .5 + var(--u) * 4) 0 0; }
 .case-next .gf{ --fw:clamp(200px, 20vw, 300px); margin:0 auto; }
 
-.site-footer{ position:relative; z-index:20; display:flex; flex-wrap:wrap; gap:8px 28px; padding:22px var(--pad-x) 40px; background:#fff; color:#666; font-size:.84em; }
+.site-footer{ position:relative; z-index:20; display:flex; flex-wrap:wrap; gap:8px 28px; padding:22px var(--pad-x) 40px; background:var(--paper); color:var(--mute-l); font-size:.84em; }
 body:not([data-view="case"]) .site-footer{ display:none; }
 
 /* ---------- «столбик»: телефон и планшет в портретной ориентации ----------
@@ -412,11 +443,12 @@ body:not([data-view="case"]) .site-footer{ display:none; }
    чистый (js/content.js, heroFolders); если их включить в админке, они встают лентой над кнопками.
    То же условие — в js/content.js (STACK). */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
-  :root{ --btn-h:48px; --btn-fs:17px; --bar:calc(var(--btn-h) + 14px + max(12px, env(safe-area-inset-bottom))); --corner:76px; --corner-r:14px; }
-  body[data-view="case"]{ --corner:68px; --corner-r:12px; }
+  :root{ --btn-h:calc(48px * var(--k-btn)); --btn-fs:calc(16px * var(--k-btn)); --bar:calc(var(--btn-h) + 14px + max(12px, env(safe-area-inset-bottom))); --corner:76px; --corner-r:14px; }
+  body[data-view="case"],body[data-view="work"]{ --corner:68px; --corner-r:12px; }
   .topbar{ grid-template-columns:1fr; padding-top:max(var(--pad-top), env(safe-area-inset-top)); }
   .topbar-side{ position:absolute; top:max(4px, env(safe-area-inset-top)); right:8px; }
   .lang{ height:36px; font-size:15px; }
+  .cv-pre{ display:none; }      /* в нижней панели места мало: просто «CV» */
   /* кнопки — в нижней панели, под большим пальцем */
   .topnav,body[data-view="hero"] .topnav{ position:fixed; left:0; right:0; bottom:0; z-index:41; justify-self:stretch; gap:10px; padding:8px 10px max(12px, env(safe-area-inset-bottom)); transform:none; transition:none; }
   /* главное действие — «Все работы» — залито и шире; CV и «Звук» — контуром: на экране одна чёрная кнопка, а не три */
@@ -425,8 +457,6 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   body:not([data-view="hero"]) .topnav{ background:rgba(255,255,255,.9); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); --fg:#000; --on-fg:#fff; }
   .stage.is-corner,.corner-probe{ top:calc(100% - var(--bar) - var(--corner) - 10px); left:calc(100% - var(--corner) - var(--corner-r)); }
   body:not([data-view="hero"]) .subs{ right:calc(var(--corner) + var(--corner-r) + 10px); bottom:calc(var(--bar) + 10px + var(--corner) * .5); max-width:calc(100vw - var(--corner) - var(--corner-r) - 26px); font-size:16px; line-height:1.25; }
-  body[data-view="work"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); }
-  body[data-view="work"] .subs-line:empty{ display:none; }
   /* плашка наклона: на чистом экране — в 8 точках над кнопками, место под неё оставляет раскладка (TIP_SLOT в js/app.js);
      с лентой папок места внизу нет — она встаёт наверху */
   .tip{ top:max(5px, env(safe-area-inset-top)); bottom:auto; }
@@ -436,21 +466,20 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .folders{ inset:auto 0 var(--bar) 0; display:flex; align-items:flex-start; gap:22px; padding:calc(var(--mfw,170px) * .4) calc(50% - var(--mfw,170px) / 2) 8px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; pointer-events:auto; -webkit-overflow-scrolling:touch; }
   .folders::-webkit-scrollbar{ display:none; }
   .folders .gf,.folders .gf.is-open{ position:static; flex:none; transform:none; scroll-snap-align:center; scroll-snap-stop:always; cursor:pointer; touch-action:pan-x; }
-  .folders.is-tight .gf-pill{ display:none; }      /* на невысоком экране счётчик уступает место голове */
   .folders .gf:last-child:nth-child(n+3){ order:-1; }
   .folders .gf-title{ margin-left:-14%; margin-right:-14%; color:var(--mute); transition:color .25s; }      /* подпись может быть чуть шире маленькой папки */
   .folders .gf.is-cur .gf-title{ color:var(--fg); }      /* папка в центре ленты — текущая, соседние приглушены */
   /* каталог: визуал сверху, под ним текст проекта, ниже лента карточек; нижняя панель прозрачная — лежит на фоне проекта */
-  body[data-view="work"]{ --corner:64px; }
   body[data-view="work"] .topnav{ background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; --fg:inherit; --on-fg:inherit; }
   .cat-info{ top:auto; bottom:calc(var(--strip-top, 300px) + 18px); left:16px; width:calc(100% - 32px); }
   .cat-info-in{ top:auto; bottom:0; }
-  .cat-chip{ height:30px; margin-bottom:10px; font-size:14px; }
-  .cat-title{ font-size:clamp(26px, 7.6vw, 40px); }
-  .cat-sum{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-top:8px; font-size:16px; }
+  .cat-chip{ height:30px; margin-bottom:10px; font-size:15px; }
+  .cat-title{ font-size:calc(clamp(26px, 7.6vw, 40px) * var(--k-title)); }
+  .cat-sum{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-top:8px; font-size:calc(15px * var(--k-text)); line-height:1.45; }
   .cat-acts{ gap:8px; margin-top:14px; }
-  .cat-acts .btn{ height:44px; font-size:16px; }
+  .cat-acts .btn{ --btn-h:calc(46px * var(--k-btn)); --btn-fs:calc(16px * var(--k-btn)); padding:0 1.4em; }
   .cat-fade{ height:calc(var(--strip-top, 300px) + 30vh); }
+  .cat-play{ right:16px; width:40px; }
   .case-hero{ padding-top:calc(var(--hdr) + 22px); }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
   .site-footer{ padding-bottom:calc(var(--bar) + 24px); }
