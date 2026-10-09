@@ -77,6 +77,11 @@
  },
  "style": {
   "textWeight": 300,
-  "titleTracking": 0
+  "titleTracking": 0,
+  "ink": "#1D1D1F",
+  "paper": "#F4F6F6",
+  "mute": "#6E6E74",
+  "projectBg": "#F5F5F7",
+  "heart": "#FF343A"
  }
 }
