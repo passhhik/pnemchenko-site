@@ -121,7 +121,7 @@
     "Исследования",
     "A/B-тесты"
    ],
-   "published": false,
+   "published": true,
    "hero": {
     "desk": {
      "x": 0.757,
@@ -464,7 +464,7 @@
     "Ключевой визуал",
     "Наружная реклама"
    ],
-   "published": false
+   "published": true
   },
   {
    "slug": "city-posters",
@@ -765,7 +765,7 @@
     "Упаковка",
     "Навигация"
    ],
-   "published": false
+   "published": true
   },
   {
    "slug": "shum-festival",
