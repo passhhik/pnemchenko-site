@@ -121,7 +121,7 @@
     "Исследования",
     "A/B-тесты"
    ],
-   "published": true,
+   "published": false,
    "hero": {
     "desk": {
      "x": 0.757,
@@ -240,7 +240,7 @@
     "Мобайл",
     "Конверсия"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "b2b-analytics",
@@ -353,7 +353,7 @@
     "Data viz",
     "Дизайн-система"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "travel-campaign",
@@ -464,7 +464,7 @@
     "Ключевой визуал",
     "Наружная реклама"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "city-posters",
@@ -557,7 +557,7 @@
     "Типографика",
     "Наружная реклама"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "label-promo",
@@ -649,7 +649,7 @@
     "Соцсети",
     "Музыка"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "zerno-coffee",
@@ -765,7 +765,7 @@
     "Упаковка",
     "Навигация"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "shum-festival",
@@ -858,7 +858,7 @@
     "Моушн",
     "Генеративный дизайн"
    ],
-   "published": true
+   "published": false
   },
   {
    "slug": "breathe-yoga",
@@ -951,7 +951,7 @@
     "Сайт",
     "Гайдлайн"
    ],
-   "published": true
+   "published": false
   }
  ]
 }
