@@ -28,7 +28,10 @@ const slugify = (s) => String(s || '').toLowerCase().replace(/[а-яё]/g, (c) =
 const BLOCKS = {
   text: { name: 'Текст', hint: 'Заголовок и абзацы', make: () => ({ type: 'text', title: '', text: '' }) },
   image: { name: 'Картинка', hint: 'Одна работа крупно', make: () => ({ type: 'image', src: '', alt: '', caption: '', width: 'wide' }) },
-  gallery: { name: 'Галерея', hint: 'Несколько работ плиткой', make: () => ({ type: 'gallery', columns: 2, items: [] }) },
+  gallery: { name: 'Плитки', hint: 'Несколько работ: квадраты, телефоны или карточки с подписью', make: () => ({ type: 'gallery', columns: 2, items: [] }) },
+  idea: { name: 'Идея и лесенка', hint: 'Текст сверху слева, три картинки растут вправо', make: () => ({ type: 'idea', title: '', text: '', items: [] }) },
+  split: { name: 'Картинка и текст', hint: 'Телефон с одной стороны, глава — с другой', make: () => ({ type: 'split', title: '', text: '', src: '', alt: '', side: 'left', shape: 'phone' }) },
+  links: { name: 'Финал со ссылками', hint: 'Заголовок, текст и кнопки: Figma, прототип', make: () => ({ type: 'links', title: '', text: '', items: [{ label: 'Figma', url: '' }] }) },
   metrics: { name: 'Цифры', hint: 'Результаты крупными числами', make: () => ({ type: 'metrics', items: [{ v: '', l: '' }] }) },
   quote: { name: 'Цитата', hint: 'Слова заказчика или коллеги', make: () => ({ type: 'quote', text: '', author: '', role: '' }) },
   steps: { name: 'Шаги', hint: 'Процесс по порядку', make: () => ({ type: 'steps', title: '', items: [{ title: '', text: '' }] }) },
@@ -36,7 +39,11 @@ const BLOCKS = {
   video: { name: 'Видео', hint: 'Запись интерфейса или ролик', make: () => ({ type: 'video', src: '', poster: '', loop: true, caption: '' }) },
   palette: { name: 'Палитра', hint: 'Цвета проекта', make: () => ({ type: 'palette', title: '', colors: [{ hex: '#000000', name: '' }] }) },
 };
-const MAKE = { metric: () => ({ v: '', l: '' }), step: () => ({ title: '', text: '' }), color: () => ({ hex: '#000000', name: '' }) };
+// Банк идей (админка → «Настройки сайта»): концепции, которые ещё не собраны. key — выключатель, когда идея готова
+const IDEAS = [
+  { title: 'Полароид', status: 'концепция', key: '', text: 'Круглая кнопка-полароид рядом с головой (в макете — серый круг справа внизу). Когда голову растягивают в необычную морду, которой ещё не было, кадр «фотографируется» на полароид и уходит в архив снимков: его можно открыть, листать и смеяться. Выключатель появится, когда соберём.' },
+];
+const MAKE = { metric: () => ({ v: '', l: '' }), step: () => ({ title: '', text: '' }), color: () => ({ hex: '#000000', name: '' }), link: () => ({ label: '', url: '' }) };
 
 const st = {
   site: null, projects: [], saved: '', dir: null, mtime: {},
@@ -382,6 +389,7 @@ function IMGLIST(path, o = {}) {
     <ol>${items.map((it, i) => `<li>
       <span class="thumb"><img data-src="${esc(it.src)}" alt=""></span>
       <span><input type="text" class="inp" data-path="${path}.${i}.alt" data-l="1" value="${esc(getL(it.alt))}" placeholder="${esc(st.lang !== defLang() && txDef(it.alt) ? txDef(it.alt) : 'Что на картинке')}" aria-label="Описание картинки ${i + 1}">
+        ${o.caption ? `<input type="text" class="inp" data-path="${path}.${i}.caption" data-l="1" value="${esc(getL(it.caption))}" placeholder="Подпись под картинкой (необязательно)" aria-label="Подпись к картинке ${i + 1}">` : ''}
         <span class="meta">${o.cut ? `<label><input type="checkbox" data-path="${path}.${i}.cut" data-kind="bool"${it.cut ? ' checked' : ''}> без фона</label>` : ''}<span>${esc(fileName(it.src))}</span></span></span>
       ${tools(path, i, items.length, 'картинку')}
     </li>`).join('')}</ol>
@@ -395,11 +403,13 @@ function PAIRS(path, kind) {
       <input type="text" class="inp" data-path="${path}.${i}.l" data-l="1" value="${esc(getL(it.l))}" placeholder="что она значит" aria-label="Подпись к цифре ${i + 1}"></span>`,
     step: (it, i) => `<span class="cells col"><input type="text" class="inp" data-path="${path}.${i}.title" data-l="1" value="${esc(getL(it.title))}" placeholder="Шаг ${i + 1}" aria-label="Название шага ${i + 1}">
       <input type="text" class="inp" data-path="${path}.${i}.text" data-l="1" value="${esc(getL(it.text))}" placeholder="Что сделали и что это дало" aria-label="Описание шага ${i + 1}"></span>`,
+    link: (it, i) => `<span class="cells"><input type="text" class="inp" data-path="${path}.${i}.label" data-l="1" value="${esc(getL(it.label))}" placeholder="Figma" aria-label="Надпись на кнопке ${i + 1}">
+      <input type="text" class="inp" data-path="${path}.${i}.url" value="${esc(it.url || '')}" placeholder="https://…" aria-label="Адрес ссылки ${i + 1}" spellcheck="false" inputmode="url"></span>`,
     color: (it, i) => `<span class="cells hex"><input type="color" data-path="${path}.${i}.hex" data-kind="color" value="${/^#[0-9a-f]{6}$/i.test(it.hex || '') ? it.hex : '#000000'}" aria-label="Цвет ${i + 1}">
       <input type="text" class="inp" data-path="${path}.${i}.hex" data-kind="hex" value="${esc(it.hex || '')}" aria-label="Код цвета ${i + 1}" spellcheck="false">
       <input type="text" class="inp" data-path="${path}.${i}.name" data-l="1" value="${esc(getL(it.name))}" placeholder="Название" aria-label="Название цвета ${i + 1}"></span>`,
   }[kind];
-  const word = { metric: ['цифру', 'Добавить цифру'], step: ['шаг', 'Добавить шаг'], color: ['цвет', 'Добавить цвет'] }[kind];
+  const word = { metric: ['цифру', 'Добавить цифру'], step: ['шаг', 'Добавить шаг'], color: ['цвет', 'Добавить цвет'], link: ['ссылку', 'Добавить ссылку'] }[kind];
   const full = kind === 'metric' && items.length >= 4;
   return `<ol class="pairs">${items.map((it, i) => `<li>${cell(it, i)}${tools(path, i, items.length, word[0])}</li>`).join('')}</ol>
     <div class="f">${full ? '<span class="hint">В ряд помещается четыре цифры.</span>' : `<button class="btn btn--line btn--sm" type="button" data-act="item-add" data-path="${path}" data-make="${kind}">${word[1]}</button>`}</div>`;
@@ -408,13 +418,20 @@ const SAY = (P) => F('Реплика головы', `${P}.say`, { l: 1, hint: '�
 const WIDTH = (P) => F('Ширина', `${P}.width`, { type: 'select', options: [['text', 'В колонку текста'], ['wide', 'Широкая'], ['full', 'Во всю ширину экрана']] });
 
 const BF = {
-  text: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 6, hint: 'Пустая строка — новый абзац.' }) + SAY(P),
+  text: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Проблема: «Родитель выбирает из двух плохих вариантов»' }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 6, hint: 'Пустая строка — новый абзац.' })
+    + F('Выравнивание', `${P}.align`, { type: 'select', kind: 'opt', options: [['', 'Само: короткий текст — по центру, длинный — слева'], ['center', 'По центру'], ['left', 'Слева']], hint: 'Глава по центру держится вместе со следующей картинкой или плитками.' }) + SAY(P),
   image: (b, P) => IMG('Картинка', `${P}.src`, { cut: `${P}.cut`, dims: 1 }) + F('Что на картинке', `${P}.alt`, { l: 1, hint: 'Для незрячих и поисковиков.' })
     + F('Подпись', `${P}.caption`, { l: 1 }) + WIDTH(P) + CHECK('Картинка без фона — положить на подложку', `${P}.cut`) + COLOR('Цвет подложки', `${P}.bg`, { optional: 1 }) + SAY(P),
   gallery: (b, P) => F('Заголовок', `${P}.title`, { l: 1 })
-    + `<div class="grid2">${F('Колонок', `${P}.columns`, { type: 'select', kind: 'num', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']] })}${F('Картинка в плитке', `${P}.fit`, { type: 'select', kind: 'opt', options: [['', 'Вписать целиком'], ['cover', 'Заполнить плитку']] })}</div>`
-    + COLOR('Цвет плиток', `${P}.bg`, { optional: 1 }) + IMGLIST(`${P}.items`, { dims: 1 }) + SAY(P),
-  metrics: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + PAIRS(`${P}.items`, 'metric') + SAY(P),
+    + `<div class="grid3">${F('Форма плиток', `${P}.shape`, { type: 'select', kind: 'opt', options: [['', 'По картинке'], ['square', 'Квадрат'], ['phone', 'Телефон 330×574'], ['card', 'Карточка с подписью 287×363']] })}${F('Колонок', `${P}.columns`, { type: 'select', kind: 'num', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']] })}${F('Картинка в плитке', `${P}.fit`, { type: 'select', kind: 'opt', options: [['', 'Вписать целиком'], ['cover', 'Заполнить плитку']] })}</div>`
+    + COLOR('Цвет плиток', `${P}.bg`, { optional: 1, hint: 'Пусто — основной цвет на 10%, как в дизайн-системе.' }) + IMGLIST(`${P}.items`, { dims: 1, caption: 1 }) + SAY(P),
+  idea: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Идея: «Родитель управляет доверием, а не запретами»' }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 4 })
+    + `<p class="hint">Три картинки встают лесенкой: низкая, средняя, высокая (как три уровня доверия). Картинка или короткое видео заполняют плитку.</p>` + IMGLIST(`${P}.items`, { dims: 1 }) + COLOR('Цвет плиток', `${P}.bg`, { optional: 1 }) + SAY(P),
+  split: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Решение: «Отказ — это маршрут, а не тупик»' }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 4 })
+    + IMG('Картинка или видео', `${P}.src`, { kind: 'image', dims: 1, hint: 'Экран телефона или короткая запись интерфейса.' }) + F('Что на картинке', `${P}.alt`, { l: 1 })
+    + `<div class="grid2">${F('Картинка', `${P}.side`, { type: 'select', kind: 'opt', options: [['left', 'Слева'], ['right', 'Справа']] })}${F('Форма', `${P}.shape`, { type: 'select', kind: 'opt', options: [['phone', 'Телефон 330×574'], ['square', 'Квадрат']] })}</div>` + COLOR('Цвет плитки', `${P}.bg`, { optional: 1 }) + SAY(P),
+  links: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Границы и следующий шаг' }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 3 }) + PAIRS(`${P}.items`, 'link') + SAY(P),
+  metrics: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Метрики: «Как понять, что это работает»' }) + `<p class="hint">Цифры ещё нет (концепт, не мерили) — оставьте цифру пустой: встанет кружок и подпись «что будем мерить».</p>` + PAIRS(`${P}.items`, 'metric') + SAY(P),
   quote: (b, P) => F('Цитата', `${P}.text`, { l: 1, type: 'area', rows: 4 }) + `<div class="grid2">${F('Кто сказал', `${P}.author`, { l: 1 })}${F('Должность, компания', `${P}.role`, { l: 1 })}</div>` + SAY(P),
   steps: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Как решал' }) + PAIRS(`${P}.items`, 'step') + SAY(P),
   compare: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + IMG('До', `${P}.before.src`, { dims: 1 }) + F('Что на картинке «до»', `${P}.before.alt`, { l: 1 })
@@ -430,6 +447,7 @@ function summaryOf(b) {
     case 'text': return cut(txAny(b.title) || txAny(b.text));
     case 'image': return cut(txAny(b.caption) || txAny(b.alt) || fileName(b.src) || 'картинка не выбрана');
     case 'gallery': return cut(txAny(b.title)) || n(b.items, 'картинка', 'картинки', 'картинок');
+    case 'idea': case 'split': case 'links': return cut(txAny(b.title) || txAny(b.text));
     case 'metrics': return cut((b.items || []).map((m) => txAny(m.v)).filter(Boolean).join(', '));
     case 'quote': return cut(txAny(b.author) || txAny(b.text));
     case 'steps': return cut(txAny(b.title)) || n(b.items, 'шаг', 'шага', 'шагов');
@@ -538,19 +556,26 @@ const PANES = {
   main: (p) => `
     ${F('Название', 'title', { l: 1, ph: 'Онбординг в банке за 3 минуты' })}
     <div class="grid2">${F('Раздел', 'section', { type: 'select', options: (st.site.sections || []).map((s) => [s.id, txAny(s.label)]) })}${F('Год', 'year', { type: 'number', kind: 'num' })}</div>
-    ${F('Коротко о проекте', 'summary', { l: 1, type: 'area', rows: 2, hint: 'Одна-две фразы под заголовком: что сделали и для кого.' })}
+    ${F('Коротко о проекте', 'summary', { l: 1, type: 'area', rows: 2, hint: 'Одна-две фразы: видны в каталоге под названием (на телефоне — до трёх строк).' })}
+    ${F('Слоган в обложке кейса', 'tagline', { l: 1, ph: 'Детский банкинг как модель финансового взросления', hint: 'Под логотипом проекта в цветной обложке кейса. Пусто — берётся «Коротко о проекте».' })}
     <div class="grid2">${F('Роль', 'role', { l: 1, ph: 'Lead Product Designer' })}${F('Клиент', 'client', { l: 1, ph: 'Финтех, B2C' })}</div>
     <div class="grid2">${F('Команда', 'team', { l: 1, ph: '2 дизайнера, 6 разработчиков' })}${F('Срок', 'duration', { l: 1, ph: '4 месяца' })}</div>
+    ${IMG('Логотип клиента', 'clientLogo', { small: 1, max: 600, hint: 'Необязательно. В карточке фактов вместо названия клиента — PNG или SVG на прозрачном фоне, светлый на тёмном цвете проекта.' })}
     ${F('Теги', 'tags', { kind: 'list', l: 1, hint: 'Через запятую.' })}
     ${F('Адрес страницы', 'slug', { kind: 'slug', attrs: 'spellcheck="false"', hint: 'Латиницей. Кейс открывается по адресу …/#/work/адрес. Если поменять его после публикации, старые ссылки перестанут работать.' })}`,
   look: (p) => {
     const c = contrastHTML(p);
     const kind = (p.bg && p.bg.kind) || 'color';
     return `
+    <fieldset class="fs"><legend>Логотип проекта</legend>
+      <p class="hint">Надпись-логотип проекта картинкой (PNG или SVG на прозрачном фоне, как «СВОИ ДЕНЬГИ» в макете). Стоит в цветной обложке кейса и на телефоне в каталоге вместо названия. Пусто — там будет название текстом.</p>
+      ${IMG('Логотип проекта', 'logo', { max: 1600 })}
+    </fieldset>
     <fieldset class="fs"><legend>Карточка в каталоге</legend>
       <p class="hint">Карточка в ленте внизу каталога. Картинка или короткое видео без звука. Видео — как анимации на сайте Apple: проигрывается один раз, когда карточка впервые выехала на экран, и замирает на последнем кадре; выбрали проект — снова с начала. До запуска видна картинка карточки. Нет ни того ни другого — берётся малая копия обложки. На телефоне карточек нет: там проект на весь экран, внизу точки.</p>
       ${IMG('Картинка карточки', 'card.image', { max: 1400, hint: 'Горизонтальная, примерно 3:2. Главное — по центру.' })}
       ${IMG('Видео карточки', 'card.video', { kind: 'video', hint: 'MP4 или WebM без звука, 3–8 секунд, до 3 МБ. Последний кадр должен быть хорош сам по себе — на нём ролик останавливается.' })}
+      ${COLOR('Свечение выбранной карточки', 'glow', { optional: 1, hint: 'Пусто — светлое на тёмном фоне, синее (#5B7FFF) на светлом, как в дизайн-системе.' })}
     </fieldset>
     <fieldset class="fs"><legend>Фон в каталоге</legend>
       <p class="hint">Весь экран каталога, пока выбран этот проект.</p>
@@ -568,7 +593,8 @@ const PANES = {
       ${HEROPOS('desk', 'Компьютер и планшет горизонтально')}
       ${HEROPOS('phone', 'Телефон и планшет вертикально')}
     </fieldset>
-    ${IMG('Обложка', 'cover', { thumb: 'thumb', hint: 'Главная картинка кейса, лучше 4:3. Её малая копия — карточка в каталоге, если своей картинки у карточки нет.' })}
+    ${IMG('Визуал обложки кейса', 'caseVisual', { max: 1800, hint: 'Справа в цветной обложке кейса, может выходить за её край (как свинка в макете). PNG без фона или короткое видео. Пусто — берётся визуал из каталога.' })}
+    ${IMG('Обложка', 'cover', { thumb: 'thumb', hint: 'Запасная картинка проекта, лучше 4:3: её малая копия — карточка в каталоге, если своей нет; она же — визуал кейса, если не задан другой.' })}
     ${IMG('Наклейка на папке', 'sticker', { small: 1, max: 480, hint: 'Знак или иконка проекта на прозрачном фоне: PNG или SVG.' })}
     ${COLOR('Цвет папки', 'folder', { optional: 1, hint: 'Пусто — нейтральное матовое стекло.' })}
     <fieldset class="fs"><legend>Работы проекта</legend>
@@ -637,6 +663,15 @@ function sitePane() {
     <fieldset class="fs"><legend>Пасхалка: плевки</legend>
       <p class="hint">Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.</p>
       ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: 'Отсчёт — от последнего действия посетителя. 0 — выключить. Плевки идут неторопливо, примерно раз в минуту. В предпросмотре админки головы нет, поэтому плевков там не видно: смотрите на сайте после «Опубликовать». Посмотреть, не меняя настройку, — адрес сайта с ?spit=5 (через 5 секунд).' })}
+    </fieldset>
+    <fieldset class="fs"><legend>Звук</legend>
+      <p class="hint">Кнопка «Звук» в шапке: включает голос головы (записанные реплики). По макету её пока нет — голова говорит только субтитрами.</p>
+      ${CHECK('Показывать кнопку «Звук»', 'soundOn')}
+    </fieldset>
+    <fieldset class="fs"><legend>Банк идей</legend>
+      <p class="hint">Задумки, которые ещё не собраны. Выключатель появится у идеи, когда она будет готова к запуску.</p>
+      <ul class="ideas">${IDEAS.map((it) => `<li><b>${esc(it.title)}</b> <span class="hint">— ${esc(it.status)}</span><br><span>${esc(it.text)}</span>${it.key ? CHECK('Включить на сайте', it.key) : ''}</li>`).join('')}</ul>
+      ${F('Свои заметки', 'ideaNotes', { type: 'area', rows: 3, hint: 'Для себя: на сайт не выводится.' })}
     </fieldset>
     <fieldset class="fs"><legend>Лайки</legend>
       <p class="hint">Посетитель ставит лайк проекту в каталоге; сердечко на карточке видит только он сам. Сколько лайков у каждого проекта, считает свой счётчик — облачная функция (как её завести — server/likes/README.md в репозитории сайта). Вставьте сюда её адрес и опубликуйте: числа появятся в списке проектов слева.</p>

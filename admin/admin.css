@@ -227,3 +227,7 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .heropos-h{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
 .grid3{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .pitem-likes{ color:#C2185B; white-space:nowrap; }
+/* банк идей */
+.ideas{ margin:0 0 12px; padding:0; list-style:none; display:grid; gap:12px; }
+.ideas li{ padding:12px 14px; border-radius:12px; background:rgba(0,0,0,.04); line-height:1.4; }
+.ideas li .f{ margin:8px 0 0; }

@@ -9,19 +9,19 @@ const pct = (v) => String(Number(v) / 100);
 
 export const STYLE_GROUPS = [
   { title: 'Цвета', hint: 'Текст и кнопки на светлом фоне, текст на тёмном фоне проекта. Белый или чёрный текст на фоне проекта выбирается по контрасту.', items: [
-    { key: 'paper', label: 'Фон сайта', type: 'color', def: '#FFFFFF', css: '--paper' },
+    { key: 'paper', label: 'Фон сайта', type: 'color', def: '#F4F6F6', css: '--paper' },
     { key: 'ink', label: 'Текст и кнопки', type: 'color', def: '#1D1D1F', css: '--ink' },
-    { key: 'mute', label: 'Второстепенный текст', type: 'color', def: '#6E6E73', css: '--mute-l' },
-    { key: 'inkDark', label: 'Текст на тёмном фоне проекта', type: 'color', def: '#FFFFFF', css: '--ink-dark' },
+    { key: 'mute', label: 'Второстепенный текст', type: 'color', def: '#616263', css: '--mute-l' },
+    { key: 'inkDark', label: 'Текст на тёмном фоне проекта', type: 'color', def: '#F4F6F6', css: '--ink-dark' },
     { key: 'heart', label: 'Лайк', type: 'color', def: '#FF4D6A', css: '--heart' },
     { key: 'projectBg', label: 'Фон проекта, если цвет не задан', type: 'color', def: '#E9E9EC' },
   ] },
   { title: 'Шрифты', hint: 'Заголовки, метки разделов, теги и реплики головы — узкий шрифт; кнопки и тексты — Roboto. Размеры — в процентах от шкалы в css/tokens.css (там же — отступы и кнопки): 100% — ровно как в файле.', items: [
     { key: 'titleSize', label: 'Размер заголовков', type: 'range', def: 100, min: 70, max: 140, step: 1, unit: '%', css: '--k-title', map: pct },
-    { key: 'titleTracking', label: 'Трекинг заголовков', type: 'range', def: -1.2, min: -6, max: 6, step: 0.2, unit: '%', css: '--tr-title', map: (v) => `${Number(v) / 100}em` },
+    { key: 'titleTracking', label: 'Трекинг заголовков', type: 'range', def: 0, min: -6, max: 6, step: 0.2, unit: '%', css: '--tr-title', map: (v) => `${Number(v) / 100}em` },
     { key: 'textSize', label: 'Размер текста', type: 'range', def: 100, min: 80, max: 130, step: 1, unit: '%', css: '--k-text', map: pct },
     { key: 'textWeight', label: 'Насыщенность текста', type: 'select', def: 400, options: W, css: '--w-text' },
-    { key: 'leadWeight', label: 'Описание проекта (каталог, шапка кейса)', type: 'select', def: 400, options: W, css: '--w-lead' },
+    { key: 'leadWeight', label: 'Слоган в обложке кейса', type: 'select', def: 300, options: W, css: '--w-lead' },
     { key: 'btnSize', label: 'Размер кнопок', type: 'range', def: 100, min: 80, max: 130, step: 1, unit: '%', css: '--k-btn', map: pct },
     { key: 'btnWeight', label: 'Насыщенность кнопок', type: 'select', def: 400, options: W, css: '--w-btn' },
   ] },

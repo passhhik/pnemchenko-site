@@ -17,7 +17,8 @@ const SPRING_K = 150;                 // жёсткость «пружины» �
 const SETTLE_MS = 150;                // столько тишины после колёсика — и лента встаёт на проект
 // Визуал проекта, если в админке место не задано: на широком экране — справа, на узком — над текстом
 // x, y — центр в долях экрана; s — сторона квадрата, в который вписан визуал (длинная сторона картинки), в процентах
-export const HERO_DEFAULT = { desk: { x: 0.66, y: 0.4, s: 34 }, phone: { x: 0.5, y: 0.36, s: 80 } };
+// (по макету Figma «Каталог»: на компьютере визуал справа, 670 px высотой при экране 1440×803; на телефоне — по центру под логотипом)
+export const HERO_DEFAULT = { desk: { x: 0.725, y: 0.574, s: 52 }, phone: { x: 0.5, y: 0.44, s: 124 } };
 
 // ---- что показывать у проекта ----
 const firstCut = (p) => (p.artifacts || []).find((a) => a && typeof a === 'object' && a.cut && a.src);
@@ -67,9 +68,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <div class="cat-hero" aria-hidden="true"></div>
       <div class="cat-info" data-info></div>
       <div class="cat-fade" aria-hidden="true"></div>
+      <div class="cat-glow" aria-hidden="true"></div>
       <div class="cat-strip" data-strip role="group" aria-label="${esc(t('work'))}"></div>
       <div class="cat-dots" data-dots role="group" aria-label="${esc(t('work'))}"></div>
-      <button class="cat-likefab" type="button" data-like aria-pressed="false" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       <button class="cat-play" type="button" data-play hidden><svg class="cat-play-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20.5" pathLength="100"/></svg><svg class="cat-play-i" viewBox="0 0 44 44" aria-hidden="true"></svg></button>
       <p class="empty" data-empty hidden>${esc(t('empty'))}</p>
     </div>`;
@@ -81,7 +82,6 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   const empty = root.querySelector('[data-empty]');
   const ctl = root.querySelector('[data-play]');
   const dots = root.querySelector('[data-dots]');
-  const fab = root.querySelector('.cat-likefab');
   const phone = () => S.layout === 'phone';
 
   const S = {
@@ -121,47 +121,51 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     S.W = W; S.H = H;
     S.layout = isStack() ? 'phone' : 'desk';
     const u = Math.min(W, 1.5 * H) / 100;
-    let cw, ch, gap, bottom;
-    if (S.layout === 'phone') {
-      S.pad = 20;
-      cw = Math.min(W * 0.5, 260); ch = cw / 1.45; gap = 12;
-      const bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar')) || 70;
-      bottom = bar + 12;
-    } else {
-      const tok = (n, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || fb;
-      S.pad = tok('--cat-pad', 50);      // отступ слева и шаг ленты — из css/tokens.css
-      gap = tok('--gap-cards', 20);
-      ch = Math.min(clamp(W * 0.245, 230, 560) / 1.53, H * 0.3);
-      cw = ch * 1.53;
-      bottom = clamp(H * 0.035, 14, 44);
-    }
-    S.step = cw + gap; S.cw = cw;
+    // Размеры ленты — из css/tokens.css (Figma: «Карточка проекта», экран 1440×803) и растут или сжимаются вместе с экраном
+    const tok = (n, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || fb;
+    const k = S.layout === 'phone' ? 1 : clamp(Math.min(W / 1440, H / 803), 0.72, 1.4);
+    S.pad = tok('--cat-pad', S.layout === 'phone' ? 20 : 60);
+    const cw = tok('--card-w', 287) * k, ch = tok('--card-h', 208) * k;
+    const aw = tok('--card-active-w', 364) * k, ah = tok('--card-active-h', 287) * k;
+    const gap = tok('--gap-cards', 20) * k, bottom = tok('--strip-bottom', 33) * k;
+    S.cw = cw; S.ch = ch; S.aw = aw; S.ah = ah; S.gap = gap; S.r = tok('--radius-card', 56) * k;
+    S.step = cw + gap;
     const rs = cat.style;
-    rs.setProperty('--cw', `${cw.toFixed(1)}px`);
-    rs.setProperty('--ch', `${ch.toFixed(1)}px`);
+    rs.setProperty('--caw', `${aw.toFixed(1)}px`);
+    rs.setProperty('--cah', `${ah.toFixed(1)}px`);
+    rs.setProperty('--car', `${S.r.toFixed(1)}px`);
     rs.setProperty('--cb', `${bottom.toFixed(1)}px`);
     rs.setProperty('--cpad', `${S.pad.toFixed(1)}px`);
     // где кончается лента — по этой линии встают текст проекта и реплика головы
-    document.body.style.setProperty('--strip-top', `${(ch + bottom).toFixed(1)}px`);
+    document.body.style.setProperty('--strip-top', `${(ah + bottom).toFixed(1)}px`);
   }
 
   // ---------- лента ----------
-  // Карточки стоят от левого края текста: выбранная — первой. Те, что уже позади, уезжают влево, уменьшаются и гаснут.
+  // Карточки стоят от левого поля (Figma: «Каталог»): выбранная — первой, крупнее и со свечением; те, что позади,
+  // уезжают за левый край целиком. Каждая карточка — блок размера выбранной: обычная — он же, уменьшенный
+  // и обрезанный сверху до своих пропорций (287×208 против 364×287); скругление на экране всегда одно — 56.
+  const posOf = (d) => (d >= 1 ? S.pad + S.aw + S.gap + (d - 1) * (S.cw + S.gap) : d >= 0 ? S.pad + d * (S.aw + S.gap) : S.pad + d * (S.cw + S.gap));
   function place() {
     const n = S.cards.length;
+    const si = S.cw / S.aw;
     for (let i = 0; i < n; i++) {
       const d = i - S.p;
-      let x = S.pad + d * S.step, s = 1, o = 1;
-      if (d < 0) { x = S.pad + d * S.step * 0.72; s = clamp(1 + d * 0.1, 0.8, 1); o = clamp(1 + d * 1.15, 0, 1); }
+      const a = clamp(1 - Math.abs(d), 0, 1);                  // насколько карточка «выбрана»: 1 — на месте выбранной
+      const x = posOf(d), s = si + (1 - si) * a;
+      const h = S.ch + (S.ah - S.ch) * a;                        // видимая высота
+      const crop = S.ah - h / s, r = S.r / s;
       const el = S.cards[i];
-      el.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${s.toFixed(3)})`;
-      const op = o.toFixed(2);
-      if (el._o !== op) { el._o = op; el.style.opacity = op; el.style.visibility = o < 0.02 ? 'hidden' : ''; }
+      el.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${s.toFixed(4)})`;
+      const cs = `${crop.toFixed(1)}|${r.toFixed(1)}`;
+      if (el._cs !== cs) { el._cs = cs; el.style.setProperty('--crop', `${crop.toFixed(1)}px`); el.style.setProperty('--cr', `${r.toFixed(1)}px`); }
+      const o = x + S.aw * s < -4 || x > S.W + 4 ? 0 : 1;      // за краем экрана — не рисуем
+      if (el._o !== o) { el._o = o; el.style.visibility = o ? '' : 'hidden'; }
       // видео на карточке — как у Apple: карточка впервые выехала на экран — проигрывается один раз и замирает
       // на последнем кадре; уехала посреди ролика — встаёт и доигрывает, когда вернётся. Выбрали проект — с начала (select)
       const vid = el._v === undefined ? (el._v = el.querySelector('video')) : el._v;
       if (vid) {
-        const seen = S.active && !phone() && o > 0.05 && x < S.W && x + S.cw * s > 0;
+        const vw = S.aw * s, vis = (Math.min(x + vw, S.W) - Math.max(x, 0)) / vw;      // какая доля карточки на экране
+        const seen = S.active && !phone() && vis > 0.5;
         if (!seen) pause(vid);
         else if (!el._ran) { el._ran = true; if (vid.preload === 'none') vid.preload = 'auto'; start(vid); }
         else if (!vid._held) play(vid);
@@ -174,6 +178,9 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
         if (vid && vid.preload === 'none') vid.preload = 'metadata';
       }
     }
+    // свечение стоит на месте выбранной карточки и гаснет, пока лента едет между проектами
+    const g = clamp(1 - Math.abs(S.p - Math.round(S.p)) * 2.5, 0, 1).toFixed(2);
+    if (S.go !== g) { S.go = g; cat.style.setProperty('--glow-o', g); }
     // телефон: ленты не видно — за пальцем идут сами текст и визуал: уезжают влево и гаснут, новый проект въезжает справа
     const f = phone() && S.idx >= 0 ? clamp(S.p - S.idx, -0.6, 0.6) : 0;
     const fk = f.toFixed(3);
@@ -235,7 +242,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.classList.toggle('is-far', many && d > 5);
       el.classList.toggle('is-edge', many && d >= 4 && d <= 5);
     });
-    fab.setAttribute('aria-pressed', String(liked(p.slug)));
+    // свечение карточки — своё у проекта (админка) или по тону фона
+    if (/^#[0-9a-f]{6}$/i.test(String(p.glow || ''))) cat.style.setProperty('--glow', p.glow); else cat.style.removeProperty('--glow');
     // видео выбранной карточки — с начала, один раз (на телефоне карточек нет)
     const cv = !phone() && S.cards[i] && S.cards[i].querySelector('video');
     if (cv) { cv._held = false; S.cards[i]._ran = true; }
@@ -253,15 +261,16 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   }
 
   function infoHTML(p) {
-    const sec = sectionById(p.section);
+    // Figma: «Проект в каталоге». На телефоне вместо названия — логотип проекта картинкой (если он загружен в админке)
     const on = liked(p.slug);
+    const logo = srcOf(p.logo);
     return `<div class="cat-info-in">
-      ${sec ? `<p class="cat-chip">${esc(tx(sec.label))}</p>` : ''}
+      <p class="cat-logo">${logo ? `<img src="${esc(logo)}" alt="${esc(tx(p.title))}" draggable="false" decoding="async">` : ''}</p>
       <h2 class="cat-title">${esc(tx(p.title))}</h2>
       ${tx(p.summary) ? `<p class="cat-sum">${esc(tx(p.summary))}</p>` : ''}
       <div class="cat-acts">
         <a class="btn cat-open" href="#/work/${encodeURIComponent(p.slug)}" draggable="false">${esc(t('openProject'))}</a>
-        <button class="btn cat-likeb" type="button" data-like aria-pressed="${on}" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
+        <button class="btn btn--icon cat-likeb" type="button" data-like aria-pressed="${on}" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       </div>
     </div>`;
   }
@@ -277,6 +286,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const b = bgOf(p);
     const key = `${b.kind}|${b.color}|${b.image}|${b.video}`;
     setTheme({ color: b.color, tone: b.tone });       // тон интерфейса (белый или чёрный текст) и цвет полосы браузера
+    cat.style.setProperty('--cat-c', b.color);        // в этот цвет снизу уходит визуал (градиент)
     if (key === S.bgKey) { bgLayers[S.bgOn].dataset.slug = p.slug; syncCtl(); return; }      // фон тот же, что у прежнего проекта
     S.bgKey = key;
     const prev = bgLayers[S.bgOn], next = bgLayers[1 - S.bgOn];
@@ -301,9 +311,13 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     let w = heroW(pos.s), y = pos.y * S.H;
     const x = pos.x * S.W;
     if (phone()) {
+      // визуал — между логотипом и кнопками «Смотреть»: снизу он уходит в цвет проекта, и логотип с описанием лежат поверх
       const ii = info.querySelector('.cat-info-in:not(.is-out)');
+      const acts = ii && ii.querySelector('.cat-acts');
       const top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 90) + 8;
-      const bottom = ii ? info.offsetTop + ii.offsetTop - 16 : S.H * 0.6;
+      const infoTop = ii ? info.offsetTop + ii.offsetTop : S.H * 0.55;
+      const bottom = acts ? info.offsetTop + ii.offsetTop + acts.offsetTop - 8 : infoTop + 120;
+      cat.style.setProperty('--info-top', `${Math.round(infoTop)}px`);
       if (bottom - top > 60) { w = Math.min(w, bottom - top); y = clamp(y, top + w / 2, bottom - w / 2); }
     }
     return { x, y, w };
@@ -393,14 +407,13 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const p = S.list[S.idx];
     if (!p) return;
     const on = toggleLike(p.slug);
-    [fab, info.querySelector('.cat-info-in:not(.is-out) [data-like]')].forEach((x) => { if (x) x.setAttribute('aria-pressed', String(on)); });
+    [info.querySelector('.cat-info-in:not(.is-out) [data-like]')].forEach((x) => { if (x) x.setAttribute('aria-pressed', String(on)); });
     b.classList.remove('is-pop'); void b.offsetWidth; if (on && !reduced) b.classList.add('is-pop');
     const badge = S.cards[S.idx] && S.cards[S.idx].querySelector('.cat-like');
     if (badge) { badge.hidden = !on; badge.classList.remove('is-pop'); void badge.offsetWidth; if (on && !reduced) badge.classList.add('is-pop'); }
     if (onLike) onLike(p, on);
   };
   info.addEventListener('click', onLikeClick);
-  fab.addEventListener('click', onLikeClick);
   dots.addEventListener('click', (e) => { const d = e.target.closest('[data-dot]'); if (d) goTo(Number(d.dataset.dot)); });
 
   // ---------- прокрутка ----------
@@ -422,7 +435,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     if (!S.active || !S.list.length || e.button > 0) return;
     // листать можно откуда угодно, в том числе начав с «Смотреть проект» (на телефоне она во всю ширину — прямо под пальцем);
     // нажатие, которым кончилось перетаскивание, ссылку не открывает (ниже). Не листают только маленькие кнопки
-    if (e.target.closest('[data-like], [data-play], [data-dots], .cat-hero-m.is-edit')) return;
+    if (e.target.closest('[data-like], [data-play], [data-dot], .cat-hero-m.is-edit')) return;
     S.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, p0: S.p, axis: '', moved: false, hist: [[performance.now(), S.p]] };
     S.dragged = false;
   });

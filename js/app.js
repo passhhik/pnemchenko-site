@@ -95,6 +95,9 @@ function applyContent() {
   $$('[data-cv]').forEach((a) => { if (cv) a.href = cv; if (site.cvFileName) a.download = site.cvFileName; });
   document.body.classList.toggle('no-cv', !cv);
   document.body.classList.toggle('no-likes', site.likesOn !== true);      // лайки включаются в админке («Лайки»); пока выключены
+  // кнопка «Звук» — тоже из админки; выключена — голова молчит, даже если посетитель включал звук раньше
+  document.body.classList.toggle('no-sound', site.soundOn !== true);
+  if (site.soundOn !== true && voice.enabled) { voice.setEnabled(false); els.sound.setAttribute('aria-pressed', 'false'); }
   if (cv && !content.preview) {
     fetch(cv, { method: 'HEAD', cache: 'no-cache' })
       .then((r) => { if (!r.ok) document.body.classList.add('no-cv'); })
@@ -206,6 +209,8 @@ const geo = { subs: null, mobile: false, fw: 220, centered: false, tip: 0 };    
 const tokPx = (name, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fb;
 // высота кнопки шапки — по самой кнопке: в ней уже учтён множитель размера из админки
 const btnH = () => { const b = els.topbar ? [...els.topbar.querySelectorAll('.topnav .btn')].find((x) => x.offsetHeight) : null; return (b && b.offsetHeight) || tokPx('--button-height', 44); };
+// телефон: сколько снизу занимает стеклянная панель вместе с отступом до края экрана
+const barH = () => { const r = els.nav.getBoundingClientRect(); return r.height ? Math.max(0, window.innerHeight - r.top) : 102; };
 function layout() {
   const W = window.innerWidth, H = window.innerHeight, mobile = isStack();
   const u = Math.min(W, 1.5 * H) / 100;                       // единица макета, как --u в стилях
@@ -226,17 +231,20 @@ function layout() {
     hdr = padTop + row + padBot;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else if (!mobile) {
-    padTop = hero ? clamp(H * 0.042, 12, 60) : tokPx('--hdr-top', 20);
-    logoW = hero ? clamp(27 * u, 200, 640) : tokPx('--logo-case', 170);      // на главной логотип — часть композиции с головой, он резиновый
+    // главная (Figma: «Шапка», Главная): логотип 379 при экране 1440×803 — часть композиции с головой, поэтому резиновый;
+    // кейс: логотип 197, кнопки 48, сверху 50, снизу 20 — из css/tokens.css
+    padTop = hero ? clamp(H * 0.037, 12, 60) : tokPx('--hdr-top', 50);
+    logoW = hero ? clamp(31.5 * u, 200, 700) : tokPx('--logo-case', 197);
     const row = hero ? logoW / logoAR : Math.max(btnH(), logoW / logoAR);
-    hdr = hero ? padTop + row : padTop * 2 + row;
+    if (!hero) padBot = tokPx('--hdr-bottom', 20);
+    hdr = hero ? padTop + row : padTop + row + padBot;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else {
     const workM = view === 'work';
     rs.setProperty('--pad-top', hero ? '12px' : workM ? `${Math.round(clamp(H * 0.06, 24, 56))}px` : '8px');      // каталог: над логотипом воздух, как в макете
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
     // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее); в каталоге — по макету, почти половина
-    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, CLEAN_LOGO_MAX) : W / 3) : workM ? Math.min(W * 0.48, 280) : Math.min(W / 3, 36 * logoAR);
+    logoW = hero ? (clean ? Math.min(W * CLEAN_LOGO, CLEAN_LOGO_MAX) : W / 3) : workM ? Math.min(W * 0.59, 280) : Math.min(W / 3, 36 * logoAR);
     const row = hero || workM ? logoW / logoAR : Math.max(36, logoW / logoAR);
     hdr = hero ? padTop + row + 4 : workM ? padTop + row + 8 : padTop * 2 + row;
     logoY = padTop + (row - logoW / logoAR) / 2;
@@ -253,8 +261,9 @@ function layout() {
   const saved = mobile || content.preview ? {} : session.get('folders', {});
   let width, top, subsY, subsW, subsSize, subsH, fw;
   if (!mobile) {
-    // ритм макета: логотип — 3,6u — голова — 3,6u — субтитры (до верха букв), под ними поля побольше
-    subsSize = clamp(2.77 * u, 18, 58);
+    // ритм макета: логотип — 3,6u — голова — 3,6u — субтитры (до верха букв), под ними поля побольше.
+    // Реплика (Figma: «Реплика»): узкий 32, ширина 654 — из css/tokens.css; место — под две строки, третья уходит в поле снизу
+    subsSize = tokPx('--fs-subs', 32);
     subsH = subsSize * SUBS_LH * 2;
     const gapTop = 3.6 * u, gapSubs = 2.9 * u, bottom = Math.max(4 * u, 26);
     const avail = H - hdr - gapTop - gapSubs - subsH - bottom;
@@ -263,7 +272,7 @@ function layout() {
     // лишняя высота: сначала до 3u под субтитры (как в макете), остальное — поровну сверху и снизу
     top = hdr + gapTop + Math.max(0, avail - hh - 3 * u) / 2;
     subsY = top + hh + gapSubs;
-    subsW = Math.min(72 * u, W - 48);
+    subsW = Math.min(tokPx('--subs-w', 654), W - 48);
     fw = clamp(18.5 * u, 150, 400);
     const L = cx - width / 2, R = cx + width / 2;
     folderEls.forEach((el, i) => {
@@ -293,10 +302,10 @@ function layout() {
   } else if (clean) {
     // Телефон, чистый экран: логотип, голова, три строки реплики, кнопки под большим пальцем. Папок нет — свободную
     // высоту не отдаём голове целиком, а оставляем воздухом: чуть больше над головой, остальное — под репликой.
-    subsSize = clamp(0.05 * W, 16, 32);
+    subsSize = tokPx('--fs-subs', 24);
     subsH = subsSize * SUBS_LH * 3;
-    subsW = Math.min(W - 28, subsSize * 30);
-    const bar = els.nav.getBoundingClientRect().height || 66;
+    subsW = W - 40;
+    const bar = barH();
     const gap = 10;                                             // наименьший зазор сверху (от логотипа) и снизу (до кнопок)
     // реплика стоит под подбородком с запасом: когда голова говорит, челюсть опускается
     const chin = (hh) => Math.max(14, hh * 0.06);
@@ -316,10 +325,10 @@ function layout() {
     geo.centered = false;
   } else {
     // телефон с папками: маленький логотип, крупная голова, три строки субтитров, лента папок, кнопки под большим пальцем
-    subsSize = clamp(0.05 * W, 16, 32);
+    subsSize = tokPx('--fs-subs', 24);
     subsH = subsSize * SUBS_LH * 3;
-    subsW = Math.min(W - 28, subsSize * 30);
-    const bar = els.nav.getBoundingClientRect().height || 66;
+    subsW = W - 40;
+    const bar = barH();
     // папки компактные: соседние разделы почти целиком видны по бокам, а высота уходит голове
     fw = clamp(0.2 * H, 116, 0.5 * W);
     rs.setProperty('--mfw', `${fw.toFixed(1)}px`);
@@ -350,7 +359,7 @@ function layout() {
   rs.setProperty('--ph-x', `${(cx - width / 2).toFixed(1)}px`); rs.setProperty('--ph-y', `${top.toFixed(1)}px`);
   rs.setProperty('--ph-w', `${width.toFixed(1)}px`); rs.setProperty('--ph-h', `${(width * ar).toFixed(1)}px`);
   rs.setProperty('--subs-x', `${cx}px`); rs.setProperty('--subs-y', `${subsY.toFixed(1)}px`);
-  rs.setProperty('--subs-w', `${subsW.toFixed(1)}px`); rs.setProperty('--subs-size', `${subsSize.toFixed(2)}px`);
+  rs.setProperty('--subs-bw', `${subsW.toFixed(1)}px`); rs.setProperty('--subs-size', `${subsSize.toFixed(2)}px`);
   rs.setProperty('--tip', `${(clean ? geo.tip : 0).toFixed(1)}px`);
 }
 let raf = 0;

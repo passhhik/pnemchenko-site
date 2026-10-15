@@ -103,6 +103,19 @@ export class Subtitles {
     p.style.width = `${Math.ceil(right - left) + 1 + (cs.boxSizing === 'border-box' ? padL + padR : 0)}px`;
   }
 
+  // На главной реплика — не больше трёх строк (Figma: «Реплика»): длиннее — кегль чуть уменьшается, но не меньше 80%
+  _fit(p) {
+    this.el.style.fontSize = '';
+    if (document.body.dataset.view !== 'hero') return;
+    const base = parseFloat(getComputedStyle(this.el).fontSize) || 0;
+    if (!base) return;
+    for (let k = 1; k > 0.8; k -= 0.05) {
+      if (k < 1) this.el.style.fontSize = `${(base * k).toFixed(2)}px`;
+      const lh = parseFloat(getComputedStyle(p).lineHeight) || base * k * 1.15;
+      if (p.offsetHeight <= lh * 3 + 2) return;
+    }
+  }
+
   async _line(id, alive, more) {
     const text = this.text(id);
     this.srEl.textContent = text.replace(/\n/g, ' ');
@@ -110,6 +123,7 @@ export class Subtitles {
     this.el.innerHTML = '';
     this.el.appendChild(p);
     this.el.classList.remove('is-out');
+    this._fit(p);
     this._hug(p);
     let audio = null;
     if (this.voice.has(id)) audio = await this.voice.play(id);
