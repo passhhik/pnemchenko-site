@@ -6,7 +6,7 @@
 // и пальцем, стрелки. Отпустили — лента мягко встаёт на ближайший проект, и экран целиком перекрашивается под него.
 // Кейс открывается кнопкой «Смотреть проект» или нажатием на уже выбранную карточку.
 import { content, tx, t, esc, srcOf, thumbOf, sectionById, isStack } from './content.js';
-import { setTheme, toneOf } from './theme.js';
+import { setTheme, toneOf, softTextOk, inkOf } from './theme.js';
 import { liked, toggleLike } from './likes.js';
 import { styleValue } from './style.js';
 
@@ -50,6 +50,26 @@ const mediaHTML = ({ video, image, poster = '' }, { cls = '', lazy = false, alt 
 // Сами видео запускаются, только если можно: при «меньше движения» и экономии трафика стоят на первом кадре —
 // запустить их можно кнопкой. Кнопка (пауза / воспроизвести / повторить) — у выбранного проекта, если у него есть видео
 const motionOk = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches && !(navigator.connection && navigator.connection.saveData);
+
+// ---- цвет: фон между проектами смешивается в OKLab — так середина пути между синим и оранжевым не грязно-серая ----
+const hexRgb = (hex) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const toLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const toByte = (c) => { c = clamp(c, 0, 1); return Math.round((c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055) * 255); };
+function oklab([r8, g8, b8]) {
+  const r = toLin(r8), g = toLin(g8), b = toLin(b8);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+function fromOklab([L, A, B]) {
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+  return [toByte(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), toByte(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), toByte(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)];
+}
+// свечение карточки: своё у проекта (админка) или по тону его фона — синее на светлом, светлое на тёмном (как в дизайн-системе)
+const glowOf = (p) => (/^#[0-9a-f]{6}$/i.test(String(p.glow || '')) ? p.glow : bgOf(p).tone === 'dark' ? 'var(--ink-dark)' : 'var(--glow-light)');
 const run = (v) => { const r = v.play(); if (r && r.catch) r.catch(() => {}); };
 const play = (v) => { if (v && v.paused && !v.ended && motionOk()) run(v); };
 const start = (v) => { if (!v) return; try { v.currentTime = 0; } catch (_) { /* ещё не загрузилось */ } if (motionOk()) run(v); };
@@ -68,7 +88,6 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <div class="cat-hero" aria-hidden="true"></div>
       <div class="cat-info" data-info></div>
       <div class="cat-fade" aria-hidden="true"></div>
-      <div class="cat-glow" aria-hidden="true"></div>
       <div class="cat-strip" data-strip role="group" aria-label="${esc(t('work'))}"></div>
       <div class="cat-dots" data-dots role="group" aria-label="${esc(t('work'))}"></div>
       <button class="cat-play" type="button" data-play hidden><svg class="cat-play-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20.5" pathLength="100"/></svg><svg class="cat-play-i" viewBox="0 0 44 44" aria-hidden="true"></svg></button>
@@ -94,9 +113,13 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   // пока каталог закрыт, картинки карточек не качаются (lazy): им не место в очереди с головой; первые подгружает warm()
   function render() {
     S.list = content.projects.slice();
+    // цвета фонов проектов — в пространстве OKLab: между двумя проектами фон смешивается равномерно на глаз (см. place)
+    S.labs = S.list.map((p) => oklab(hexRgb(bgOf(p).color) || [244, 246, 246]));
+    S.ck = '';
     strip.innerHTML = S.list.map((p, i) => {
       const m = cardOf(p);
-      return `<button class="cat-card" type="button" data-i="${i}" aria-label="${esc(tx(p.title))}">
+      return `<button class="cat-card" type="button" data-i="${i}" aria-label="${esc(tx(p.title))}" style="--card-glow:${glowOf(p)}">
+        <span class="cat-card-glow" aria-hidden="true" hidden></span>
         <span class="cat-card-m">${mediaHTML(m, { cls: 'cat-card-media', lazy: !S.active || i > 4 })}</span>
         <span class="cat-like"${liked(p.slug) ? '' : ' hidden'}>${HEART}</span>
       </button>`;
@@ -144,6 +167,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
   // Карточки стоят от левого поля (Figma: «Каталог»): выбранная — первой, крупнее и со свечением; те, что позади,
   // уезжают за левый край целиком. Каждая карточка — блок размера выбранной: обычная — он же, уменьшенный
   // и обрезанный сверху до своих пропорций (287×208 против 364×287); скругление на экране всегда одно — 56.
+  // Свечение (Figma: стиль «Свечение карточки») — у самой карточки и едет вместе с ней: разгорается, пока карточка
+  // въезжает на место выбранной, и гаснет, пока уезжает. Фон экрана тоже идёт за лентой — см. конец place().
   const posOf = (d) => (d >= 1 ? S.pad + S.aw + S.gap + (d - 1) * (S.cw + S.gap) : d >= 0 ? S.pad + d * (S.aw + S.gap) : S.pad + d * (S.cw + S.gap));
   function place() {
     const n = S.cards.length;
@@ -158,6 +183,13 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${s.toFixed(4)})`;
       const cs = `${crop.toFixed(1)}|${r.toFixed(1)}`;
       if (el._cs !== cs) { el._cs = cs; el.style.setProperty('--crop', `${crop.toFixed(1)}px`); el.style.setProperty('--cr', `${r.toFixed(1)}px`); }
+      // свечение — по тому, насколько карточка уже на месте выбранной; у краёв мягче, чтобы не вспыхивало
+      const gw = a * a * (3 - 2 * a), gk = gw < 0.01 ? 0 : Math.round(gw * 100) / 100;
+      if (el._g !== gk) {
+        el._g = gk;
+        const gl = el._gl || (el._gl = el.querySelector('.cat-card-glow'));
+        if (gl) { gl.hidden = !gk; gl.style.opacity = gk ? String(gk) : ''; }
+      }
       const o = x + S.aw * s < -4 || x > S.W + 4 ? 0 : 1;      // за краем экрана — не рисуем
       if (el._o !== o) { el._o = o; el.style.visibility = o ? '' : 'hidden'; }
       // видео на карточке — как у Apple: карточка впервые выехала на экран — проигрывается один раз и замирает
@@ -178,9 +210,15 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
         if (vid && vid.preload === 'none') vid.preload = 'metadata';
       }
     }
-    // свечение стоит на месте выбранной карточки и гаснет, пока лента едет между проектами
-    const g = clamp(1 - Math.abs(S.p - Math.round(S.p)) * 2.5, 0, 1).toFixed(2);
-    if (S.go !== g) { S.go = g; cat.style.setProperty('--glow-o', g); }
+    // Фон экрана идёт за лентой, а не меняется скачком: между двумя проектами его цвет смешивается ровно настолько,
+    // насколько лента доехала до соседа. Тот же цвет у градиента внизу — поэтому под карточками нет «полосы» другого цвета.
+    if (S.labs && S.labs.length) {
+      const m = S.labs.length - 1, q = clamp(S.p, 0, m), i0 = Math.floor(q), f = q - i0;
+      const A = S.labs[i0], B = S.labs[Math.min(i0 + 1, m)];
+      const rgb = fromOklab(f < 1e-4 ? A : [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f]);
+      const ck = rgb.join(',');
+      if (S.ck !== ck) { S.ck = ck; cat.style.setProperty('--cat-c', `rgb(${ck})`); }
+    }
     // телефон: ленты не видно — за пальцем идут сами текст и визуал: уезжают влево и гаснут, новый проект въезжает справа
     const f = phone() && S.idx >= 0 ? clamp(S.p - S.idx, -0.6, 0.6) : 0;
     const fk = f.toFixed(3);
@@ -242,13 +280,14 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       el.classList.toggle('is-far', many && d > 5);
       el.classList.toggle('is-edge', many && d >= 4 && d <= 5);
     });
-    // свечение карточки — своё у проекта (админка) или по тону фона
-    if (/^#[0-9a-f]{6}$/i.test(String(p.glow || ''))) cat.style.setProperty('--glow', p.glow); else cat.style.removeProperty('--glow');
     // видео выбранной карточки — с начала, один раз (на телефоне карточек нет)
     const cv = !phone() && S.cards[i] && S.cards[i].querySelector('video');
     if (cv) { cv._held = false; S.cards[i]._ran = true; }
     if (cv) { if (cv.preload === 'none') cv.preload = 'auto'; start(cv); }
     syncCtl();
+    // описание проекта — вторичным цветом (70%), но не бледнее 4,5:1 на фоне проекта: иначе — основным цветом
+    const bp = bgOf(p);
+    if (softTextOk(inkOf(bp.tone), bp.color)) cat.style.removeProperty('--mute'); else cat.style.setProperty('--mute', 'var(--fg)');
     showInfo(p);
     // фон и визуал меняются чуть позже текста: пока ленту крутят быстро, экран не мигает на каждом проекте
     clearTimeout(S.swapT);
@@ -282,22 +321,22 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     if (!reduced) el.classList.add('is-in');
   }
 
+  // Цвет фона ставит place() — он идёт за лентой. Здесь — тон интерфейса и картинка или видео фона, если они есть:
+  // два слоя поверх цвета сменяются наплывом. У проекта с фоном-цветом слоёв нет вовсе — только цвет.
   function showBg(p) {
     const b = bgOf(p);
-    const key = `${b.kind}|${b.color}|${b.image}|${b.video}`;
+    const key = b.kind === 'color' ? '' : `${b.kind}|${b.image}|${b.video}`;
     setTheme({ color: b.color, tone: b.tone });       // тон интерфейса (белый или чёрный текст) и цвет полосы браузера
-    cat.style.setProperty('--cat-c', b.color);        // в этот цвет снизу уходит визуал (градиент)
-    if (key === S.bgKey) { bgLayers[S.bgOn].dataset.slug = p.slug; syncCtl(); return; }      // фон тот же, что у прежнего проекта
+    if (key === S.bgKey) { if (key) bgLayers[S.bgOn].dataset.slug = p.slug; syncCtl(); return; }      // фон тот же, что у прежнего проекта
     S.bgKey = key;
     const prev = bgLayers[S.bgOn], next = bgLayers[1 - S.bgOn];
     S.bgOn = 1 - S.bgOn;
-    next.style.backgroundColor = b.color;
     next.dataset.slug = p.slug;
     next.innerHTML = b.kind === 'image' ? mediaHTML({ image: b.image }, { cls: 'cat-bg-m' })
       : b.kind === 'video' ? mediaHTML({ video: b.video, poster: b.poster }, { cls: 'cat-bg-m' }) : '';
     next.classList.remove('is-on');
     void next.offsetWidth;
-    next.classList.add('is-on');
+    if (key) next.classList.add('is-on');
     prev.classList.remove('is-on');
     start(next.querySelector('video'));
     syncCtl();

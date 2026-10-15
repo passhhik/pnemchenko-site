@@ -80,7 +80,7 @@ body[data-view="case"].is-scrolled .topbar::before{ opacity:1; }
 .topbar-side{ grid-column:1; justify-self:start; display:flex; gap:2px; }
 /* Логотип — свой слой. На главной он лежит под головой (z-index ниже сцены): голова может его перекрывать,
    когда её тянут вверх или она подпрыгивает. Внутри сайта он часть шапки и стоит над содержимым. Место задаёт скрипт. */
-.logo{ position:fixed; z-index:0; left:calc(50% - var(--logo-w,27vw) / 2); top:var(--logo-y, var(--pad-top)); display:flex; justify-content:center; align-items:center; width:var(--logo-w,27vw); text-decoration:none; color:var(--fg); }
+.logo{ position:fixed; z-index:0; left:calc(50% - var(--logo-w,27vw) / 2); top:var(--logo-y, var(--pad-top)); display:flex; justify-content:center; align-items:center; width:var(--logo-w,27vw); text-decoration:none; color:var(--fg); transition:color .45s ease; }
 body:not([data-view="hero"]) .logo{ z-index:42; }
 .logo-mark{ display:block; width:100%; aspect-ratio:var(--logo-ar, 393/95); visibility:hidden; background:currentColor; -webkit-mask:var(--logo-url) center/contain no-repeat; mask:var(--logo-url) center/contain no-repeat; }
 .logo.is-ready .logo-mark{ visibility:visible; }      /* до загрузки содержимого на месте логотипа пусто, а не чёрная плашка */
@@ -289,6 +289,9 @@ html.is-cat .site-footer{ display:none; }
 .cat{ position:fixed; inset:0; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; color:var(--fg); }
 .cat.is-dragging,.cat.is-dragging .cat-card{ cursor:grabbing; }
 .cat-bg,.cat-hero,.cat-fade{ position:absolute; inset:0; pointer-events:none; }
+/* фон проекта: цвет ставит скрипт каждый кадр, пока едет лента (--cat-c, js/catalog.js → place) — смена плавная, без скачка;
+   картинка или видео фона, если они есть у проекта, лежат поверх цвета двумя слоями и сменяются наплывом */
+.cat-bg{ background-color:var(--cat-c, var(--paper)); }
 .cat-bg-l{ position:absolute; inset:0; overflow:hidden; opacity:0; transition:opacity .7s var(--ease); }
 .cat-bg-l.is-on{ opacity:1; }
 .cat-bg-m{ position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; animation:bg-in 1.6s var(--ease) both; }
@@ -335,13 +338,14 @@ html.is-cat .site-footer{ display:none; }
 .cat-strip{ position:absolute; z-index:2; left:0; right:0; bottom:var(--cb); height:var(--cah); }
 .cat-card{ position:absolute; left:0; bottom:0; width:var(--caw); height:var(--cah); padding:0; border:0; background:none; cursor:pointer;
   transform-origin:0 100%; will-change:transform; -webkit-tap-highlight-color:transparent; }
+/* свечение (Figma: стиль «Свечение карточки», 0 1 132): у самой карточки и едет вместе с ней; яркость — по тому, насколько
+   карточка уже встала на место выбранной (скрипт ставит opacity). Цвет — свой у проекта или по тону его фона */
+.cat-card-glow{ position:absolute; left:0; right:0; bottom:0; top:var(--crop, 0px); border-radius:var(--cr, 56px); pointer-events:none;
+  box-shadow:0 1px var(--glow-blur) var(--card-glow, var(--glow-light)); }
 .cat-card-m{ position:absolute; left:0; right:0; bottom:0; top:var(--crop, 0px); overflow:hidden; border-radius:var(--cr, 56px); background:color-mix(in srgb, var(--fg) 12%, transparent); }
 .cat-card-media{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; }
 .cat-card:focus-visible{ outline:none; }
 .cat-card:focus-visible .cat-card-m{ box-shadow:0 0 0 3px var(--fg); }
-/* свечение выбранной карточки (Figma: стиль «Свечение карточки»): цвет — тон фона или свой у проекта */
-.cat-glow{ position:absolute; z-index:0; left:var(--cpad); bottom:var(--cb); width:var(--caw); height:var(--cah); border-radius:var(--car, 56px); pointer-events:none;
-  box-shadow:0 1px var(--glow-blur) var(--glow, var(--glow-light)); opacity:var(--glow-o, 1); transition:opacity .3s ease; }
 /* сердечко на карточке — только там, где посетитель сам поставил лайк */
 .cat-like{ position:absolute; z-index:1; top:calc(var(--crop, 0px) + 14px); right:14px; display:grid; place-items:center; width:36px; aspect-ratio:1; border-radius:50%; background:rgba(255,255,255,.95); box-shadow:0 4px 14px rgba(0,0,0,.18); }
 .cat-like .heart{ width:56%; height:56%; fill:var(--heart); }
@@ -365,8 +369,10 @@ html.is-cat .site-footer{ display:none; }
 .cat-dot.is-far{ display:none; }
 .cat-dot:focus-visible{ outline:none; }
 .cat-dot:focus-visible i{ outline:2px solid currentColor; outline-offset:3px; }
-/* снизу визуал уходит в цвет проекта (Figma: «Градиент цвета проекта»): карточки и текст лежат на чистом цвете */
-.cat-fade{ z-index:1; top:auto; height:calc(var(--strip-top, 300px) + 60px); background:linear-gradient(to bottom, color-mix(in srgb, var(--cat-c, #000) 0%, transparent), var(--cat-c, transparent) 170px); }
+/* снизу визуал уходит в цвет проекта (Figma: «Градиент цвета проекта»): карточки и текст лежат на чистом цвете.
+   Это тот же цвет фона под маской-градиентом: он меняется вместе с фоном, кадр в кадр, и полосы другого цвета не бывает */
+.cat-fade{ z-index:1; top:auto; height:calc(var(--strip-top, 300px) + 60px); background-color:var(--cat-c, transparent);
+  -webkit-mask-image:linear-gradient(to bottom, transparent, #000 170px); mask-image:linear-gradient(to bottom, transparent, #000 170px); }
 .cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-family:var(--font); font-size:calc(var(--fs-h2) * var(--k-title)); }
 
 /* ---------- кейс (Figma: блоки «Кейс / …») ----------
@@ -380,7 +386,7 @@ html.is-cat .site-footer{ display:none; }
 .cover-text{ position:relative; z-index:2; width:min(57%, 683px); padding:0 0 var(--sp-40) var(--sp-40); }
 .cover-title{ margin:0; outline:none; font:var(--w-title) calc(clamp(48px, 6.4vw, 104px) * var(--k-title))/1 var(--font); letter-spacing:var(--tr-title); text-wrap:balance; }
 .cover-title:not(:has(img)){ padding-top:var(--sp-40); }
-.cover-logo{ display:block; width:100%; max-width:683px; height:auto; }
+.cover-logo{ display:block; width:auto; max-width:min(100%, 683px); max-height:min(261px, 20vw); height:auto; }      /* высокий логотип не разрастается: потолок — высота логотипа «Свои деньги» в макете */
 .cover-lead{ max-width:643px; margin:var(--sp-10) 0 0; font-weight:var(--w-lead); font-size:calc(var(--fs-lead) * var(--k-text)); line-height:var(--lh-lead); text-wrap:pretty; }
 .cover-visual{ position:absolute; z-index:1; right:-4.5%; top:6.6%; width:50.3%; aspect-ratio:1; pointer-events:none; }
 .cover-visual img,.cover-visual video{ display:block; width:100%; height:100%; object-fit:contain; }
@@ -390,7 +396,7 @@ html.is-cat .site-footer{ display:none; }
 .fact dd{ order:-1; margin:0; font:var(--w-title) calc(var(--fs-fact) * var(--k-title))/var(--lh-narrow) var(--font); text-wrap:balance; }
 .fact dd.is-long{ font-size:calc(var(--fs-fact) * .6 * var(--k-title)); }
 .fact dd img{ display:block; height:calc(var(--fs-fact) * 1.15); width:auto; max-width:100%; }
-.fact dt{ font-size:calc(var(--fs-body) * var(--k-text)); line-height:var(--lh-body); opacity:.7; }
+.fact dt{ font-size:calc(var(--fs-body) * var(--k-text)); line-height:var(--lh-body); opacity:var(--cfo, .7); }      /* --cfo: 1, если на цвете проекта 70% бледнее 4,5:1 (js/case.js) */
 /* итоги: цифры и «суть в трёх абзацах» — сразу под фактами, для того, кто читает 30 секунд */
 .case-results{ display:grid; grid-template-columns:repeat(var(--n,3),minmax(0,1fr)); gap:var(--sp-20); margin-top:var(--sp-100); text-align:center; }
 .result-v{ margin:0; font:var(--w-title) calc(var(--fs-cat-title) * 1.15 * var(--k-title))/1 var(--font); letter-spacing:var(--tr-title); white-space:nowrap; }
@@ -426,6 +432,10 @@ html.is-cat .site-footer{ display:none; }
 .tile-box{ position:relative; aspect-ratio:1; border-radius:var(--radius-card); background:var(--tile, color-mix(in srgb, var(--ink) 10%, transparent)); overflow:hidden; }
 .tile-box img,.tile-box video{ position:absolute; left:9%; top:9%; width:82%; height:82%; max-width:none; object-fit:contain; filter:drop-shadow(0 14px 24px rgba(0,0,0,.14)); }
 .tile-box.is-cover img,.tile-box.is-cover video{ left:0; top:0; width:100%; height:100%; object-fit:cover; filter:none; }
+/* серая плашка — место под картинку (Figma: серые прямоугольники в макете кейса); надпись — что сюда встанет */
+.tile-box.is-ph{ display:grid; place-items:center; padding:var(--sp-20); }
+.tile-ph{ max-width:24em; color:var(--mute); font-size:calc(var(--fs-caption) * var(--k-text)); line-height:1.35; text-align:center; text-wrap:balance; }
+.blk-image.is-ph .tile-box{ aspect-ratio:1206 / 593; }
 /* формы плиток: телефон 330×574 — по два с воздухом; карточка 287×363 с подписью — по три по центру */
 .blk-gallery.shape-phone{ grid-template-columns:repeat(var(--cols,2), minmax(0, 330px)); justify-content:space-evenly; }
 .shape-phone .tile-box{ aspect-ratio:330 / 574; }
@@ -537,7 +547,7 @@ body:not([data-view="case"]) .site-footer{ display:none; }
      внизу панель «К голове» / CV. Ленты карточек здесь нет: проекты листаются свайпом (js/catalog.js) */
   body[data-view="work"] .topnav [data-home]{ display:inline-flex; order:-1; }
   .cat{ --dots-b:calc(var(--bar) + 60px); }
-  .cat-strip,.cat-glow{ display:none; }
+  .cat-strip{ display:none; }
   .cat-dots{ display:flex; }
   .cat-info{ top:auto; bottom:calc(var(--dots-b) + 38px); left:var(--cpad); width:calc(100% - var(--cpad) * 2); will-change:transform, opacity; text-align:center; }
   .cat-info-in{ top:auto; bottom:0; display:flex; flex-direction:column; align-items:center; }
@@ -546,7 +556,7 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .cat-title{ max-width:none; text-wrap:balance; }
   .cat-sum{ max-width:362px; margin-top:var(--sp-15); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .cat-acts{ justify-content:center; margin-top:var(--sp-20); }
-  .cat-fade{ top:calc(var(--info-top, 60%) - 80px); height:auto; bottom:0; background:linear-gradient(to bottom, color-mix(in srgb, var(--cat-c, #000) 0%, transparent), var(--cat-c, transparent) 150px); }
+  .cat-fade{ top:calc(var(--info-top, 60%) - 80px); height:auto; bottom:0; -webkit-mask-image:linear-gradient(to bottom, transparent, #000 150px); mask-image:linear-gradient(to bottom, transparent, #000 150px); }
   .cat-hero{ will-change:transform; }
   .cat-play{ right:var(--cpad); bottom:calc(var(--dots-b) - 10px); width:40px; }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }

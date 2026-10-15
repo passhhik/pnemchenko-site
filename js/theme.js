@@ -24,6 +24,23 @@ export function contrastOf(hex, tone) {
   return tone === 'dark' ? 1.05 / (L + 0.05) : (L + 0.05) / 0.05;
 }
 
+// Вторичный текст в дизайн-системе — основной цвет на 70%. На насыщенном фоне проекта такой текст часто бледнее 4,5:1
+// (норма WCAG для обычного текста) — тогда он становится основным цветом целиком. fg — цвет текста, bg — фон (#RRGGBB)
+const rgbOf = (hex) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const lumOf = ([r, g, b]) => { const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
+export function softTextOk(fg, bg, k = 0.7) {
+  const f = rgbOf(fg), b = rgbOf(bg);
+  if (!f || !b) return true;
+  const mix = f.map((v, i) => v * k + b[i] * (1 - k));
+  const a = lumOf(mix), c = lumOf(b);
+  return (Math.max(a, c) + 0.05) / (Math.min(a, c) + 0.05) >= 4.5;
+}
+// цвет текста в токенах сайта (их можно поменять в админке): основной на светлом фоне и на тёмном
+export const inkOf = (tone) => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(tone === 'dark' ? '--ink-dark' : '--ink').trim();
+  return /^#[0-9a-f]{6}$/i.test(v) ? v : tone === 'dark' ? '#F4F6F6' : '#1D1D1F';
+};
+
 // Адрес картинки делаем полным: url() внутри переменной браузер иначе считает от папки со стилями
 const abs = (src) => { try { return new URL(src, document.baseURI).href; } catch (_) { return src; } };
 

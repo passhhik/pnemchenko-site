@@ -4,7 +4,7 @@
 // Блоки и их порядок задаются в content/projects.json (их правит админка). Каждая глава мягко всплывает при прокрутке.
 import { content, tx, t, esc, srcOf, peekItems } from './content.js';
 import { folderHTML } from './folders.js';
-import { setTheme, themeOf, toneOf } from './theme.js';
+import { setTheme, themeOf, toneOf, softTextOk, inkOf } from './theme.js';
 import { heroOf } from './catalog.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -26,6 +26,10 @@ const dims = (o) => (sized(o) ? ` width="${Math.round(o.w)}" height="${Math.roun
 const tile = (bg) => (color(bg) ? ` style="--tile:${color(bg)}"` : '');
 const widthOf = (b, def = 'wide') => (['text', 'wide', 'full'].includes(b.width) ? b.width : def);
 const RING = '<svg class="metric-i" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28.5"/></svg>';
+// Серая плашка — место под картинку, которой ещё нет (как в макете: «1 модель рынка с логотипами»). В содержимом у такой
+// плитки есть поле ph — надпись внутри (может быть пустой). Появится картинка — плашка сама станет картинкой
+const isPh = (it) => !!(it && typeof it === 'object' && !srcOf(it) && 'ph' in it);
+const phLabel = (it) => (tx(it.ph) ? `<span class="tile-ph">${esc(tx(it.ph))}</span>` : '');
 
 // Виды блоков. Новый вид = новая функция здесь + форма в админке (admin/admin.js, BLOCKS и BF).
 const BLOCKS = {
@@ -38,6 +42,7 @@ const BLOCKS = {
 
   image(b, ctx) {
     const src = srcOf(b);
+    if (!src && isPh(b)) return `<figure class="blk blk-image blk--${widthOf(b)} is-ph">${h2(b)}<div class="tile-box is-ph" aria-hidden="true">${phLabel(b)}</div>${cap(b)}</figure>`;
     if (!src) return '';
     const framed = !!(b.cut || color(b.bg));          // вырезанная картинка (без фона) кладётся на подложку
     const extra = dims(b) + (framed && sized(b) ? ` class="is-sized" style="--w:${Math.round(b.w)};--h:${Math.round(b.h)}"` : '');
@@ -46,13 +51,13 @@ const BLOCKS = {
 
   // Плитки: квадраты, телефоны (330×574) или карточки с подписью (287×363) — Figma: «Кейс / Плитка»
   gallery(b, ctx) {
-    const items = (b.items || []).filter((it) => srcOf(it));
+    const items = (b.items || []).filter((it) => srcOf(it) || isPh(it));
     if (!items.length) return '';
     const shape = ['square', 'phone', 'card'].includes(b.shape) ? b.shape : '';
     const cols = clamp(Math.round(Number(b.columns)) || Math.min(shape === 'phone' ? 2 : 3, items.length), 1, 4);
     const cover = (it) => shape === 'phone' || shape === 'card' || (it.fit || b.fit) === 'cover';
     return `<section class="blk blk-tiles blk--${widthOf(b)}">${h2(b)}<div class="blk-gallery${shape ? ` shape-${shape}` : ''}" style="--cols:${cols}">${items.map((it) =>
-      `<figure class="tile"><div class="tile-box${cover(it) ? ' is-cover' : ''}"${tile(it.bg || b.bg)}>${media(srcOf(it), it.alt, dims(it), ctx)}</div>${cap(it)}</figure>`).join('')}</div></section>`;
+      `<figure class="tile"><div class="tile-box${cover(it) ? ' is-cover' : ''}${isPh(it) ? ' is-ph' : ''}"${tile(it.bg || b.bg)}>${isPh(it) ? phLabel(it) : media(srcOf(it), it.alt, dims(it), ctx)}</div>${cap(it)}</figure>`).join('')}</div></section>`;
   },
 
   // Идея и лесенка (глава «Идея» в макете «Свои деньги»): текст сверху слева, три плитки растут вправо
@@ -159,6 +164,7 @@ const telegramUrl = (v) => {
 
 // Визуал обложки: свой (админка → «Визуал обложки кейса»), иначе визуал из каталога, иначе обложка проекта
 function coverVisual(p) {
+  if (p.caseVisual === 'none') return null;                 // визуала нет — обложка только с логотипом и слоганом
   if (srcOf(p.caseVisual)) return { src: srcOf(p.caseVisual), video: isVideo(srcOf(p.caseVisual)) };
   const h = heroOf(p, 'desk');
   if (h.video) return { src: h.video, video: true, poster: h.poster };
@@ -186,7 +192,8 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
   const mail = String(site.email || '').trim(), tg = telegramUrl(site.telegram), cv = tx(site.cv);
   const logo = srcOf(p.logo), vis = coverVisual(p);
   const lead = tx(p.tagline) || tx(p.summary);
-  const cardVars = cc ? `--cc:${esc(cc)};--cf:${ctone === 'dark' ? 'var(--ink-dark)' : 'var(--ink)'}` : '';
+  // подписи фактов — на 70%, но не бледнее 4,5:1 на цвете проекта (иначе целиком)
+  const cardVars = cc ? `--cc:${esc(cc)};--cf:${ctone === 'dark' ? 'var(--ink-dark)' : 'var(--ink)'}${softTextOk(inkOf(ctone), cc) ? '' : ';--cfo:1'}` : '';
   const cardStyle = cardVars ? ` style="${cardVars}"` : '';
 
   root.innerHTML = `
