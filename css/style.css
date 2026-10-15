@@ -38,6 +38,8 @@
   --hdr:96px;                            /* высота шапки — уточняется скриптом */
   --fw:240px;                            /* ширина папки; задаётся там, где папка стоит */
   color-scheme:light;
+  /* зерно: бумага полароида, плёнка снимка, затемнение под карточкой */
+  --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.7 -.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* в кейсе голова не должна мешать чтению: кружок меньше и прижат к краю (в каталоге головы нет, кружок там же — погасший) */
 body[data-view="case"],body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 11), 200px); --corner-r:clamp(12px, calc(var(--u) * 2), 40px); }
@@ -75,7 +77,7 @@ body:not([data-view="hero"]) .topbar{ padding-bottom:var(--pad-bot, var(--pad-to
 .topbar > *{ pointer-events:auto; }
 /* в кейсе под шапкой подложка, чтобы текст и картинки не просвечивали при прокрутке: цвета проекта над его шапкой, белая — над листом */
 .topbar::before{ content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; opacity:0; background:var(--bar-bg, rgba(255,255,255,.9)); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); transition:opacity .3s; }
-body[data-view="case"].is-scrolled .topbar::before{ opacity:1; }
+body[data-view="case"].is-scrolled .topbar::before,body[data-view="archive"].is-scrolled .topbar::before{ opacity:1; }
 /* в каталоге шапка без подложки: логотип и кнопки лежат прямо на фоне проекта */
 .topbar-side{ grid-column:1; justify-self:start; display:flex; gap:2px; }
 /* Логотип — свой слой. На главной он лежит под головой (z-index ниже сцены): голова может его перекрывать,
@@ -235,8 +237,8 @@ body[data-view="hero"] .subs-line .s{ display:inline-block; max-width:100%; }
 .is-touch .subs-line .c.is-on,.is-touch .subs-line .w.is-on .c{ animation:none; }      /* на телефоне буква появляется сразу: меньше перерисовок */
 /* в каталоге и кейсе реплики стоят слева от кружка с головой, по его центру */
 body:not([data-view="hero"]) .subs{ left:auto; right:calc(var(--corner-r) + var(--corner) + clamp(12px, calc(var(--u) * 1.8), 36px)); top:auto; bottom:calc(var(--corner-b) + var(--corner) * .5); width:fit-content; max-width:min(calc(var(--u) * 30), calc(100vw - var(--corner) - var(--corner-r) - 60px)); transform:translateY(50%); text-align:left; font-size:clamp(16px, calc(var(--u) * 1.65), 32px); }
-body[data-view="case"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:0 1px 0 rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08); }
-body[data-view="case"] .subs-line:empty{ display:none; }
+body[data-view="case"] .subs-line,body[data-view="archive"] .subs-line{ display:inline-block; padding:.45em .7em; border-radius:.7em; background:rgba(255,255,255,.88); color:#000; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:0 1px 0 rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08); }
+body[data-view="case"] .subs-line:empty,body[data-view="archive"] .subs-line:empty{ display:none; }
 .is-preview .subs,.is-preview .loader{ display:none; }
 /* предпросмотр в админке: вместо головы — её силуэт, чтобы расставлять папки */
 .is-preview[data-view="hero"] .hero::before{ content:''; position:fixed; left:var(--ph-x); top:var(--ph-y); width:var(--ph-w); height:var(--ph-h); border-radius:48% 48% 50% 50% / 40% 40% 60% 60%; background:#ECECEF; }
@@ -283,7 +285,7 @@ body[data-view="case"] .subs-line:empty{ display:none; }
 /* ---------- каталог: проекты лентой, выбранный — крупно (js/catalog.js) ----------
    Слои снизу вверх: фон проекта (цвет, картинка или видео) → его визуал → лента карточек → градиент снизу → текст.
    Размеры ленты (--cw, --ch, --cb, --cpad) задаёт скрипт; --strip-top — где кончается лента. */
-html.is-cat,html.is-cat body{ overflow:hidden; height:100%; overscroll-behavior:none; }
+html.is-cat,html.is-cat body{ overflow:hidden; height:100%; overscroll-behavior:none; background-color:var(--cat-c, var(--paper)); }
 html.is-cat .site-footer{ display:none; }
 .catalog{ position:relative; z-index:20; }
 .cat{ position:fixed; inset:0; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; color:var(--fg); }
@@ -344,6 +346,9 @@ html.is-cat .site-footer{ display:none; }
   box-shadow:0 1px var(--glow-blur) var(--card-glow, var(--glow-light)); }
 .cat-card-m{ position:absolute; left:0; right:0; bottom:0; top:var(--crop, 0px); overflow:hidden; border-radius:var(--cr, 56px); background:color-mix(in srgb, var(--fg) 12%, transparent); }
 .cat-card-media{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; }
+/* то, что выглядывает за край карточки (Figma: лапы свиньи свисают через край): та же картинка, что под ней, — без обрезки
+   по скруглению. Картинка карточки встаёт по центру своего блока, поэтому и слой поверх — с той же середины (--crop / 2) */
+.cat-card-over{ position:absolute; z-index:1; left:0; top:calc(var(--crop, 0px) / 2); display:block; width:100%; height:auto; max-width:none; pointer-events:none; }
 .cat-card:focus-visible{ outline:none; }
 .cat-card:focus-visible .cat-card-m{ box-shadow:0 0 0 3px var(--fg); }
 /* сердечко на карточке — только там, где посетитель сам поставил лайк */
@@ -373,6 +378,7 @@ html.is-cat .site-footer{ display:none; }
    Это тот же цвет фона под маской-градиентом: он меняется вместе с фоном, кадр в кадр, и полосы другого цвета не бывает */
 .cat-fade{ z-index:1; top:auto; height:calc(var(--strip-top, 300px) + 60px); background-color:var(--cat-c, transparent);
   -webkit-mask-image:linear-gradient(to bottom, transparent, #000 170px); mask-image:linear-gradient(to bottom, transparent, #000 170px); }
+.cat.is-btn-light{ --btn-bg:var(--btn-light-bg); --btn-fg:var(--btn-light-fg); }
 .cat .empty{ position:absolute; z-index:3; left:var(--cpad); top:42%; margin:0; font-family:var(--font); font-size:calc(var(--fs-h2) * var(--k-title)); }
 
 /* ---------- кейс (Figma: блоки «Кейс / …») ----------
@@ -497,9 +503,36 @@ html.is-cat .site-footer{ display:none; }
 .cmp input:focus-visible + .cmp-bar::after{ outline:2px solid #000; outline-offset:2px; }
 .case-tags{ display:flex; flex-wrap:wrap; justify-content:center; gap:var(--sp-10); margin:var(--sp-120) 0 0; padding:0; list-style:none; }
 .case-tags li{ display:inline-flex; align-items:center; height:36px; padding:0 var(--sp-15); border-radius:999px; background:color-mix(in srgb, var(--fg) 7%, transparent); color:var(--mute); font:400 calc(var(--fs-body) * .8) / 1 var(--font-text); }
-.case-end{ display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:var(--sp-60); margin-top:var(--sp-120); padding:var(--sp-50) 0 var(--sp-120); border-top:1px solid var(--line); }
-.case-contact p{ max-width:18em; margin:0 0 var(--sp-20); font-family:var(--font); font-size:calc(var(--fs-h2) * var(--k-title)); line-height:var(--lh-narrow); text-wrap:balance; }
-.case-contact .row{ display:flex; flex-wrap:wrap; gap:var(--sp-20); }
+.case-end{ display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--sp-60); margin-top:var(--sp-120); padding:0 0 var(--sp-120); }
+/* визитка в конце кейса: кружок под голову (она перелетает сюда из угла, js/app.js — dockIn) и контакты */
+.vcard{ --vh:clamp(150px, calc(var(--u) * 17), 250px); position:relative; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:clamp(24px, calc(var(--u) * 4), 60px);
+  padding:clamp(24px, calc(var(--u) * 4), 60px); border-radius:var(--radius-card); background:var(--tile, color-mix(in srgb, var(--ink) 6%, var(--paper))); }
+.vcard-head{ position:relative; width:var(--vh); height:var(--vh); }
+.vcard-ph{ position:absolute; inset:0; border-radius:50%; background:#D9D9D9; }
+.vcard-kicker{ margin:0 0 var(--sp-10); color:var(--mute); text-wrap:balance; }
+.vcard-name{ margin:0; font:var(--w-title) calc(var(--fs-h2) * 1.25 * var(--k-title))/1.02 var(--font); letter-spacing:var(--tr-title); }
+.vcard-role{ margin:var(--sp-5) 0 0; color:var(--mute); }
+.vcard-acts{ display:flex; flex-wrap:wrap; gap:var(--sp-15); margin-top:var(--sp-25); }
+.vcard-links{ margin:var(--sp-15) 0 0; color:var(--mute); font-size:var(--fs-caption); }
+.vcard-links a{ color:inherit; text-decoration-thickness:1px; text-underline-offset:.2em; }
+/* голова в визитке: сцена переехала в кружок и прокручивается вместе со страницей */
+.vcard-head > .stage.is-dock{ position:absolute; z-index:1; inset:0; top:0; left:0; width:100%; height:100%; border-radius:50%; overflow:hidden; background:#D9D9D9; opacity:1; visibility:visible; transition:none; }
+/* реплика головы в визитке — облачко на месте подводки «Есть похожая задача?»: растёт вверх от её нижнего края, в поле карточки,
+   и ничего не сдвигает. Хвостик смотрит на голову. Пока голова не заговорила, облачка нет; договорила — реплика остаётся */
+.vcard-top{ position:relative; }
+.vcard-top:empty{ display:none; }
+.vcard-say{ position:absolute; z-index:2; left:-.15em; bottom:var(--sp-10); width:max-content; max-width:min(100%, 24em); padding:.5em .8em .55em; border-radius:.8em; background:#fff; color:#000;
+  font:400 clamp(16px, calc(var(--u) * 1.35), 20px)/1.2 var(--font); text-align:left; box-shadow:0 1px 0 rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.12);
+  transform-origin:0 100%; transition:opacity .3s var(--ease), transform .45s cubic-bezier(.34,1.5,.5,1); }
+.vcard-say::after{ content:''; position:absolute; right:100%; bottom:.9em; border:8px solid transparent; border-right-color:#fff; border-left-width:0; }
+.vcard:not(.is-said) .vcard-say{ opacity:0; transform:scale(.85); pointer-events:none; }
+.vcard.is-said .vcard-kicker{ visibility:hidden; }
+.vcard-say .subs-line,body[data-view="case"] .vcard-say .subs-line{ display:block; margin:0; padding:0; border-radius:0; background:none; box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none; }
+.confetti{ position:fixed; inset:0; z-index:37; width:100%; height:100%; pointer-events:none; }
+/* «Реплика головы» — точка между блоками: на экране её нет, расстояния между блоками не меняются */
+.case-blocks > .blk.blk-say{ height:1px; margin:0 0 -1px; padding:0; opacity:0; pointer-events:none; }
+.case-blocks > .blk + .blk.blk-say{ margin-top:0; }
+.case-blocks > .blk-text + .blk-say + :is(.blk-image,.blk-tiles,.blk-video,.blk-compare,.blk-metrics,.blk-palette,.blk-steps){ margin-top:var(--sp-40); }
 .case-next{ padding:calc(var(--u) * 6) calc(var(--corner) * .5 + var(--u) * 4) 0 0; }
 .case-next .gf{ --fw:clamp(200px, 20vw, 300px); margin:0 auto; }
 /* появление при прокрутке — один раз, как у Apple: 0,6 с, без пружины */
@@ -511,12 +544,169 @@ html.is-cat .site-footer{ display:none; }
 body:not([data-view="case"]) .site-footer{ display:none; }
 
 
+/* ---------- полароид (js/polaroid.js) и архив полароидов (js/archive.js); Figma: «Полароид», «Архив» ----------
+   Карточка — как настоящий полароид: бумага с холодным отливом, квадратное окно с фото, широкое поле снизу под подпись.
+   Всё внутри неё задано в долях её ширины (единицы cqw), поэтому одна и та же карточка годится для редактора,
+   сетки архива, крупного просмотра и кружка «Архив». Наклейки и их места — в долях карточки (x, y от 0 до 1). */
+.pc{ position:relative; display:block; width:100%; aspect-ratio:281/341; margin:0; padding:6% 6% 0; border:0; border-radius:1.4% / 1.15%;
+  background:linear-gradient(180deg, #E1E2EA 0%, #E6E7EE 68%, #EBEDF1 100%); color:#1D1D1F; text-align:center; container-type:inline-size;
+  box-shadow:0 1px 1px rgba(20,22,40,.16), 0 3px 8px rgba(20,22,40,.12), 0 18px 34px rgba(20,22,40,.14); -webkit-tap-highlight-color:transparent; }
+.pc::before{ content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:var(--noise) 0 0/160px 160px; opacity:.32; mix-blend-mode:multiply; }
+.pc::after{ content:''; position:absolute; left:.6%; right:.6%; bottom:0; height:1.5px; border-radius:50%; background:rgba(66,70,168,.4); pointer-events:none; }   /* синеватый нижний край, как в макете */
+.pc-photo{ position:relative; display:block; aspect-ratio:1; overflow:hidden; background:#2A3030; }
+.pc-photo::after{ content:''; position:absolute; inset:0; z-index:2; pointer-events:none; mix-blend-mode:soft-light; opacity:.6;
+  background:linear-gradient(128deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 36%), var(--noise) 0 0/140px 140px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.16), inset 0 1px 3px rgba(0,0,0,.3); }
+.pc-shot{ display:block; width:100%; height:100%; object-fit:cover; -webkit-user-drag:none; }
+.pc-cap{ position:absolute; z-index:1; left:6%; right:6%; bottom:0; height:22.5%; display:flex; align-items:center; justify-content:center; margin:0; padding:0 1%;
+  font:400 14px/1.15 var(--font); font-size:7.1cqw; color:#1D1D1F; overflow:hidden; overflow-wrap:anywhere; text-wrap:balance; }
+.pc-stks{ position:absolute; z-index:3; inset:0; pointer-events:none; }
+.pc-stk{ position:absolute; display:block; width:30%; height:auto; aspect-ratio:1; transform:translate(-50%,-50%) rotate(var(--r,0deg)); object-fit:contain; -webkit-user-drag:none; user-select:none; }
+.pc-stk img{ display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; -webkit-user-drag:none; user-select:none; }
+
+/* съёмка: рамка видоискателя вокруг головы на время отсчёта и вспышка */
+.pol-finder{ position:fixed; z-index:62; pointer-events:none; color:var(--fg); animation:finder-in .35s var(--ease) both; }
+.pol-finder i{ position:absolute; width:13%; height:13%; border:0 solid currentColor; }
+.pol-finder i:nth-child(1){ left:0; top:0; border-width:3px 0 0 3px; border-top-left-radius:14px; }
+.pol-finder i:nth-child(2){ right:0; top:0; border-width:3px 3px 0 0; border-top-right-radius:14px; }
+.pol-finder i:nth-child(3){ left:0; bottom:0; border-width:0 0 3px 3px; border-bottom-left-radius:14px; }
+.pol-finder i:nth-child(4){ right:0; bottom:0; border-width:0 3px 3px 0; border-bottom-right-radius:14px; }
+.pol-finder b{ position:absolute; right:4%; top:4%; width:12px; height:12px; border-radius:50%; background:#FF3B30; animation:rec 1s steps(2, jump-none) infinite; }
+@keyframes finder-in{ from{ opacity:0; transform:scale(1.06); } }
+@keyframes rec{ 50%{ opacity:.15; } }
+.pol-flash{ position:fixed; inset:0; z-index:75; background:#fff; pointer-events:none; animation:pol-flash .8s cubic-bezier(.2,.6,.3,1) forwards; }
+@keyframes pol-flash{ from{ opacity:.96; } to{ opacity:0; } }
+
+/* редактор: затемнение, карточка, наклейки по бокам, окно с репликой и кнопками */
+.pol{ position:fixed; inset:0; z-index:64; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; color:var(--ink-dark); }
+.pol-scrim{ position:absolute; inset:0; background:rgba(29,29,31,.78); -webkit-backdrop-filter:blur(10px) saturate(.9); backdrop-filter:blur(10px) saturate(.9); opacity:0; transition:opacity .45s ease; }
+.pol-scrim::after{ content:''; position:absolute; inset:0; background:var(--noise) 0 0/220px 220px; opacity:.1; }
+.pol.is-in .pol-scrim{ opacity:1; }
+.pol.is-out .pol-scrim{ opacity:0; transition-duration:.55s; }
+.pol-stage{ position:absolute; inset:0; transform:translateY(var(--kb, 0px)); transition:transform .3s var(--ease); }
+.pol-card{ position:absolute; width:var(--cw, 281px); transform:translate(-50%,-50%) rotate(8deg); perspective:1600px; }
+.pol-turn{ position:relative; transform-style:preserve-3d; }
+.pol-front,.pol-back{ -webkit-backface-visibility:hidden; backface-visibility:hidden; }
+.pol-back{ position:absolute; inset:0; transform:rotateY(180deg); border-radius:1.4% / 1.15%; background:linear-gradient(150deg, rgba(255,255,255,.1), rgba(255,255,255,0) 45%), #1C1D20;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 18px 34px rgba(0,0,0,.3); }
+/* проявка: сначала тёмно-зелёная муть, из неё медленно проступает снимок */
+.pol .pc-shot{ filter:saturate(.12) brightness(.5) contrast(.78) blur(1.6px); transition:filter 3.8s cubic-bezier(.3,.1,.3,1); }
+.pol.is-dev .pc-shot{ filter:none; }
+.pc-dev{ position:absolute; inset:0; z-index:1; background:#1F2829; opacity:.94; pointer-events:none; transition:opacity 3.2s cubic-bezier(.4,.1,.4,1); }
+.pol.is-dev .pc-dev{ opacity:0; }
+/* подпись пишется прямо на карточке */
+textarea.pc-cap{ display:block; width:auto; resize:none; border:0; border-radius:4px; background:transparent; outline:none; padding:5.4% 1% 0; text-align:center; caret-color:#1D1D1F;
+  -webkit-user-select:text; user-select:text; touch-action:manipulation; transition:background-color .2s; }
+textarea.pc-cap::placeholder{ color:#1D1D1F; opacity:.5; }
+textarea.pc-cap:focus{ background:rgba(255,255,255,.4); }
+.pc--edit .pc-stk{ margin:0; padding:0; border:0; background:none; pointer-events:auto; cursor:pointer; -webkit-tap-highlight-color:transparent; }      /* приклеенная — отклеивается нажатием */
+.pc--edit .pc-stk:focus-visible{ outline:2px dashed #1D1D1F; outline-offset:2px; border-radius:22%; }
+.pol.is-dragging,.pol.is-dragging *{ cursor:grabbing !important; }
+/* палитра наклеек: появляются по очереди и чуть покачиваются */
+.pol-pal{ position:absolute; inset:0; pointer-events:none; }
+.pol-st{ position:absolute; left:var(--x); top:var(--y); width:var(--s); height:var(--s); margin:0; padding:0; border:0; border-radius:50%; background:none; pointer-events:auto; cursor:grab; touch-action:none;
+  opacity:0; transform:translate(-50%,-50%) scale(.3); transition:transform .45s var(--spring), opacity .25s ease; transition-delay:calc(var(--i, 0) * 45ms); -webkit-tap-highlight-color:transparent; }
+.pol-st img{ display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; animation:st-bob 3.4s ease-in-out infinite; animation-delay:calc(var(--i, 0) * -.43s); }
+.pol.is-up .pol-st{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+@media (hover:hover){ .pol.is-up .pol-st:hover{ transform:translate(-50%,-50%) scale(1.12) rotate(-6deg); transition-delay:0s; } }
+.pol-st:focus-visible{ outline:2px solid var(--ink-dark); outline-offset:4px; }
+/* наклейку тащат: она приподнята; над другой наклейкой — бледнеет (туда не приклеится); приклеенная в палитре не видна */
+.pol.is-up .pol-st.is-held{ z-index:2; transition:none; transform:translate(-50%,-50%) scale(1.08) rotate(-4deg); filter:drop-shadow(0 12px 14px rgba(0,0,0,.35)); cursor:grabbing; }
+.pol-st.is-held img,.pol-st.is-flying img{ animation-play-state:paused; }
+.pol.is-up .pol-st.is-blocked{ opacity:.55; }
+.pol .pol-st.is-flying{ z-index:3; transition:none; }
+.pol .pol-st.is-used{ visibility:hidden; opacity:0; pointer-events:none; transition:none; }
+.pol.is-out .pol-st{ opacity:0; transform:translate(-50%,-50%) scale(.6); transition-delay:0s; }
+@keyframes st-bob{ 0%,100%{ transform:translateY(0) rotate(0deg); } 50%{ transform:translateY(-4%) rotate(2.5deg); } }
+/* окно с репликой (Figma: 518×184, радиус 56, поле 30, кнопки «Перефоткать» / «Сохранить») */
+.pol-dlg{ position:absolute; left:50%; bottom:max(20px, 5vh); display:flex; flex-direction:column; align-items:center; gap:20px; padding:30px; border-radius:var(--radius-card); background:var(--paper); color:var(--ink);
+  opacity:0; transform:translate(-50%, 24px); transition:opacity .35s ease, transform .5s var(--ease); outline:none; }
+.pol.is-up .pol-dlg{ opacity:1; transform:translate(-50%, 0); }
+.pol.is-out .pol-dlg{ opacity:0; transform:translate(-50%, 24px); transition-duration:.25s; }
+.pol-say{ width:100%; min-height:calc(var(--dfs, 24px) * 1.15 * 2); font:400 var(--dfs, 24px)/1.15 var(--font); text-align:center; text-wrap:balance; }
+.pol-say .subs-line{ margin:0; }
+.pol-acts{ display:flex; justify-content:center; gap:20px; }
+.pol-acts .btn{ min-width:135px; --fg:var(--ink); --on-fg:var(--paper); }
+.pol.is-busy .pol-acts .btn{ pointer-events:none; opacity:.6; }
+.pol-x{ position:absolute; top:var(--pad-top, 30px); right:var(--pad-x); display:grid; place-items:center; width:var(--btn-h); height:var(--btn-h); padding:0; border:0; border-radius:50%; background:transparent; color:var(--ink-dark);
+  box-shadow:inset 0 0 0 1px currentColor; cursor:pointer; opacity:0; transition:opacity .3s ease, background-color .2s, color .2s; }
+.pol-x svg{ width:40%; height:40%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+.pol.is-up .pol-x{ opacity:1; }
+.pol.is-out .pol-x{ opacity:0; }
+@media (hover:hover){ .pol-x:hover{ background:var(--ink-dark); color:var(--ink); } }
+.pol-x:focus-visible{ outline:2px solid var(--ink-dark); outline-offset:3px; }
+/* пока открыта карточка: логотип — над затемнением и светлый, кнопки шапки и реплика под головой убраны */
+.is-pol .logo{ z-index:66; color:var(--ink-dark); }
+.is-pol .topnav,.is-pol .topbar-side,.is-pol .tip,.is-pol .subs{ visibility:hidden; }
+.is-pol .arch-btn{ z-index:66; }
+
+/* кружок «Архив» на главной (Figma: 171 при экране 1440×803, справа внизу): серый диск и две карточки */
+.arch-btn{ --ab:clamp(110px, calc(var(--u) * 14.2), 230px); position:fixed; z-index:30; right:var(--pad-x); bottom:clamp(16px, calc(var(--u) * 2.5), 40px); display:block; width:var(--ab); height:var(--ab);
+  text-decoration:none; -webkit-tap-highlight-color:transparent; animation:view-in .5s ease both; }
+body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
+.arch-disc{ position:absolute; inset:0; border-radius:50%; background:#D9D9D9; transition:transform .45s var(--spring); }
+.arch-mini{ position:absolute; display:block; width:60%; aspect-ratio:281/341; padding:calc(var(--ab) * .036) calc(var(--ab) * .036) 0; border-radius:2px;
+  background:linear-gradient(180deg, #E1E2EA, #EBEDF1); box-shadow:0 1px 1px rgba(20,22,40,.18), 0 6px 14px rgba(20,22,40,.18); transition:transform .45s var(--spring); }
+.arch-mini::after{ content:''; position:absolute; left:2%; right:2%; bottom:0; height:1px; background:rgba(66,70,168,.4); }
+.arch-mini--a{ left:-6%; top:3%; transform:rotate(-21deg); }
+.arch-mini--b{ left:42%; top:21%; transform:rotate(5deg); }
+.arch-ph{ display:block; aspect-ratio:1; overflow:hidden; background:#CDD0D7; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
+.arch-ph img{ display:block; width:100%; height:100%; object-fit:cover; }
+@media (hover:hover){
+  .arch-btn:hover .arch-disc{ transform:scale(1.04); }
+  .arch-btn:hover .arch-mini--a{ transform:translate(-5%,-5%) rotate(-27deg); }
+  .arch-btn:hover .arch-mini--b{ transform:translate(4%,-4%) rotate(9deg); }
+}
+.arch-btn:focus-visible{ outline:none; }
+.arch-btn:focus-visible .arch-disc{ outline:2px solid var(--fg); outline-offset:4px; }
+.arch-btn.is-bump .arch-disc{ animation:arch-bump .6s var(--spring); }
+@keyframes arch-bump{ 40%{ transform:scale(1.12); } }
+/* полароид без мыши: кнопка видна только в фокусе с клавиатуры */
+.pol-a11y{ position:fixed; z-index:31; left:50%; bottom:calc(var(--bar-res, 0px) + 20px); transform:translateX(-50%); min-height:44px; padding:0 18px; border:0; border-radius:999px; background:var(--ink); color:var(--paper); font:400 14px/1 var(--font-text); pointer-events:auto; cursor:pointer; }
+.pol-a11y:not(:focus){ position:absolute; width:1px; height:1px; min-height:0; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.no-pol .pol-a11y,.no-webgl .pol-a11y{ display:none; }
+
+/* страница архива: сетка карточек, каждая чуть повёрнута; при наведении выпрямляется */
+.archive{ position:relative; z-index:20; min-height:100vh; padding:calc(var(--arc-top, var(--hdr)) + clamp(30px, calc(var(--u) * 6), 100px)) var(--pad-x) calc(var(--corner) + 80px); color:var(--fg); }
+.archive:not([hidden]){ animation:view-in .4s ease both; }
+.arc-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:clamp(56px, calc(var(--u) * 7.5), 110px) clamp(28px, calc(var(--u) * 4.6), 72px); max-width:1320px; margin:0 auto; padding:0; list-style:none; }
+.arc-li{ position:relative; display:block; transform:translateY(var(--dy, 0px)); }
+.arc-card{ font:inherit; cursor:pointer; transform:rotate(var(--rot, 0deg)); transition:transform .45s var(--spring), box-shadow .3s ease; }
+@media (hover:hover){ .arc-card:hover{ z-index:2; transform:rotate(0deg) scale(1.04); box-shadow:0 1px 1px rgba(20,22,40,.16), 0 6px 14px rgba(20,22,40,.14), 0 28px 50px rgba(20,22,40,.2); } }
+.arc-card:active{ transform:rotate(0deg) scale(.98); }
+.arc-card:focus-visible{ outline:2px solid var(--fg); outline-offset:6px; }
+.arc-tag{ position:absolute; z-index:4; left:50%; top:-.9em; transform:translateX(-50%) rotate(-2deg); padding:.3em .8em; border-radius:999px; background:var(--ink); color:var(--paper); font:400 12px/1.2 var(--font-text); white-space:nowrap; }
+/* своя карточка — с розовой плашкой и чуть крупнее соседних: «эту оставили вы» */
+.arc-card.is-mine{ box-shadow:0 0 0 3px var(--heart), 0 1px 1px rgba(20,22,40,.16), 0 3px 8px rgba(20,22,40,.12), 0 18px 34px rgba(20,22,40,.14); }
+.arc-card.is-mine .arc-tag{ background:var(--heart); color:#fff; }
+.arc-empty{ max-width:560px; margin:10vh auto 0; text-align:center; font:400 calc(var(--fs-h2) * .8)/1.15 var(--font); text-wrap:balance; }
+.arc-empty p{ margin:0; }
+.arc-empty .btn{ margin-top:var(--sp-30); }
+.arc-note{ margin:var(--sp-40) 0 0; min-height:1.25em; text-align:center; color:var(--mute); font-size:var(--fs-caption); }
+.arc-more{ height:1px; }
+/* карточка крупно */
+.is-lb{ overflow:hidden; }
+.arc-lb{ position:fixed; inset:0; z-index:80; display:grid; place-items:center; }
+.arc-lb-scrim{ position:absolute; inset:0; background:rgba(29,29,31,.84); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); animation:view-in .25s ease both; }
+.arc-lb-fig{ --lw:min(86vw, calc(76vh / 1.2135), 560px); position:relative; width:var(--lw); margin:0; animation:lb-in .35s var(--ease) both; }
+.arc-lb-card{ cursor:default; touch-action:pan-y; }
+.arc-lb-meta{ margin-top:var(--sp-15); text-align:center; color:#C9CCD1; font:400 14px/1.3 var(--font-text); }
+@keyframes lb-in{ from{ opacity:0; transform:translateY(16px) scale(.96) rotate(-2deg); } }
+.arc-lb-btn,.arc-lb-x{ position:absolute; display:grid; place-items:center; width:48px; height:48px; padding:0; border:0; border-radius:50%; background:rgba(244,246,246,.12); color:var(--ink-dark); cursor:pointer; transition:background-color .2s, opacity .2s; -webkit-tap-highlight-color:transparent; }
+.arc-lb-btn svg,.arc-lb-x svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+@media (hover:hover){ .arc-lb-btn:hover:not(:disabled),.arc-lb-x:hover{ background:rgba(244,246,246,.24); } }
+.arc-lb-btn:disabled{ opacity:.25; cursor:default; }
+.arc-lb-btn:focus-visible,.arc-lb-x:focus-visible{ outline:2px solid var(--ink-dark); outline-offset:3px; }
+.arc-lb-prev{ top:50%; left:max(16px, calc(50% - min(86vw, calc(76vh / 1.2135), 560px) / 2 - 88px)); transform:translateY(-50%); }
+.arc-lb-next{ top:50%; right:max(16px, calc(50% - min(86vw, calc(76vh / 1.2135), 560px) / 2 - 88px)); transform:translateY(-50%); }
+.arc-lb-x{ top:max(16px, env(safe-area-inset-top)); right:16px; }
+
 /* ---------- «столбик»: телефон и планшет в портретной ориентации (Figma: режим «Телефон») ----------
    Логотип, голова, реплика; кнопки — в стеклянной панели по центру внизу (Figma: «Панель (телефон)»). Папок разделов
    на главной здесь по умолчанию нет (js/content.js, heroFolders); если их включить в админке, они встают лентой над панелью.
    То же условие — в js/content.js (STACK) и css/tokens.css. */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
-  :root{ --bar-gap:max(var(--bar-bottom), calc(env(safe-area-inset-bottom) + 10px)); --bar:calc(var(--btn-h) + 20px + var(--bar-gap)); --corner:76px; --corner-r:14px; }
+  :root{ --bar-gap:max(var(--bar-bottom), calc(env(safe-area-inset-bottom) + 6px)); --bar:calc(var(--btn-h) + 20px + var(--bar-gap)); --corner:76px; --corner-r:14px; }
   body[data-view="case"],body[data-view="work"]{ --corner:68px; --corner-r:12px; }
   .topbar{ grid-template-columns:1fr; padding-top:max(var(--pad-top), env(safe-area-inset-top)); }
   .topbar-side{ position:absolute; top:max(4px, env(safe-area-inset-top)); right:8px; }
@@ -556,11 +746,48 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .cat-title{ max-width:none; text-wrap:balance; }
   .cat-sum{ max-width:362px; margin-top:var(--sp-15); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .cat-acts{ justify-content:center; margin-top:var(--sp-20); }
-  .cat-fade{ top:calc(var(--info-top, 60%) - 80px); height:auto; bottom:0; -webkit-mask-image:linear-gradient(to bottom, transparent, #000 150px); mask-image:linear-gradient(to bottom, transparent, #000 150px); }
+  /* градиент поднят: визуал уходит в цвет проекта ещё до логотипа — логотип и описание лежат на почти чистом цвете.
+     Ступени маски — по плавной кривой, без заметной границы */
+  .cat-fade{ top:calc(var(--info-top, 60%) - 170px); height:auto; bottom:0;
+    -webkit-mask-image:linear-gradient(to bottom, transparent, rgba(0,0,0,.12) 34px, rgba(0,0,0,.38) 70px, rgba(0,0,0,.68) 108px, rgba(0,0,0,.9) 145px, #000 185px);
+    mask-image:linear-gradient(to bottom, transparent, rgba(0,0,0,.12) 34px, rgba(0,0,0,.38) 70px, rgba(0,0,0,.68) 108px, rgba(0,0,0,.9) 145px, #000 185px); }
   .cat-hero{ will-change:transform; }
   .cat-play{ right:var(--cpad); bottom:calc(var(--dots-b) - 10px); width:40px; }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
   .site-footer{ padding-bottom:calc(var(--bar) + 24px); }
+  /* полароид: кружок «Архив» — слева от кнопок (Figma: 114 при ширине 390); голова и реплика встают над ним (js/app.js, barH) */
+  .arch-btn{ --ab:clamp(84px, calc(100vw - 268px), 114px); left:15px; right:auto; bottom:var(--bar-gap); }
+  .arch-mini--a{ left:1%; top:-2%; }
+  .arch-mini--b{ left:44%; top:20%; }
+  .is-pol .arch-btn{ visibility:hidden; }
+  .folders{ bottom:var(--bar-res, var(--bar)); }
+  .no-folders .tip{ bottom:calc(var(--bar-res, var(--bar)) + 8px); }
+  /* архив: две колонки лесенкой (правая ниже), внизу «К голове» и «Все работы» */
+  .archive{ padding:calc(var(--hdr) + 24px) 12px calc(var(--bar) + 60px); }
+  .arc-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:30px 10px; padding-bottom:22%; }
+  .arc-li:nth-child(even){ transform:translateY(calc(var(--dy, 0px) + 24%)); }
+  body[data-view="archive"] .topnav [data-home]{ display:inline-flex; order:-1; }
+  body[data-view="archive"] .topnav [data-cv]{ display:none; }
+  .arc-tag{ font-size:11px; }
+  .arc-lb-fig{ --lw:min(88vw, calc(66vh / 1.2135), 520px); }
+  .arc-lb-prev,.arc-lb-next{ top:auto; bottom:max(20px, env(safe-area-inset-bottom)); transform:none; }
+  .arc-lb-prev{ left:calc(50% - 64px); }
+  .arc-lb-next{ right:calc(50% - 64px); }
+  /* редактор полароида: окно с репликой — внизу во всю ширину */
+  .pol-dlg{ bottom:max(10px, env(safe-area-inset-bottom)); padding:18px; gap:14px; border-radius:32px; }
+  .pol-acts{ width:100%; gap:10px; }
+  .pol-acts .btn{ flex:1; min-width:0; }
+  .pol-x{ top:max(10px, env(safe-area-inset-top)); right:10px; width:44px; height:44px; }
+}
+/* узкий телефон: панель кнопок уходит вправо, освобождая место кружку архива */
+@media (max-width:599px){
+  body[data-view="hero"]:not(.no-pol) .topnav{ left:auto; right:15px; transform:none; }
+}
+/* планшет в портрете: архив в три колонки, средняя ниже */
+@media (min-width:600px) and (max-width:1024px) and (max-aspect-ratio:17/20){
+  .arc-grid{ grid-template-columns:repeat(3, minmax(0, 1fr)); gap:40px 24px; }
+  .arc-li:nth-child(even){ transform:translateY(var(--dy, 0px)); }
+  .arc-li:nth-child(3n+2){ transform:translateY(calc(var(--dy, 0px) + 18%)); }
 }
 /* планшет в портрете: та же раскладка, что на телефоне */
 @media (min-width:600px) and (max-width:1024px) and (max-aspect-ratio:17/20){
@@ -589,6 +816,15 @@ body:not([data-view="case"]) .site-footer{ display:none; }
   .tile-box.is-cover img{ height:100%; }
   .case-end{ grid-template-columns:minmax(0,1fr); }
   .case-next{ order:-1; padding:var(--sp-80) 0 0; }
+  .vcard{ --vh:clamp(130px, 40vw, 170px); grid-template-columns:minmax(0,1fr); justify-items:center; text-align:center; padding:var(--sp-60) var(--sp-20) var(--sp-30); margin-top:var(--sp-60); }
+  .vcard-acts{ justify-content:center; }
+  /* на телефоне подводка и облачко — над кружком: голова говорит сверху вниз, хвостик смотрит на неё */
+  .vcard-body{ display:contents; }
+  .vcard-top{ order:-1; width:100%; margin-bottom:var(--sp-20); }
+  .vcard-kicker{ margin:0; }
+  .vcard-say{ left:50%; bottom:0; max-width:min(100%, 20em); transform:translateX(-50%); transform-origin:50% 100%; }
+  .vcard-say::after{ right:auto; left:calc(50% - 8px); bottom:auto; top:100%; border-width:8px 8px 0; border-color:#fff transparent transparent; }
+  .vcard:not(.is-said) .vcard-say{ transform:translateX(-50%) scale(.85); }
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{ animation:none !important; transition-duration:.01ms !important; transition-delay:0s !important; }

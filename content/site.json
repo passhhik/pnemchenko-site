@@ -83,5 +83,71 @@
   "mute": "#6E6E74",
   "projectBg": "#F5F5F7",
   "heart": "#FF343A"
+ },
+ "polaroidOn": true,
+ "polaroidsApi": "",
+ "polaroid": {
+  "stickers": [
+   {
+    "id": "clown",
+    "name": "Клоун",
+    "emoji": "🤡",
+    "image": ""
+   },
+   {
+    "id": "skull",
+    "name": "Череп",
+    "emoji": "💀",
+    "image": ""
+   },
+   {
+    "id": "kheart",
+    "name": "Корейское сердечко",
+    "emoji": "🫰",
+    "image": ""
+   },
+   {
+    "id": "peace",
+    "name": "Писс",
+    "emoji": "✌️",
+    "image": ""
+   },
+   {
+    "id": "pacific",
+    "name": "Пацифик",
+    "emoji": "☮️",
+    "image": ""
+   },
+   {
+    "id": "poo",
+    "name": "Какашка",
+    "emoji": "💩",
+    "image": ""
+   },
+   {
+    "id": "heart",
+    "name": "Сердечко",
+    "emoji": "❤️",
+    "image": ""
+   },
+   {
+    "id": "like",
+    "name": "Класс",
+    "emoji": "👍",
+    "image": ""
+   },
+   {
+    "id": "devil",
+    "name": "Чорт",
+    "emoji": "😈",
+    "image": ""
+   },
+   {
+    "id": "rock",
+    "name": "Рок",
+    "emoji": "🤘",
+    "image": ""
+   }
+  ]
  }
 }

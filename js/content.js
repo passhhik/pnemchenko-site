@@ -1,6 +1,7 @@
 // Контент сайта лежит в content/site.json и content/projects.json — их редактирует админка (admin/).
 // Любое текстовое поле может быть строкой или объектом { ru: '…', en: '…' }.
 import { UI, plural, detectLang } from './i18n.js';
+import { typo } from './typo.js';
 
 export const content = { site: null, projects: [], lang: 'ru', preview: false };
 
@@ -16,14 +17,14 @@ const pick = (v, lang, def) => {
   if (v && typeof v === 'object' && !Array.isArray(v)) return v[lang] || v[def] || Object.values(v).find(Boolean) || '';
   return v ?? '';
 };
-// текст контента на текущем языке
-export const tx = (v) => pick(v, content.lang, (content.site && content.site.defaultLang) || 'ru');
+// текст контента на текущем языке — сразу с типографикой: короткие слова не висят в конце строки (js/typo.js)
+export const tx = (v) => typo(pick(v, content.lang, (content.site && content.site.defaultLang) || 'ru'));
 // строка интерфейса
 export function t(key, vars) {
   const s = (UI[content.lang] && UI[content.lang][key]) ?? UI.ru[key] ?? key;
-  return vars && typeof s === 'string' ? s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '') : s;
+  return typo(vars && typeof s === 'string' ? s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '') : s);
 }
-export const count = (n, key) => `${n} ${plural(n, t(key), content.lang)}`;
+export const count = (n, key) => `${n}\u00A0${plural(n, t(key), content.lang)}`;
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // работа проекта: путь к картинке или { src, alt, cut }
 export const srcOf = (a) => (typeof a === 'string' ? a : (a && a.src)) || '';

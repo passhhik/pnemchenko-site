@@ -3,27 +3,19 @@
 // браузер заводить под неё отдельный слой — по два десятка в секунду; в Safari от этого мигало матовое стекло папок).
 // Гаснет реплика целиком: меняется прозрачность всего блока субтитров, у которого слой один и постоянный.
 import { VOWELS } from './voice.js';
+import { typo } from './typo.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const SHORT = /^[А-Яа-яЁё]{1,2}$/;        // предлоги, союзы, частицы, местоимения в одну-две буквы
 const CPS = 24;                             // скорость печати без записи голоса, букв в секунду
 // Абзац реплики. Слово — <span class="w"> (не рвётся при переносе), внутри — буквы <span class="c">: они проявляются
 // по одной, место под всю реплику занято сразу, поэтому текст не прыгает. Предложение — <span class="s">:
 // на главной строка переносится между предложениями, а не посреди фразы. \n в тексте — перенос строки.
-// Типографика: тире не уезжает в начало строки, короткое слово не остаётся в конце — они склеены с соседом.
+// Типографика — общая для сайта (js/typo.js): тире не уезжает в начало строки, короткое слово не остаётся в конце —
+// они склеены с соседом неразрывным пробелом, и такая связка — одно «слово».
 export function buildLine(text) {
-  const raw = String(text).split(/(\n|[^\S\n]+)/).filter((w) => w.length);
-  const isSpace = (w) => /^[^\S\n]+$/.test(w);
-  const tokens = [];
-  for (let i = 0; i < raw.length; i++) {
-    let w = raw[i];
-    if (w !== '\n' && !isSpace(w)) {
-      while (i + 2 < raw.length && isSpace(raw[i + 1]) && raw[i + 2] !== '\n'
-        && (/^[—–]/.test(raw[i + 2]) || SHORT.test(w.slice(w.lastIndexOf('\u00A0') + 1)))) { w += '\u00A0' + raw[i + 2]; i += 2; }
-    }
-    tokens.push(w);
-  }
+  const tokens = typo(String(text)).split(/(\n|[^\S\n\u00A0]+)/).filter((w) => w.length);
+  const isSpace = (w) => /^[^\S\n\u00A0]+$/.test(w);
   const p = document.createElement('p');
   p.className = 'subs-line';
   const spans = [];

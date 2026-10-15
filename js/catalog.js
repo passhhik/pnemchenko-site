@@ -6,7 +6,7 @@
 // и пальцем, стрелки. Отпустили — лента мягко встаёт на ближайший проект, и экран целиком перекрашивается под него.
 // Кейс открывается кнопкой «Смотреть проект» или нажатием на уже выбранную карточку.
 import { content, tx, t, esc, srcOf, thumbOf, sectionById, isStack } from './content.js';
-import { setTheme, toneOf, softTextOk, inkOf } from './theme.js';
+import { setTheme, toneOf, softTextOk, inkOf, buttonLight } from './theme.js';
 import { liked, toggleLike } from './likes.js';
 import { styleValue } from './style.js';
 
@@ -25,7 +25,8 @@ const firstCut = (p) => (p.artifacts || []).find((a) => a && typeof a === 'objec
 export function cardOf(p) {
   const c = p.card || {};
   const image = c.image || thumbOf(p);
-  return { video: c.video || '', image, poster: image };       // до запуска видео — картинка карточки
+  // over — что выглядывает за край карточки (лапы свиньи): прозрачная картинка той же ширины, что карточка, поверх неё
+  return { video: c.video || '', image, poster: image, over: c.over || '' };       // до запуска видео — картинка карточки
 }
 export function bgOf(p) {
   const b = p.bg || {}, th = p.theme || {};
@@ -68,6 +69,39 @@ function fromOklab([L, A, B]) {
   const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
   return [toByte(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), toByte(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), toByte(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)];
 }
+// Переход между цветами двух проектов. Прямая линия в OKLab между далёкими оттенками (синий → оранжевый) проходит
+// через серый — посередине выходит грязно-бежевый. Поэтому смешиваем в OKLCH: светлота и насыщенность меняются
+// плавно, а оттенок идёт по кругу коротким путём (синий → фиолетовый → розовый → красный → оранжевый) — середина яркая.
+// У серого (почти без цвета) своего оттенка нет — берётся оттенок соседа. Цвет, которого нет на экране (sRGB),
+// чуть теряет насыщенность, а не обрезается по каналам. Ход — по S-кривой: у каждого проекта его цвет держится
+// чуть дольше, промежуточные проскакивают быстрее.
+const lchOf = ([L, a, b]) => [L, Math.hypot(a, b), Math.atan2(b, a)];
+const inGamut = ([L, a, b]) => {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+  return rgb.every((v) => v > -0.0015 && v < 1.0015);
+};
+function mixLch(A, B, f) {
+  const a = lchOf(A), b = lchOf(B);
+  let ha = a[2], hb = b[2];
+  if (a[1] < 0.004) ha = hb;                    // серый: оттенок соседа
+  if (b[1] < 0.004) hb = ha;
+  let dh = hb - ha;
+  if (dh > Math.PI) dh -= 2 * Math.PI; else if (dh < -Math.PI) dh += 2 * Math.PI;
+  const L = a[0] + (b[0] - a[0]) * f, h = ha + dh * f;
+  let C = a[1] + (b[1] - a[1]) * f;
+  const at = (c) => [L, c * Math.cos(h), c * Math.sin(h)];
+  if (!inGamut(at(C))) {                         // за краем sRGB — ищем самую насыщенную версию того же тона и светлоты
+    let lo = 0, hi = C;
+    for (let k = 0; k < 12; k++) { const mid = (lo + hi) / 2; if (inGamut(at(mid))) lo = mid; else hi = mid; }
+    C = lo;
+  }
+  return at(C);
+}
+const ease = (f) => f * f * (3 - 2 * f);
+const themeMeta = document.querySelector('meta[name="theme-color"]');
+const hex2 = (n) => n.toString(16).padStart(2, '0');
+
 // свечение карточки: своё у проекта (админка) или по тону его фона — синее на светлом, светлое на тёмном (как в дизайн-системе)
 const glowOf = (p) => (/^#[0-9a-f]{6}$/i.test(String(p.glow || '')) ? p.glow : bgOf(p).tone === 'dark' ? 'var(--ink-dark)' : 'var(--glow-light)');
 const run = (v) => { const r = v.play(); if (r && r.catch) r.catch(() => {}); };
@@ -121,6 +155,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       return `<button class="cat-card" type="button" data-i="${i}" aria-label="${esc(tx(p.title))}" style="--card-glow:${glowOf(p)}">
         <span class="cat-card-glow" aria-hidden="true" hidden></span>
         <span class="cat-card-m">${mediaHTML(m, { cls: 'cat-card-media', lazy: !S.active || i > 4 })}</span>
+        ${m.over ? `<img class="cat-card-over" src="${esc(m.over)}" alt="" draggable="false" decoding="async"${!S.active || i > 4 ? ' loading="lazy"' : ''}>` : ''}
         <span class="cat-like"${liked(p.slug) ? '' : ' hidden'}>${HEART}</span>
       </button>`;
     }).join('');
@@ -212,12 +247,18 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     }
     // Фон экрана идёт за лентой, а не меняется скачком: между двумя проектами его цвет смешивается ровно настолько,
     // насколько лента доехала до соседа. Тот же цвет у градиента внизу — поэтому под карточками нет «полосы» другого цвета.
+    // Цвет ставится и всей странице (html): на iPhone под строкой Safari виден фон страницы, а не каталога, — там была
+    // белая полоса. Туда же — цвет полосы браузера (theme-color).
     if (S.labs && S.labs.length) {
       const m = S.labs.length - 1, q = clamp(S.p, 0, m), i0 = Math.floor(q), f = q - i0;
       const A = S.labs[i0], B = S.labs[Math.min(i0 + 1, m)];
-      const rgb = fromOklab(f < 1e-4 ? A : [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f]);
+      const rgb = fromOklab(f < 1e-4 || A === B ? A : f > 1 - 1e-4 ? B : mixLch(A, B, ease(f)));
       const ck = rgb.join(',');
-      if (S.ck !== ck) { S.ck = ck; cat.style.setProperty('--cat-c', `rgb(${ck})`); }
+      if (S.ck !== ck) {
+        S.ck = ck;
+        document.documentElement.style.setProperty('--cat-c', `rgb(${ck})`);
+        if (themeMeta) themeMeta.content = `#${rgb.map(hex2).join('')}`;
+      }
     }
     // телефон: ленты не видно — за пальцем идут сами текст и визуал: уезжают влево и гаснут, новый проект въезжает справа
     const f = phone() && S.idx >= 0 ? clamp(S.p - S.idx, -0.6, 0.6) : 0;
@@ -288,6 +329,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     // описание проекта — вторичным цветом (70%), но не бледнее 4,5:1 на фоне проекта: иначе — основным цветом
     const bp = bgOf(p);
     if (softTextOk(inkOf(bp.tone), bp.color)) cat.style.removeProperty('--mute'); else cat.style.setProperty('--mute', 'var(--fg)');
+    cat.classList.toggle('is-btn-light', buttonLight(bp.color));        // тёмная кнопка на почти чёрном фоне не видна — светлая
     showInfo(p);
     // фон и визуал меняются чуть позже текста: пока ленту крутят быстро, экран не мигает на каждом проекте
     clearTimeout(S.swapT);
@@ -554,6 +596,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       cancelAnimationFrame(S.raf); S.raf = 0;
       clearTimeout(S.swapT); clearTimeout(S.lookT);
       document.documentElement.classList.remove('is-cat');
+      document.documentElement.style.removeProperty('--cat-c');
+      S.ck = '';
       root.querySelectorAll('video').forEach(pause);
       ctl.hidden = true;
       setTheme(null);

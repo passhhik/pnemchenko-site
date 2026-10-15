@@ -5,41 +5,63 @@ const [below, above] = root ? [...root.children] : [];
 const meta = document.querySelector('meta[name="theme-color"]');
 let key = '';
 
-// светлый или тёмный фон: по относительной яркости цвета
-export function toneOf(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
-  if (!m) return 'light';
-  const n = parseInt(m[1], 16);
-  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-  return L < 0.179 ? 'dark' : 'light';      // граница, на которой белый и чёрный текст читаются одинаково
-}
-// контраст текста выбранного тона с цветом фона (WCAG): для обычного текста нужно не меньше 4,5
-export function contrastOf(hex, tone) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
-  if (!m) return 21;
-  const n = parseInt(m[1], 16);
-  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-  return tone === 'dark' ? 1.05 / (L + 0.05) : (L + 0.05) / 0.05;
-}
-
-// Вторичный текст в дизайн-системе — основной цвет на 70%. На насыщенном фоне проекта такой текст часто бледнее 4,5:1
-// (норма WCAG для обычного текста) — тогда он становится основным цветом целиком. fg — цвет текста, bg — фон (#RRGGBB)
+// ---------- контраст: правило сайта, где текст светлый, а где тёмный ----------
+// Считаем по APCA — методу из черновика WCAG 3. Старая формула WCAG 2 на насыщенных средних цветах (синий, оранжевый,
+// красный, фиолетовый) ошибается в пользу чёрного текста, хотя глаз читает там белый не хуже, а чёрный выглядит грязным.
+// APCA учитывает, как глаз видит яркие цвета и что светлое на тёмном читается иначе, чем тёмное на светлом.
+// Lc — «сила» контраста: 90 — для мелкого текста, 75 — основной текст, 60 — текст от 18–24 px (описание проекта),
+// 45 — крупные заголовки, 30 — на грани читаемости.
+//
+// Правило: на фоне проекта текст светлый, если он набирает хотя бы Lc 45 и читается не хуже тёмного — с форой
+// в 5 единиц в пользу светлого. Иначе текст тёмный. Описание (вторичный цвет — основной на 70%) остаётся полупрозрачным,
+// только если и так набирает Lc 60; иначе оно того же цвета, что заголовок. Тёмная кнопка на почти чёрном фоне
+// становится светлой (buttonLight). В админке тон текста можно поставить вручную.
+export const LC_HEAD = 45, LC_TEXT = 60, LIGHT_EDGE = 5, LC_UI = 15;
 const rgbOf = (hex) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-const lumOf = ([r, g, b]) => { const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
-export function softTextOk(fg, bg, k = 0.7) {
-  const f = rgbOf(fg), b = rgbOf(bg);
-  if (!f || !b) return true;
-  const mix = f.map((v, i) => v * k + b[i] * (1 - k));
-  const a = lumOf(mix), c = lumOf(b);
-  return (Math.max(a, c) + 0.05) / (Math.min(a, c) + 0.05) >= 4.5;
+const yOf = ([r, g, b]) => 0.2126729 * (r / 255) ** 2.4 + 0.7151522 * (g / 255) ** 2.4 + 0.072175 * (b / 255) ** 2.4;
+// контраст текста fg на фоне bg (APCA-W3 0.0.98G): плюс — тёмный на светлом, минус — светлый на тёмном
+export function apca(fg, bg) {
+  const f = Array.isArray(fg) ? fg : rgbOf(fg), b = Array.isArray(bg) ? bg : rgbOf(bg);
+  if (!f || !b) return 0;
+  const soft = (y) => (y > 0.022 ? y : y + (0.022 - y) ** 1.414);
+  const yt = soft(yOf(f)), yb = soft(yOf(b));
+  if (Math.abs(yb - yt) < 0.0005) return 0;
+  if (yb > yt) { const c = (yb ** 0.56 - yt ** 0.57) * 1.14; return c < 0.1 ? 0 : (c - 0.027) * 100; }
+  const c = (yb ** 0.65 - yt ** 0.62) * 1.14;
+  return c > -0.1 ? 0 : (c + 0.027) * 100;
 }
 // цвет текста в токенах сайта (их можно поменять в админке): основной на светлом фоне и на тёмном
 export const inkOf = (tone) => {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(tone === 'dark' ? '--ink-dark' : '--ink').trim();
+  const v = typeof document !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue(tone === 'dark' ? '--ink-dark' : '--ink').trim() : '';
   return /^#[0-9a-f]{6}$/i.test(v) ? v : tone === 'dark' ? '#F4F6F6' : '#1D1D1F';
 };
+// насколько читается светлый и тёмный текст на цвете (модули Lc) и что выбирает правило
+export function toneInfo(hex) {
+  const light = Math.abs(apca(inkOf('dark'), hex)), dark = Math.abs(apca(inkOf('light'), hex));
+  const tone = light >= LC_HEAD && light + LIGHT_EDGE >= dark ? 'dark' : 'light';
+  return { tone, light, dark, lc: tone === 'dark' ? light : dark };
+}
+// тон фона: 'dark' — текст на нём светлый, 'light' — тёмный
+export function toneOf(hex) {
+  if (!rgbOf(hex)) return 'light';
+  return toneInfo(hex).tone;
+}
+// сила контраста текста выбранного тона на цвете (Lc, без знака)
+export function contrastOf(hex, tone) {
+  if (!rgbOf(hex)) return 100;
+  return Math.abs(apca(inkOf(tone === 'dark' ? 'dark' : 'light'), hex));
+}
+// Основная кнопка в дизайн-системе тёмная на любом фоне. Если фон сам почти такой же тёмный (меньше Lc 15 — порог,
+// ниже которого фигуру уже не отличить от фона), кнопка становится светлой.
+export const buttonLight = (bg) => !!rgbOf(bg) && Math.abs(apca(inkOf('light'), bg)) < LC_UI;
+// Вторичный текст в дизайн-системе — основной цвет на 70%. Если на фоне проекта такой текст набирает меньше Lc 60,
+// он становится основным цветом целиком. fg — цвет текста, bg — фон (#RRGGBB)
+export function softTextOk(fg, bg, k = 0.7) {
+  const f = rgbOf(fg), b = rgbOf(bg);
+  if (!f || !b) return true;
+  const mix = f.map((v, i) => Math.round(v * k + b[i] * (1 - k)));
+  return Math.abs(apca(mix, b)) >= LC_TEXT;
+}
 
 // Адрес картинки делаем полным: url() внутри переменной браузер иначе считает от папки со стилями
 const abs = (src) => { try { return new URL(src, document.baseURI).href; } catch (_) { return src; } };
@@ -101,7 +123,9 @@ export function setTheme(theme) {
   const prev = key;
   key = k;
   document.body.dataset.tone = theme ? (theme.tone || toneOf(theme.color)) : 'light';
-  if (meta) meta.content = theme ? theme.color : '#FFFFFF';
+  // полоса браузера — цвета проекта или цвета листа (а не чисто белая: лист чуть серее, и на iPhone был виден шов)
+  const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+  if (meta) meta.content = theme ? theme.color : (/^#[0-9a-f]{6}$/i.test(paper) ? paper : '#F4F6F6');
   document.body.style.setProperty('--theme-c', theme ? theme.color : '#FFFFFF');     // цвет фона — для дымки под шапкой каталога
   if (!root) return;
   if (!theme) { below.classList.remove('is-on'); above.classList.remove('is-on'); return; }

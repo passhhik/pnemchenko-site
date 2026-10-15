@@ -231,3 +231,22 @@ button,input,select,textarea{ font:inherit; color:inherit; }
 .ideas{ margin:0 0 12px; padding:0; list-style:none; display:grid; gap:12px; }
 .ideas li{ padding:12px 14px; border-radius:12px; background:rgba(0,0,0,.04); line-height:1.4; }
 .ideas li .f{ margin:8px 0 0; }
+
+/* полароид: наклейки и карточки архива */
+.stk-list{ margin:0 0 12px; padding:0; list-style:none; display:grid; gap:10px; }
+.stk-row{ display:grid; grid-template-columns:64px minmax(0,1fr); gap:12px; align-items:start; padding:10px; border-radius:12px; background:rgba(0,0,0,.035); }
+.stk-prev{ display:grid; place-items:center; width:64px; height:64px; border-radius:12px; background:#55575c; }
+.stk-prev img{ width:52px; height:52px; object-fit:contain; }
+.stk-fields .imgf{ margin-bottom:4px; }
+.pol-mod{ margin:10px 0; padding:0; list-style:none; display:grid; gap:8px; }
+.pol-mod-it{ display:grid; grid-template-columns:64px minmax(0,1fr) auto; gap:12px; align-items:center; padding:8px; border:1px solid var(--line); border-radius:12px; }
+.pol-mod-it.is-hidden{ background:rgba(255,77,106,.06); border-color:rgba(255,77,106,.35); }
+.pol-mod-it.is-hidden .pol-mod-img{ opacity:.5; }
+.pol-mod-img{ display:block; width:64px; height:64px; border-radius:6px; overflow:hidden; background:var(--soft); }
+.pol-mod-img img{ width:100%; height:100%; object-fit:cover; }
+.pol-mod-txt{ display:grid; gap:2px; min-width:0; }
+.pol-mod-txt b{ font-weight:500; overflow-wrap:anywhere; }
+.stk-row .f{ margin-bottom:6px; }
+.stk-row .imgf{ margin:0; padding:6px 10px; }
+.stk-row .imgf-thumb{ display:none; }
+.stk-row .imgf-main .row{ margin-top:4px; }

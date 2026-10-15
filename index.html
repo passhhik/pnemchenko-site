@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <!-- Защита страницы: скрипты, стили, картинки и запросы — только со своего адреса. Чужой или вставленный в страницу
        скрипт браузер не выполнит. 'unsafe-eval' нужен только затем, чтобы старые Safari разрешили распаковщик 3D-модели (WebAssembly). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Павел Немченко — продуктовый дизайнер</title>
@@ -42,6 +42,8 @@
   <link rel="modulepreload" href="js/subtitles.js">
   <link rel="modulepreload" href="js/voice.js">
   <link rel="modulepreload" href="js/model.js">
+  <link rel="modulepreload" href="js/polaroids.js">
+  <link rel="modulepreload" href="js/stickers.js">
   <!-- 3D-голова подгружается после интерфейса; движок начинаем качать заранее. Саму модель и её загрузчики здесь
        не трогаем: их запускает js/app.js, когда движок уже скачан, — иначе они делят с ним канал, и на мобильной
        сети первым на экране появляется не мозг, а долгое ожидание -->
@@ -49,7 +51,7 @@
   <link rel="modulepreload" href="js/head.js">
   <link rel="modulepreload" href="js/brain.js">
 </head>
-<body data-view="hero" data-tone="light" class="no-sound no-likes">
+<body data-view="hero" data-tone="light" class="no-sound no-likes no-pol">
   <a class="skip-link" href="#/work" data-t="skip">Сразу к работам</a>
 
   <!-- фон «в стиле проекта»: два слоя для плавной смены -->
@@ -75,6 +77,13 @@
   <div data-eyes aria-hidden="true" hidden></div>
   <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
 
+  <!-- архив полароидов (Figma: кружок справа внизу, на телефоне — слева от кнопок): две свежие карточки, ведёт в архив -->
+  <a class="arch-btn" href="#/archive" data-arch-btn aria-label="Архив полароидов">
+    <span class="arch-disc" aria-hidden="true"></span>
+    <span class="arch-mini arch-mini--a" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
+    <span class="arch-mini arch-mini--b" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
+  </a>
+
   <!-- загрузка без процентов: пока 3D-голова качается, на месте мозга — розовое пятно, потом сам мозг (место им задаёт js/app.js),
        а когда модель готова, голова собирается по частям -->
   <div class="loader" data-loader role="status"><span class="visually-hidden" data-t="loader">Собираю лицо</span></div>
@@ -83,10 +92,13 @@
     <section class="hero" data-screen="hero" aria-labelledby="hero-title">
       <h1 id="hero-title" class="visually-hidden" tabindex="-1"><span data-name>Павел Немченко</span> — <span data-role>продуктовый дизайнер</span></h1>
       <nav class="folders" data-folders aria-label="Разделы портфолио"></nav>
+      <!-- полароид без мыши: кнопка видна, только когда на неё перешли клавишей Tab -->
+      <button class="pol-a11y" type="button" data-pol-shot data-t="polShot">Сфотографироваться с головой</button>
     </section>
 
     <section class="catalog" data-screen="work" hidden aria-labelledby="work-title"></section>
     <article class="case" data-screen="case" hidden></article>
+    <section class="archive" data-screen="archive" hidden aria-labelledby="archive-title"></section>
   </main>
 
   <footer class="site-footer">

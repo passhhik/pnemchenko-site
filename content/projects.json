@@ -15,7 +15,8 @@
    "sticker": "assets/cases/svoi-dengi/sticker.webp",
    "logo": "assets/cases/svoi-dengi/logo.webp",
    "card": {
-    "image": "assets/cases/svoi-dengi/card.webp"
+    "image": "assets/cases/svoi-dengi/card.webp",
+    "over": "assets/cases/svoi-dengi/card-over.webp"
    },
    "theme": {
     "color": "#5C7EFF"

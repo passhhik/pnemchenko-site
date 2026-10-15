@@ -119,6 +119,7 @@ uniform float uSqW[SQ_N];
 uniform float uSqA[SQ_N];
 uniform mat4 uObjToHead;
 uniform mat4 uHeadToObj;
+uniform float uSqOn;      // насколько щипки тянут этот предмет: голова — всегда 1; снятые очки — 0 (они жёсткие, см. _updateGlasses)
 // Два гауссовых слоя на каждый щипок: узкий держит точку под пальцем, широкий «желейный»
 // запаздывает и колышется. Плюс лёгкое сужение «шейки» у вытянутой части.
 // J — якобиан поля: нужен, чтобы корректно повернуть нормали и свет на растянутой коже.
@@ -149,7 +150,8 @@ vec3 squishField(vec3 p, out mat3 J) {
       J -= a * (outerProduct(rp, gw) + w * (mat3(1.0) - outerProduct(u, u)));
     }
   }
-  return d;
+  J = mat3(1.0) + (J - mat3(1.0)) * uSqOn;
+  return d * uSqOn;
 }
 `;
 
@@ -891,7 +893,7 @@ export class Head extends EventTarget {
   }
 
   _patch(m, mesh, f) {
-    const u = { uObjToHead: { value: new THREE.Matrix4() }, uHeadToObj: { value: new THREE.Matrix4() } };
+    const u = { uObjToHead: { value: new THREE.Matrix4() }, uHeadToObj: { value: new THREE.Matrix4() }, uSqOn: { value: 1 } };
     mesh.userData.sqU = u;
     const shared = this.shared;
     const lensU = f.lens ? { uLensA: { value: f.lens } } : null;
@@ -1868,6 +1870,10 @@ export class Head extends EventTarget {
     this.blind += (tgt - this.blind) * damp(dt, tgt > this.blind ? 3.2 : 6);
     if (tgt === 0 && this.blind < 0.002) this.blind = 0;
     g.off = dist > 0.22;
+    // Очки на носу тянутся вместе с лицом. Снятые — жёсткие: иначе щипок по голове гнул бы оправу отдельно от линз,
+    // а линзы — отдельно от «окон» в размытии (их контур считается по очкам в покое)
+    const sq = 1 - smoothstep(0.03, 0.16, dist);
+    if (sq !== g.sq) { g.sq = sq; for (const o of this.glassMeshes) if (o.userData.sqU) o.userData.sqU.uSqOn.value = sq; }
     // если отдельного слоя для очков нет (слабое устройство), снятые очки рисуются поверх головы прямо на основном холсте
     const onTop = dist > GLASSES_ON_TOP && !(this.ov && this.ov.on);
     if (onTop !== !!g.onTop) {

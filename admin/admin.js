@@ -2,11 +2,13 @@
 // — публиковать на сайт: одним коммитом в репозиторий на GitHub (см. github.js), сайт пересобирается сам;
 // — читать и сохранять прямо в папке сайта на компьютере (Chrome, Edge);
 // — отдавать архивом, если нет ни того ни другого.
-import { toneOf, contrastOf } from '../js/theme.js';
+import { toneInfo, contrastOf, LC_HEAD, LC_TEXT } from '../js/theme.js';
 import { gh, gitSha, GhError, DEFAULT_REPO } from './github.js';
 import { LINES, LINE_INFO } from '../js/lines.js';
 import { HERO_DEFAULT } from '../js/catalog.js';
 import { likesApi, likeCounts } from '../js/likes.js';
+import { DEFAULT_STICKERS, dieCut } from '../js/stickers.js';
+import { polaroidsApi, fetchList, setHidden, removePolaroid, modImage } from '../js/polaroids.js';
 import { STYLE_GROUPS, STYLE_TOKENS, styleValue } from '../js/style.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -38,11 +40,10 @@ const BLOCKS = {
   compare: { name: 'До / после', hint: 'Сравнение ползунком', make: () => ({ type: 'compare', before: { src: '', alt: '' }, after: { src: '', alt: '' }, caption: '' }) },
   video: { name: 'Видео', hint: 'Запись интерфейса или ролик', make: () => ({ type: 'video', src: '', poster: '', loop: true, caption: '' }) },
   palette: { name: 'Палитра', hint: 'Цвета проекта', make: () => ({ type: 'palette', title: '', colors: [{ hex: '#000000', name: '' }] }) },
+  say: { name: 'Реплика головы', hint: 'Точка между блоками: докрутили до неё — голова говорит', make: () => ({ type: 'say', say: '' }) },
 };
 // Банк идей (админка → «Настройки сайта»): концепции, которые ещё не собраны. key — выключатель, когда идея готова
-const IDEAS = [
-  { title: 'Полароид', status: 'концепция', key: '', text: 'Круглая кнопка-полароид рядом с головой (в макете — серый круг справа внизу). Когда голову растягивают в необычную морду, которой ещё не было, кадр «фотографируется» на полароид и уходит в архив снимков: его можно открыть, листать и смеяться. Выключатель появится, когда соберём.' },
-];
+const IDEAS = [];      // полароид собран — у него свой раздел настроек («Полароид»)
 const MAKE = { metric: () => ({ v: '', l: '' }), step: () => ({ title: '', text: '' }), color: () => ({ hex: '#000000', name: '' }), link: () => ({ label: '', url: '' }) };
 
 const st = {
@@ -139,6 +140,10 @@ function normalize() {
   }
   st.site.sections = st.site.sections || [];
   st.site.languages = st.site.languages && st.site.languages.length ? st.site.languages : ['ru'];
+  // наклейки полароида: десять мест; чего в содержимом нет — берём исходное (id, название, эмодзи)
+  const pol = st.site.polaroid = st.site.polaroid && typeof st.site.polaroid === 'object' ? st.site.polaroid : {};
+  const own = Array.isArray(pol.stickers) ? pol.stickers : [];
+  pol.stickers = DEFAULT_STICKERS.map((d) => { const o = own.find((x) => x && x.id === d.id) || {}; return { id: d.id, name: o.name ?? d.name, emoji: o.emoji ?? d.emoji, image: o.image || '' }; });
 }
 function init(site, projects) {
   st.site = site; st.projects = projects;
@@ -282,7 +287,7 @@ function hydrate(root) {
 }
 async function addFiles(files, t) {
   const obj = cur();
-  const folder = st.idx < 0 ? 'assets' : `assets/cases/${obj.slug || 'project'}`;
+  const folder = t.folder || (st.idx < 0 ? 'assets' : `assets/cases/${obj.slug || 'project'}`);
   let n = 0;
   for (const file of files) {
     let out;
@@ -360,11 +365,13 @@ function IMG(label, path, o = {}) {
   const v = val(path);
   const src = o.l ? getL(v) : (v || '');
   const kind = o.kind || 'image';
-  const thumb = !src ? 'нет файла' : kind === 'file' ? 'PDF' : kind === 'video' ? `<video data-src="${esc(src)}" muted preload="metadata"></video>` : `<img data-src="${esc(src)}" alt="">`;
-  const data = `data-path="${path}" data-kind="${kind}" data-max="${o.max || 2400}"${o.l ? ' data-l="1"' : ''}${o.cut ? ` data-cut="${o.cut}"` : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}${o.fixed ? ` data-fixed="${o.fixed}"` : ''}`;
+  // «none» у визуала обложки кейса — визуала нет нарочно (обложка только с логотипом и слоганом), это не файл
+  const none = src === 'none';
+  const thumb = none ? 'без визуала' : !src ? 'нет файла' : kind === 'file' ? 'PDF' : kind === 'video' ? `<video data-src="${esc(src)}" muted preload="metadata"></video>` : `<img data-src="${esc(src)}" alt="">`;
+  const data = `data-path="${path}" data-kind="${kind}" data-max="${o.max || 2400}"${o.l ? ' data-l="1"' : ''}${o.cut ? ` data-cut="${o.cut}"` : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}${o.fixed ? ` data-fixed="${o.fixed}"` : ''}${o.folder ? ` data-folder="${o.folder}"` : ''}`;
   return `<div class="imgf${o.small ? ' imgf--sm' : ''}" data-drop ${data}>
     <div class="imgf-thumb">${thumb}</div>
-    <div class="imgf-main"><span class="lbl">${esc(label)}</span><span class="imgf-name">${esc(src ? src : (o.hint || ''))}</span>
+    <div class="imgf-main"><span class="lbl">${esc(label)}</span><span class="imgf-name">${esc(none ? 'Без визуала: в обложке только логотип и слоган. «Убрать» — вернуть визуал из каталога.' : src ? src : (o.hint || ''))}</span>
       <div class="row"><button class="btn btn--line btn--sm" type="button" data-act="pick" ${data}>${src ? 'Заменить' : 'Выбрать файл'}</button>
       ${src ? `<button class="btn btn--line btn--sm" type="button" data-act="clear" data-path="${path}"${o.l ? ' data-l="1"' : ''}${o.dims ? ' data-dims="1"' : ''}${o.thumb ? ` data-thumb="${o.thumb}"` : ''}>Убрать</button>` : ''}</div>
     </div></div>`;
@@ -418,6 +425,7 @@ const SAY = (P) => F('Реплика головы', `${P}.say`, { l: 1, hint: '�
 const WIDTH = (P) => F('Ширина', `${P}.width`, { type: 'select', options: [['text', 'В колонку текста'], ['wide', 'Широкая'], ['full', 'Во всю ширину экрана']] });
 
 const BF = {
+  say: (b, P) => F('Что скажет голова', `${P}.say`, { l: 1, type: 'area', rows: 2, hint: 'Голова в углу скажет это, когда посетитель докрутит до этого места — оно между соседними блоками, на странице его не видно. Коротко, до 90 знаков: «О, тут я жёстко заебался», «А вот это душниловка».' }),
   text: (b, P) => F('Заголовок', `${P}.title`, { l: 1, ph: 'Проблема: «Родитель выбирает из двух плохих вариантов»' }) + F('Текст', `${P}.text`, { l: 1, type: 'area', rows: 6, hint: 'Пустая строка — новый абзац.' })
     + F('Выравнивание', `${P}.align`, { type: 'select', kind: 'opt', options: [['', 'Само: короткий текст — по центру, длинный — слева'], ['center', 'По центру'], ['left', 'Слева']], hint: 'Глава по центру держится вместе со следующей картинкой или плитками.' }) + SAY(P),
   image: (b, P) => IMG('Картинка', `${P}.src`, { cut: `${P}.cut`, dims: 1 }) + F('Что на картинке', `${P}.alt`, { l: 1, hint: 'Для незрячих и поисковиков.' })
@@ -445,6 +453,7 @@ function summaryOf(b) {
   const n = (a, one, few, many) => { const k = (a || []).length; const d = k % 10, h = k % 100; return `${k} ${d === 1 && h !== 11 ? one : d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many}`; };
   switch (b.type) {
     case 'text': return cut(txAny(b.title) || txAny(b.text));
+    case 'say': return cut(txAny(b.say) || 'текст не задан');
     case 'image': return cut(txAny(b.caption) || txAny(b.alt) || fileName(b.src) || 'картинка не выбрана');
     case 'gallery': return cut(txAny(b.title)) || n(b.items, 'картинка', 'картинки', 'картинок');
     case 'idea': case 'split': case 'links': return cut(txAny(b.title) || txAny(b.text));
@@ -475,8 +484,8 @@ function checks(p) {
   add(txAny(p.summary).trim(), 'Короткое описание под заголовком', 'main');
   add(p.cover, 'Обложка', 'look');
   add(p.sticker, 'Наклейка на папке', 'look');
-  const c = p.theme && p.theme.color, tone = (p.theme && p.theme.tone) || toneOf(c), k = contrastOf(c, tone);
-  add(c && k >= 4.5, c ? `Текст на фоне проекта читается: контраст ${k.toFixed(1)}` : 'Цвет фона проекта', 'look');
+  const c = p.theme && p.theme.color, tone = (p.theme && p.theme.tone) || toneInfo(c).tone, k = contrastOf(c, tone);
+  add(c && k >= LC_HEAD, c ? `Текст на фоне проекта читается: контраст Lc ${Math.round(k)}` : 'Цвет фона проекта', 'look');
   add((p.artifacts || []).length, 'Работы, которые выглядывают из папки', 'look');
   add((p.metrics || []).some((m) => txAny(m.v).trim()), 'Результаты в цифрах', 'results');
   add(['task', 'did', 'result'].every((x) => txAny((p.tldr || {})[x]).trim()), 'Задача, решение и результат', 'results');
@@ -492,10 +501,13 @@ function checksHTML(p) {
 function contrastHTML(p) {
   const c = p.theme && p.theme.color;
   if (!/^#[0-9a-f]{6}$/i.test(c || '')) return { cls: '', html: 'Задайте цвет — в него окрасится фон каталога при наведении и шапка кейса.' };
-  const tone = p.theme.tone || toneOf(c), k = contrastOf(c, tone), word = tone === 'dark' ? 'Белый' : 'Чёрный';
-  return k >= 4.5
-    ? { cls: 'is-ok', html: `<i class="swatch" style="background:${esc(c)}"></i>${word} текст читается хорошо: контраст ${k.toFixed(1)}.` }
-    : { cls: 'is-bad', html: `<i class="swatch" style="background:${esc(c)}"></i>${word} текст читается плохо: контраст ${k.toFixed(1)}, нужно от 4,5. ${p.theme.tone ? 'Поставьте «Подобрать автоматически» или возьмите' : 'Возьмите'} цвет ${tone === 'dark' ? 'темнее' : 'светлее'}.` };
+  // правило контраста — в js/theme.js: светлый текст, если он набирает Lc 45 и читается не хуже тёмного (с форой 5)
+  const info = toneInfo(c), tone = p.theme.tone || info.tone, k = Math.round(contrastOf(c, tone)), word = tone === 'dark' ? 'Белый' : 'Чёрный';
+  const sw = `<i class="swatch" style="background:${esc(c)}"></i>`;
+  const why = p.theme.tone ? '' : ` Подобран по правилу: у белого Lc ${Math.round(info.light)}, у чёрного Lc ${Math.round(info.dark)}${info.tone === 'dark' && info.light < info.dark ? ' — у белого фора: на насыщенном цвете чёрный выглядит грязно' : ''}.`;
+  if (k >= LC_TEXT) return { cls: 'is-ok', html: `${sw}${word} текст читается хорошо: контраст Lc ${k}.${why}` };
+  if (k >= LC_HEAD) return { cls: 'is-ok', html: `${sw}${word} текст: контраст Lc ${k} — хватает для заголовков, описание под ними будет без прозрачности.${why}` };
+  return { cls: 'is-bad', html: `${sw}${word} текст читается плохо: контраст Lc ${k}, нужно от ${LC_HEAD}. ${p.theme.tone ? 'Поставьте «Подобрать по цвету» или возьмите' : 'Возьмите'} цвет ${tone === 'dark' ? 'темнее' : 'светлее'}.` };
 }
 
 // ---------- отрисовка ----------
@@ -573,8 +585,9 @@ const PANES = {
     </fieldset>
     <fieldset class="fs"><legend>Карточка в каталоге</legend>
       <p class="hint">Карточка в ленте внизу каталога. Картинка или короткое видео без звука. Видео — как анимации на сайте Apple: проигрывается один раз, когда карточка впервые выехала на экран, и замирает на последнем кадре; выбрали проект — снова с начала. До запуска видна картинка карточки. Нет ни того ни другого — берётся малая копия обложки. На телефоне карточек нет: там проект на весь экран, внизу точки.</p>
-      ${IMG('Картинка карточки', 'card.image', { max: 1400, hint: 'Горизонтальная, примерно 3:2. Главное — по центру.' })}
+      ${IMG('Картинка карточки', 'card.image', { max: 1400, hint: 'Горизонтальная, как карточка в макете: 364×287 (около 5:4), экспорт @2x — 728×574. Главное — по центру.' })}
       ${IMG('Видео карточки', 'card.video', { kind: 'video', hint: 'MP4 или WebM без звука, 3–8 секунд, до 3 МБ. Последний кадр должен быть хорош сам по себе — на нём ролик останавливается.' })}
+      ${IMG('Что выглядывает за край карточки', 'card.over', { max: 1400, hint: 'Необязательно. PNG или WebP с прозрачным фоном той же ширины, что картинка карточки, совмещённый с ней сверху; может быть выше неё — тогда свисает за нижний край (как лапы свиньи у «Своих денег»).' })}
       ${COLOR('Свечение выбранной карточки', 'glow', { optional: 1, hint: 'Пусто — светлое на тёмном фоне, синее (#5B7FFF) на светлом, как в дизайн-системе.' })}
     </fieldset>
     <fieldset class="fs"><legend>Фон в каталоге</legend>
@@ -679,6 +692,7 @@ function sitePane() {
       ${F('Адрес счётчика', 'likesApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
       <div class="row">${likesApi(s) ? '<button class="btn btn--line btn--sm" type="button" data-act="likes-refresh">Обновить числа</button>' : ''}<span class="hint" data-likes-note>${esc(st.likesNote || '')}</span></div>
     </fieldset>
+    ${polaroidPane(s)}
     <fieldset class="fs"><legend>Пароль админки</legend>
       <p class="hint">${s.adminLock ? 'Пароль задан: без него админка не открывается.' : 'Пароля нет: админку откроет любой, кто знает адрес. Изменить сайт без токена GitHub он всё равно не сможет.'}</p>
       <div class="row">
@@ -691,6 +705,98 @@ function sitePane() {
         <small class="hint">Посетитель увидит переключатель RU / EN; язык по умолчанию выбирается по домену и языку браузера. После включения переведите тексты: вверху появится выбор языка, поля без перевода покажутся по-русски.</small></div>
     </fieldset>`;
 }
+// ---------- полароид: наклейки и модерация архива ----------
+// Наклейки — в настройках сайта (site.polaroid.stickers): название, эмодзи и своя картинка, которая заменяет эмодзи.
+// Модерация — запросы к функции архива с ключом модератора. Ключ живёт только в этом браузере (localStorage) и в
+// содержимое сайта не попадает: на сайте его не увидит никто.
+const MODKEY = 'ph:modkey';
+const modKey = () => { try { return localStorage.getItem(MODKEY) || ''; } catch (_) { return ''; } };
+st.pol = { items: [], next: '', note: '', busy: false, urls: new Map() };
+function stickerPrev(stk) {
+  const src = stk.image || (stk.emoji ? dieCut(stk.emoji, 120) : '');
+  return src ? `<img data-src="${esc(src)}" alt="">` : '<span class="hint">пусто</span>';
+}
+function polaroidPane(s) {
+  const api = polaroidsApi(s);
+  return `<fieldset class="fs" data-pol-pane><legend>Полароид</legend>
+      <p class="hint">Посетитель растягивает голову и держит пару секунд — она считает «три, два, один», и снимок выползает полароидом. На карточку можно налепить наклейки и написать пожелание; сохранённая уходит в архив: кружок с фотками на главной и страница «Архив». Общий архив — облачная функция (как её завести — server/polaroids/README.md в репозитории сайта). Пока её адреса здесь нет, карточку видит только её автор.</p>
+      ${CHECK('Полароид и архив на сайте', 'polaroidOn')}
+      ${F('Адрес архива', 'polaroidsApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
+      <fieldset class="fs"><legend>Наклейки</legend>
+        <p class="hint">Десять наклеек по бокам карточки. Пока своей картинки нет, наклейка — эмодзи: на iPhone и Mac он выглядит как эмодзи Apple, на Android и Windows — как эмодзи этой системы. Своя картинка (PNG или WebP с прозрачным фоном, квадратная, от 240 пикселей) заменяет эмодзи везде — и на уже сохранённых карточках. Название видно при наведении и читается незрячим.</p>
+        <ol class="stk-list">${(s.polaroid.stickers || []).map((stk, i) => `<li class="stk-row">
+          <span class="stk-prev" aria-hidden="true">${stickerPrev(stk)}</span>
+          <div class="stk-fields"><div class="grid2">${F('Название', `polaroid.stickers.${i}.name`, { l: 1 })}${F('Эмодзи', `polaroid.stickers.${i}.emoji`, { attrs: 'maxlength="16" spellcheck="false" autocomplete="off"' })}</div>
+            ${IMG('Своя картинка', `polaroid.stickers.${i}.image`, { small: 1, max: 480, folder: 'assets/polaroid/stickers', hint: 'необязательно' })}</div>
+        </li>`).join('')}</ol>
+      </fieldset>
+      <fieldset class="fs"><legend>Карточки в архиве</legend>
+        <p class="hint">Новые карточки появляются в архиве сразу. Карточку с матом в подписи архив скрывает сам — её можно вернуть. Скрывать и возвращать можно с ключом модератора — тем же, что в переменной MOD_KEY функции. Ключ хранится только в этом браузере и на сайт не уходит.</p>
+        ${api ? `<div class="grid2"><label class="f"><span>Ключ модератора</span><input type="password" data-modkey value="${esc(modKey())}" autocomplete="off" spellcheck="false"></label></div>
+        <div class="row"><button class="btn btn--line btn--sm" type="button" data-act="pol-load">${st.pol.items.length ? 'Обновить' : 'Показать карточки'}</button><span class="hint" data-pol-note>${esc(st.pol.note)}</span></div>
+        <ul class="pol-mod" data-pol-list>${polItemsHTML()}</ul>
+        ${st.pol.next ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="pol-more">Показать ещё</button></div>' : ''}` : '<p class="hint">Сначала вставьте адрес архива и опубликуйте.</p>'}
+      </fieldset>
+    </fieldset>`;
+}
+const polDate = (ms) => { try { return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+function polItemsHTML() {
+  return st.pol.items.map((it) => `<li class="pol-mod-it${it.h ? ' is-hidden' : ''}" data-pid="${esc(it.id)}">
+      <span class="pol-mod-img">${st.pol.urls.get(it.id) ? `<img src="${esc(st.pol.urls.get(it.id))}" alt="">` : ''}</span>
+      <span class="pol-mod-txt"><b>${it.c ? esc(it.c) : '<i>без подписи</i>'}</b>
+        <span class="hint">${esc(polDate(it.t))} · наклеек: ${(it.s || []).length}${it.h ? ' · скрыта' : ''}${it.f ? ' · скрыта проверкой на мат' : ''}</span></span>
+      <span class="row"><button class="btn btn--line btn--sm" type="button" data-act="${it.h ? 'pol-show' : 'pol-hide'}" data-pid="${esc(it.id)}">${it.h ? 'Показать' : 'Скрыть'}</button>
+        <button class="btn btn--line btn--sm" type="button" data-act="pol-del" data-pid="${esc(it.id)}">Удалить</button></span>
+    </li>`).join('');
+}
+function polRedraw() {
+  const box = $('[data-pol-pane]');
+  if (!box) return;
+  const keep = $('[data-edit]').scrollTop;
+  box.outerHTML = polaroidPane(st.site);
+  hydrate($('[data-pol-pane]'));
+  $('[data-edit]').scrollTop = keep;
+}
+async function polLoad(more = false) {
+  const api = polaroidsApi(st.site), key = modKey();
+  if (!api) return;
+  if (!key) { st.pol.note = 'Вставьте ключ модератора.'; polRedraw(); return; }
+  if (st.pol.busy) return;
+  st.pol.busy = true; st.pol.note = 'Загружаю…'; polRedraw();
+  try {
+    const page = await fetchList(api, { all: true, key, n: 24, before: more ? st.pol.next : '' });
+    if (!more) st.pol.items = [];
+    st.pol.items.push(...page.items);
+    st.pol.next = page.next;
+    const hidden = st.pol.items.filter((x) => x.h).length;
+    st.pol.note = st.pol.items.length ? `Карточек: ${st.pol.items.length}${page.next ? '+' : ''}, скрытых: ${hidden}` : 'В архиве пока пусто.';
+    // картинки — с ключом (у скрытых без него их не отдают)
+    await Promise.all(page.items.map(async (it) => { if (!st.pol.urls.has(it.id)) { try { st.pol.urls.set(it.id, await modImage(api, key, it.id)); } catch (_) { /* без картинки */ } } }));
+  } catch (e) {
+    st.pol.note = e.status === 401 || e.status === 403 ? 'Ключ модератора не подошёл.' : 'Архив не ответил. Проверьте адрес и что функция публичная.';
+  }
+  st.pol.busy = false;
+  polRedraw();
+}
+async function polModerate(id, act) {
+  const api = polaroidsApi(st.site), key = modKey(), it = st.pol.items.find((x) => x.id === id);
+  if (!api || !key || !it) return;
+  try {
+    if (act === 'del') {
+      if (!window.confirm('Удалить карточку из архива совсем? Вернуть её будет нельзя. Скрыть — можно вернуть.')) return;
+      await removePolaroid(api, key, id);
+      st.pol.items = st.pol.items.filter((x) => x.id !== id);
+      toast('Карточка удалена');
+    } else {
+      const res = await setHidden(api, key, id, act === 'hide');
+      it.h = res && typeof res.h === 'number' ? res.h : (act === 'hide' ? 1 : 0);
+      if (!it.h) it.f = 0;
+      toast(it.h ? 'Карточка скрыта: в архиве её больше не видно' : 'Карточка снова в архиве');
+    }
+  } catch (e) { toast(e.status === 401 || e.status === 403 ? 'Ключ модератора не подошёл' : 'Архив не ответил — попробуйте ещё раз'); }
+  polRedraw();
+}
+
 // ---------- реплики головы ----------
 // Исходные тексты — в js/lines.js. Свои правки хранятся в настройках сайта (site.lines[язык][id]) и ложатся поверх;
 // пустая строка — «в этой ситуации промолчать». Совпало с исходным — правка не хранится вовсе.
@@ -747,7 +853,7 @@ function renderEdit() {
   hydrate(root);
 }
 function renderViews() {
-  const list = st.idx < 0 ? [['home', 'Главная']] : [['catalog', 'Каталог'], ['case', 'Кейс']];
+  const list = st.idx < 0 ? [['home', 'Главная'], ['archive', 'Архив']] : [['catalog', 'Каталог'], ['case', 'Кейс']];
   if (!list.some(([k]) => k === st.view)) st.view = list[0][0];
   $('[data-views]').innerHTML = list.map(([k, n]) => `<button type="button" data-act="view" data-view="${k}" aria-pressed="${k === st.view}">${n}</button>`).join('');
 }
@@ -785,7 +891,7 @@ async function draftForPreview() {
   await Promise.all(jobs);
   return d;
 }
-const previewHash = () => (st.idx < 0 ? '#/' : st.view === 'catalog' ? '#/work' : `#/work/${encodeURIComponent(cur().slug || '')}`);
+const previewHash = () => (st.idx < 0 ? (st.view === 'archive' ? '#/archive' : '#/') : st.view === 'catalog' ? '#/work' : `#/work/${encodeURIComponent(cur().slug || '')}`);
 async function sendPreview(reload) {
   if (!st.site) return;
   const frame = $('[data-frame]');
@@ -1044,7 +1150,7 @@ function toast(text, undo) {
 }
 
 let pick = null;
-const targetOf = (el) => ({ path: el.dataset.path, kind: el.dataset.kind || 'image', max: el.dataset.max, cut: el.dataset.cut, dims: el.dataset.dims, thumb: el.dataset.thumb, fixed: el.dataset.fixed, l: !!el.dataset.l });
+const targetOf = (el) => ({ path: el.dataset.path, kind: el.dataset.kind || 'image', max: el.dataset.max, cut: el.dataset.cut, dims: el.dataset.dims, thumb: el.dataset.thumb, fixed: el.dataset.fixed, folder: el.dataset.folder, l: !!el.dataset.l });
 function openPicker(t) {
   pick = t;
   const inp = $('[data-file]');
@@ -1164,6 +1270,11 @@ const ACT = {
   'style-reset'() { delete st.site.style; renderEdit(); changed('style'); },
   'hero-reset'(el) { const h = cur().hero; if (h) { delete h[el.dataset.layout]; if (!Object.keys(h).length) delete cur().hero; } renderEdit(); changed('hero'); },
   'likes-refresh'() { loadLikes(true); },
+  'pol-load'() { polLoad(false); },
+  'pol-more'() { polLoad(true); },
+  'pol-hide'(el) { polModerate(el.dataset.pid, 'hide'); },
+  'pol-show'(el) { polModerate(el.dataset.pid, 'show'); },
+  'pol-del'(el) { polModerate(el.dataset.pid, 'del'); },
   'pass-cancel'() { passDlg.close(); },
   'pass-off'() {
     if (!window.confirm('Убрать пароль? После публикации админка будет открываться без него.')) return;
@@ -1200,6 +1311,7 @@ document.addEventListener('input', (e) => {
     changed('lines');
     return;
   }
+  if (el.matches && el.matches('[data-modkey]')) { try { localStorage.setItem(MODKEY, el.value.trim()); } catch (_) { /* не запомнится */ } return; }
   const path = el.dataset.path;
   if (!path || el.type === 'file') return;
   const obj = cur(), kind = el.dataset.kind || '';
@@ -1232,6 +1344,9 @@ document.addEventListener('input', (e) => {
     if (s) s.value = obj.slug;
   }
   if (el.type === 'range') { const out = el.parentNode.querySelector('output'); if (out) out.textContent = `${el.value}${el.dataset.unit || ''}`; }
+  // эмодзи наклейки поменяли — превью рядом обновляется сразу
+  const sm = /^polaroid\.stickers\.(\d+)\.emoji$/.exec(path);
+  if (sm) { const row = el.closest('.stk-row'), stk = obj.polaroid.stickers[Number(sm[1])]; if (row && stk) { row.querySelector('.stk-prev').innerHTML = stickerPrev(stk); hydrate(row); } }
   changed(path);
 });
 document.addEventListener('change', (e) => {

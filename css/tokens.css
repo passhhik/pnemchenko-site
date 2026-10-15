@@ -106,7 +106,8 @@
 
 /* ---------- «Телефон»: раскладка «столбик» (то же условие — в style.css и js/content.js) ---------- */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
-  :root{ --button-height:52px; --gap-btn:10px; --pad-x:20px; --cat-pad:20px; --radius-card:40px; }
+  /* панель кнопок — ниже, ближе к краю экрана (на iPhone — над строкой Safari или «полоской») */
+  :root{ --button-height:52px; --gap-btn:10px; --pad-x:20px; --cat-pad:20px; --radius-card:40px; --bar-bottom:14px; }
 }
 
 /* низкий экран телефона (iPhone SE со строкой адреса): панель ближе к краю — высота уходит голове */

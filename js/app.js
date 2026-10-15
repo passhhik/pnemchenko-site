@@ -4,7 +4,7 @@ import { Voice } from './voice.js';
 import { Subtitles } from './subtitles.js';
 import { Burst } from './burst.js';
 import { UI } from './i18n.js';
-import { content, loadContent, reloadDraft, tx, t, esc, srcOf, projectsOf, peekItems, thumbOf, isStack, heroFolders } from './content.js';
+import { content, loadContent, reloadDraft, tx, t, esc, srcOf, projectsOf, peekItems, thumbOf, isStack, heroFolders, count } from './content.js';
 import { linesFor, REACTIONS } from './lines.js';
 import { installFolderDefs, folderHTML } from './folders.js';
 import { setTheme } from './theme.js';
@@ -12,6 +12,7 @@ import { applyStyle } from './style.js';
 import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
+import { latestPhotos, flush as flushPolaroids } from './polaroids.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -40,7 +41,8 @@ const els = {
   sound: $('[data-sound]'), allWork: $('.topnav [href="#/work"]'),
   stage: $('#stage'), loader: $('[data-loader]'), ph: $('[data-ph]') || document.createElement('div'),      // заглушки нет в прежней версии страницы (кэш) — тогда работаем без неё
   folders: $('[data-folders]'), burst: $('[data-burst]'), subs: $('[data-subs]'), veil: $('[data-veil]'),
-  views: { hero: $('[data-screen="hero"]'), work: $('[data-screen="work"]'), case: $('[data-screen="case"]') },
+  archBtn: $('[data-arch-btn]'), polShot: $('[data-pol-shot]'),
+  views: { hero: $('[data-screen="hero"]'), work: $('[data-screen="work"]'), case: $('[data-screen="case"]'), archive: $('[data-screen="archive"]') || document.createElement('section') },
 };
 
 const HEAD_AR = 1.33;             // пропорции головы, пока модель не загрузилась (потом берутся с самой модели)
@@ -67,7 +69,18 @@ document.body.appendChild(cornerProbe);
 
 const hasLine = (id) => !!(subs && subs.lines[id]);
 // в каталоге головы нет — и реплик тоже
-const say = (ids, opts) => { if (subs && !content.preview && view !== 'work') subs.say((Array.isArray(ids) ? ids : [ids]).filter(hasLine), opts); };
+// голова встала в визитку в конце кейса — она говорит облачком там, а не из пустого угла
+const say = (ids, opts) => {
+  if (!subs || content.preview || view === 'work') return;
+  const list = (Array.isArray(ids) ? ids : [ids]).filter(hasLine);
+  if (dock.on && dock.subs) {
+    const card = dock.subs.el.closest('[data-vcard]');
+    if (card) card.classList.add('is-said');
+    const ds = dock.subs, done = ds.say(list, opts), tok = ds.token;
+    dock.said = false;
+    done.then(() => { if (ds.token === tok && dock.subs === ds) dock.said = true; });
+  } else subs.say(list, opts);
+};
 const lookAtEl = (el) => {
   if (!head) return;
   if (!el) { head.clearLook(); return; }
@@ -95,6 +108,9 @@ function applyContent() {
   $$('[data-cv]').forEach((a) => { if (cv) a.href = cv; if (site.cvFileName) a.download = site.cvFileName; });
   document.body.classList.toggle('no-cv', !cv);
   document.body.classList.toggle('no-likes', site.likesOn !== true);      // лайки включаются в админке («Лайки»); пока выключены
+  // полароид и архив — выключатель в админке («Полароид»)
+  document.body.classList.toggle('no-pol', site.polaroidOn !== true);
+  if (els.archBtn) els.archBtn.setAttribute('aria-label', t('archive'));
   // кнопка «Звук» — тоже из админки; выключена — голова молчит, даже если посетитель включал звук раньше
   document.body.classList.toggle('no-sound', site.soundOn !== true);
   if (site.soundOn !== true && voice.enabled) { voice.setEnabled(false); els.sound.setAttribute('aria-pressed', 'false'); }
@@ -209,8 +225,15 @@ const geo = { subs: null, mobile: false, fw: 220, centered: false, tip: 0 };    
 const tokPx = (name, fb) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fb;
 // высота кнопки шапки — по самой кнопке: в ней уже учтён множитель размера из админки
 const btnH = () => { const b = els.topbar ? [...els.topbar.querySelectorAll('.topnav .btn')].find((x) => x.offsetHeight) : null; return (b && b.offsetHeight) || tokPx('--button-height', 44); };
-// телефон: сколько снизу занимает стеклянная панель вместе с отступом до края экрана
-const barH = () => { const r = els.nav.getBoundingClientRect(); return r.height ? Math.max(0, window.innerHeight - r.top) : 102; };
+// телефон: сколько снизу занимает стеклянная панель вместе с отступом до края экрана. Слева от неё — кружок архива
+// полароидов, он выше панели: голова и реплика встают над ним
+const barH = () => {
+  const r = els.nav.getBoundingClientRect();
+  let h = r.height ? Math.max(0, window.innerHeight - r.top) : 102;
+  const a = els.archBtn && !document.body.classList.contains('no-pol') ? els.archBtn.getBoundingClientRect() : null;
+  if (a && a.height) h = Math.max(h, window.innerHeight - a.top + 6);
+  return h;
+};
 function layout() {
   const W = window.innerWidth, H = window.innerHeight, mobile = isStack();
   const u = Math.min(W, 1.5 * H) / 100;                       // единица макета, как --u в стилях
@@ -230,6 +253,16 @@ function layout() {
     padBot = tokPx('--hdr-bottom-cat', 20);
     hdr = padTop + row + padBot;
     logoY = padTop + (row - logoW / logoAR) / 2;
+  } else if (!mobile && view === 'archive') {
+    // архив (Figma: «Архив»): наверху логотип крупный, как на главной; при прокрутке он плавно уменьшается до размера в кейсе
+    const k = clamp(window.scrollY / 240, 0, 1), top0 = clamp(H * 0.037, 12, 60), big = clamp(31.5 * u, 200, 700), small = tokPx('--logo-case', 197);
+    padTop = top0 + (tokPx('--hdr-top', 50) - top0) * k;
+    logoW = big + (small - big) * k;
+    const row = Math.max(btnH(), logoW / logoAR);
+    padBot = tokPx('--hdr-bottom', 20);
+    hdr = padTop + row + padBot;
+    logoY = padTop + (row - logoW / logoAR) / 2;
+    rs.setProperty('--arc-top', `${Math.ceil(top0 + Math.max(btnH(), big / logoAR) + padBot)}px`);      // сетка начинается под крупной шапкой и не прыгает
   } else if (!mobile) {
     // главная (Figma: «Шапка», Главная): логотип 379 при экране 1440×803 — часть композиции с головой, поэтому резиновый;
     // кейс: логотип 197, кнопки 48, сверху 50, снизу 20 — из css/tokens.css
@@ -240,7 +273,7 @@ function layout() {
     hdr = hero ? padTop + row : padTop + row + padBot;
     logoY = padTop + (row - logoW / logoAR) / 2;
   } else {
-    const workM = view === 'work';
+    const workM = view === 'work' || view === 'archive';         // каталог и архив: логотип крупнее, как в макете
     rs.setProperty('--pad-top', hero ? '12px' : workM ? `${Math.round(clamp(H * 0.06, 24, 56))}px` : '8px');      // каталог: над логотипом воздух, как в макете
     padTop = parseFloat(getComputedStyle(els.topbar).paddingTop) || 12;      // с учётом «чёлки» телефона
     // телефон: логотип — треть ширины экрана (на чистом экране, без папок, — на треть крупнее); в каталоге — по макету, почти половина
@@ -306,6 +339,7 @@ function layout() {
     subsH = subsSize * SUBS_LH * 3;
     subsW = W - 40;
     const bar = barH();
+    rs.setProperty('--bar-res', `${bar.toFixed(1)}px`);       // столько снизу занято панелью и кружком архива (плашка наклона, лента папок)
     const gap = 10;                                             // наименьший зазор сверху (от логотипа) и снизу (до кнопок)
     // реплика стоит под подбородком с запасом: когда голова говорит, челюсть опускается
     const chin = (hh) => Math.max(14, hh * 0.06);
@@ -329,6 +363,7 @@ function layout() {
     subsH = subsSize * SUBS_LH * 3;
     subsW = W - 40;
     const bar = barH();
+    rs.setProperty('--bar-res', `${bar.toFixed(1)}px`);       // столько снизу занято панелью и кружком архива (плашка наклона, лента папок)
     // папки компактные: соседние разделы почти целиком видны по бокам, а высота уходит голове
     fw = clamp(0.2 * H, 116, 0.5 * W);
     rs.setProperty('--mfw', `${fw.toFixed(1)}px`);
@@ -393,6 +428,7 @@ const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math
 const rectOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
 function avoidRects(openEl) {
   const list = [rectOf(els.logo), rectOf(els.nav)];
+  if (els.archBtn && els.archBtn.offsetWidth) list.push(rectOf(els.archBtn));      // кружок архива работы тоже не закрывают
   for (const f of folderEls) {
     const r = rectOf(f);
     // у открытой папки работы выглядывают вверх и в стороны — оставляем им место
@@ -579,13 +615,17 @@ function route() {
   const params = new URLSearchParams(qs || '');
   if (parts[0] === 'work' && parts[1]) return show('case', { slug: decodeURIComponent(parts[1]) });
   if (parts[0] === 'work') return show('work', { cat: params.get('cat') || 'all' });
+  if (parts[0] === 'archive' && content.site && content.site.polaroidOn === true) return show('archive');      // архив выключен в админке — на главную
   return show('hero');
 }
 function show(next, opts = {}) {
   const prev = view;
   if (prev === 'work') catalog.activate(false);          // каталог запоминает, где его оставили
+  dockOut(true);                                          // голова возвращается из визитки в угол, пока страница кейса ещё на месте
   if (caseView) { caseView.destroy(); caseView = null; }
+  if (prev === 'archive' && archiveView) archiveView.close();
   view = next;
+  polStop();                                              // ушли с главной посреди отсчёта или с открытой карточкой — без снимка
   closeFolder();
   // логотип и шапка плавно меняют размер только при переходе между экранами (не при загрузке и не при ресайзе)
   if (prev && prev !== next) {
@@ -617,13 +657,24 @@ function show(next, opts = {}) {
     const p = content.projects.find((x) => x.slug === opts.slug);
     if (!p) { location.replace('#/work'); return; }
     const keep = content.preview && prev === 'case' ? window.scrollY : 0;      // в предпросмотре админки страница не прыгает наверх
-    caseView = renderCase(els.views.case, p, { reduced, say: (text) => { if (subs && !content.preview) subs.say(text, { force: true }); } });
+    sayQ.list.length = 0; clearTimeout(sayQ.t);
+    caseView = renderCase(els.views.case, p, { reduced, say: caseSay });
+    if (!content.preview) {
+      const seen = store.get('seenCases', []);
+      if (Array.isArray(seen) && !seen.includes(p.slug)) { seen.push(p.slug); store.set('seenCases', seen.slice(-50)); }
+      setupDock(els.views.case);
+    }
     window.scrollTo(0, keep);
     requestAnimationFrame(() => { if (view === 'case') window.scrollTo(0, keep); });      // на случай, если каталог ещё доезжал плавной прокруткой
     document.title = `${caseView.title} — ${name}`;
     if (!content.preview) $('h1', els.views.case).focus({ preventScroll: true });
     say('open_project', { force: true });
     track('open_project', { slug: p.slug });
+  } else if (next === 'archive') {
+    window.scrollTo(0, 0);
+    document.title = `${t('archive')} — ${name}`;
+    openArchive(prev);
+    track('view_archive');
   } else {
     window.scrollTo(0, 0);
     document.title = `${name} — ${tx(content.site.role)}`;
@@ -636,7 +687,11 @@ function show(next, opts = {}) {
   }
 }
 window.addEventListener('hashchange', route);
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view === 'case') location.hash = '#/work'; });
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (POL.state === 'count') polStop();                  // передумали фотографироваться
+  else if (view === 'case') location.hash = '#/work';
+});
 document.addEventListener('click', (e) => {
   const a = e.target.closest && e.target.closest('a');
   if (!a) return;
@@ -783,38 +838,41 @@ function offerTilt(instant = false) {
 // Вызывается один раз, когда голова создана: подписки на её события
 function wireHead() {
   head.setSceneColor(view === 'hero' ? '#FFFFFF' : '#D9D9D9');      // контровой свет цвета фона: голова «сидит» в сцене
-  head.cornerRect = () => cornerProbe.getBoundingClientRect();
+  head.cornerRect = probeRect;
   if (debug) window.__head = head;
 
   let selfReturned = false, lookT = 0;
+  // пока идёт отсчёт перед снимком или открыта карточка-полароид, на щипки голова не отвечает
+  const react = (ids, opts) => { if (!polBusy()) say(ids, opts); };
   head.addEventListener('grab', (e) => {
     activity();
     const r = e.detail.region;
-    if (REACTIONS[r]) say(REACTIONS[r], { pick: true });
+    if (REACTIONS[r]) react(REACTIONS[r], { pick: true });
     track('grab', { region: r });
   });
   head.addEventListener('release', (e) => {
     const s = e.detail.stretch;
+    store.set('stretched', true);
+    if (polBusy()) return;
     voice.boing(s);
     if (s > 0.75) say(REACTIONS.stretch, { force: true, pick: true });
-    store.set('stretched', true);
   });
-  head.addEventListener('poke', () => { voice.boing(0.2); say(REACTIONS.poke, { pick: true }); });
+  head.addEventListener('poke', () => { if (polBusy()) return; voice.boing(0.2); say(REACTIONS.poke, { pick: true }); });
   head.addEventListener('glassesoff', () => {
     selfReturned = false;
-    say(REACTIONS.glassesOff, { force: true, pick: true });
+    react(REACTIONS.glassesOff, { force: true, pick: true });
     // подсказка, зачем это всё: сквозь линзы мир резкий
     clearTimeout(lookT);
-    if (!session.get('lensTip', false)) lookT = setTimeout(() => { if (head.glasses.off) { session.set('lensTip', true); say('glasses_look', { force: true }); } }, 3200);
+    if (!session.get('lensTip', false)) lookT = setTimeout(() => { if (head.glasses.off) { session.set('lensTip', true); react('glasses_look', { force: true }); } }, 3200);
     track('glasses_off');
   });
-  head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); say('glasses_self', { force: true }); });
-  head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) say('glasses_on', { force: true }); selfReturned = false; });
+  head.addEventListener('glassesreturn', () => { selfReturned = true; clearTimeout(lookT); react('glasses_self', { force: true }); });
+  head.addEventListener('glasseson', () => { clearTimeout(lookT); if (!selfReturned) react('glasses_on', { force: true }); selfReturned = false; });
   head.addEventListener('spit', (e) => onSpit(e.detail));
   // сборка при загрузке: настоящий мозг появился — розовое пятно-заглушка под ним гаснет
   head.addEventListener('introstep', (e) => { if (e.detail.part === 'brain') { stage('brain'); els.ph.classList.add('is-out'); setTimeout(() => { els.ph.hidden = true; }, 320); } });
   head.addEventListener('model', () => stage('model'));
-  head.onTick = (dt) => { voice.tick(dt); };
+  head.onTick = (dt, now) => { voice.tick(dt); holdTick(now); };
   head.onFrame = () => { updateVeil(); };            // логотип при наклоне неподвижен — двигается только голова
 
   if (tiltWanted) head.enableTilt();                          // наклон уже разрешён (Android — сразу, iPhone — плашкой)
@@ -868,13 +926,13 @@ const idle = { i: 0, n: 0, mark: 0, at: 0 };      // следующая репл
 const spokeUntil = () => (subs ? Math.max(subs.busyUntil, subs.readUntil) : 0);      // до какого момента голова говорит (и её дочитывают)
 setInterval(() => {
   if (view !== 'hero' || !greeted || openId || dragging || spit.state !== 'off') return;
-  if (head && head.drags.size) { activity(); return; }
+  if ((head && head.drags.size) || polBusy()) { activity(); return; }
   const now = performance.now(), last = Math.max(lastActivity, head ? head.tilt.lastMove : 0);
   if (last > idle.mark) { idle.mark = last; idle.n = 0; }                 // посетитель шевельнулся — затишье считаем заново
   if (idle.n >= 3 || speaking()) return;
   // первая реплика — через 7 секунд; если плевкам задана совсем короткая задержка, оклик звучит раньше, чтобы успеть до них.
   // Когда весь список уже прозвучал, голова окликает реже (вдвое, втрое…), чтобы не надоедать
-  const calls = foldersOn ? REACTIONS.idle : REACTIONS.idleClean;
+  const calls = (foldersOn ? REACTIONS.idle : REACTIONS.idleClean).filter((id) => id !== 'idle_photo' || polOn());      // про полароид — только когда он включён
   const round = 1 + Math.floor(idle.i / calls.length);
   const wait = idle.n ? 13000 : Math.min(7, Math.max(2.5, SPIT_AFTER * 0.6)) * 1000 * round;
   if (now - (idle.n ? idle.at : Math.max(last, spokeUntil())) < wait) return;
@@ -916,7 +974,7 @@ document.addEventListener('visibilitychange', () => { spit.input = performance.n
 setInterval(() => {
   if (spit.state !== 'off' || !head || !head.loaded || !booted || reduced || document.hidden) return;
   if (view === 'work') { spit.input = performance.now(); return; }      // в каталоге головы нет — и плевков
-  if (head.drags.size || dragging || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
+  if (head.drags.size || dragging || polBusy() || [...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) { spit.input = performance.now(); return; }
   // отсчёт — с последнего действия посетителя: сколько задано в админке, столько и ждём. Оклики головы его не продлевают;
   // если время вышло, а она говорит, — дожидаемся конца реплики и ещё полторы секунды, чтобы не плевать, едва договорив
   const now = performance.now();
@@ -1000,6 +1058,255 @@ function stopSpit() {
   spit.input = performance.now();
   track('spit_wipe', { n: spit.n });
 }
+
+// ---------- визитка в конце кейса: голова переезжает в неё ----------
+// Внизу кейса — визитка (js/case.js, .vcard). Когда её место под голову почти целиком на экране, голова перелетает туда
+// из угла (сцена переезжает внутрь визитки и дальше прокручивается вместе со страницей), вокруг — конфетти, и голова
+// говорит, сколько кейсов посетитель уже посмотрел («высылай оффер»). Уехали от визитки — голова возвращается в угол.
+// Реплики — card_first, card_offer в js/lines.js; {n} — «3 кейса».
+// Реплики головы между блоками кейса (блок «Реплика головы» в админке): место доехало до середины экрана — голова
+// говорит. Не перебивает: если она ещё договаривает прошлую фразу, реплика ждёт в очереди
+const sayQ = { list: [], t: 0 };
+function caseSay(text) {
+  if (!subs || content.preview || !text) return;
+  sayQ.list.push(text);
+  pumpSay();
+}
+function pumpSay() {
+  clearTimeout(sayQ.t);
+  if (view !== 'case') { sayQ.list.length = 0; return; }
+  if (!sayQ.list.length || dock.on) return;
+  const wait = Math.max(subs.busyUntil, subs.readUntil) - performance.now();       // договорила и дала дочитать
+  if (wait > 0) { sayQ.t = setTimeout(pumpSay, wait + 60); return; }
+  subs.say(sayQ.list.shift(), { force: true });
+  if (sayQ.list.length) sayQ.t = setTimeout(pumpSay, 700);      // следующая — когда эта начнётся и станет ясно, сколько она длится
+}
+
+const dock = { on: false, slot: null, io: null, fired: false, said: false, confetti: false, home: null, subs: null, busy: 0 };
+const probeRect = () => cornerProbe.getBoundingClientRect();
+function setupDock(root) {
+  if (dock.io) { dock.io.disconnect(); dock.io = null; }
+  dock.slot = root.querySelector('[data-vcard-slot]');
+  dock.fired = false; dock.said = false; dock.confetti = false;
+  if (!dock.slot || !('IntersectionObserver' in window)) return;
+  dock.io = new IntersectionObserver((en) => {
+    const e = en[en.length - 1];
+    if (e.intersectionRatio >= 0.8 && !dock.on) dockIn();
+    else if (e.intersectionRatio < 0.3 && dock.on) dockOut();
+  }, { threshold: [0, 0.3, 0.8, 1] });
+  dock.io.observe(dock.slot);
+}
+// перелёт «как есть»: запомнили, где сцена была, переставили, и она плавно доезжает из старого места в новое
+function flip(el, from, ms) {
+  if (reduced || !from || !from.width) return Promise.resolve();
+  const to = el.getBoundingClientRect();
+  if (!to.width) return Promise.resolve();
+  el.style.transformOrigin = '0 0';
+  // старое место далеко за экраном (страницу промотали рывком) — голова влетает из-за края, а не через полстраницы
+  const H = window.innerHeight, fy = Math.min(H + 8, Math.max(-from.height - 8, from.top));
+  return el.animate([
+    { transform: `translate(${(from.left - to.left).toFixed(1)}px, ${(fy - to.top).toFixed(1)}px) scale(${(from.width / to.width).toFixed(4)})` },
+    { transform: 'none' },
+  ], { duration: ms, easing: 'cubic-bezier(.34,1.3,.5,1)' }).finished.catch(() => {});
+}
+async function dockIn() {
+  if (!head || view !== 'case' || dock.on || !dock.slot || document.body.classList.contains('no-webgl')) return;
+  const st = els.stage, from = st.getBoundingClientRect(), tk = ++dock.busy;
+  if (!dock.home) { dock.home = document.createComment('stage'); st.parentNode.insertBefore(dock.home, st); }
+  dock.on = true;
+  if (subs) subs.clear();
+  head.cornerRect = () => st.getBoundingClientRect();      // в визитке голова вписана в свой кружок, а не летит к главной
+  st.classList.add('is-dock');
+  dock.slot.insertBefore(st, dock.slot.firstChild);
+  head.frame();
+  await flip(st, from, 750);
+  if (!dock.on || tk !== dock.busy) return;
+  head.clearLook();
+  if (dock.fired) return;
+  dock.fired = true;
+  if (!dock.confetti) {                                     // хлопушка — один раз на кейс, даже если реплику пришлось повторить
+    dock.confetti = true;
+    const r = st.getBoundingClientRect();
+    if (!reduced) import('./confetti.js').then(({ confetti }) => { if (dock.on) confetti(r.left + r.width / 2, r.top + r.height * 0.35); }).catch(() => {});
+    vibrate([8, 30, 8]);
+  }
+  head.boing(0.08);
+  // сколько кейсов посмотрел: первый — одна реплика, дальше — «посмотрел уже N»
+  const seen = store.get('seenCases', []), n = Array.isArray(seen) ? Math.max(1, seen.length) : 1;
+  vars.n = count(n, 'cases');
+  const card = dock.slot.closest('[data-vcard]'), bubble = card && card.querySelector('[data-vcard-say]');
+  if (bubble && subs) {
+    if (!dock.subs || dock.subs.el !== bubble) {
+      const { Subtitles: S2 } = await import('./subtitles.js');
+      dock.subs = new S2({ el: bubble, srEl: $('[data-subs-sr]'), voice, lines: subs.lines, fmt: subs.fmt, reducedMotion: reduced });
+      dock.subs.onLine = () => card.classList.add('is-said');        // облачко появляется с первой буквой, подводка под ним прячется
+    }
+    if (dock.on) {
+      const ds = dock.subs, done = ds.say(n > 1 ? 'card_offer' : 'card_first', { force: true }), tok = ds.token;
+      done.then(() => { if (ds.token === tok && dock.subs === ds) dock.said = true; });       // договорила, а не оборвали на полуслове
+    }
+  }
+  track('vcard_dock', { n });
+}
+function dockOut(instant = false) {
+  if (!dock.on) { if (instant && dock.io) { dock.io.disconnect(); dock.io = null; } return; }
+  const st = els.stage, from = st.getBoundingClientRect(), tk = ++dock.busy;
+  dock.on = false;
+  // ушли, не дослушав, — реплика стирается и прозвучит снова, когда голова вернётся в визитку; договорённая остаётся
+  if (dock.subs && !dock.said) {
+    dock.subs.clear();
+    dock.fired = false;
+    const card = dock.subs.el.closest('[data-vcard]');
+    if (card) card.classList.remove('is-said');
+  }
+  st.classList.remove('is-dock');
+  if (dock.home && dock.home.parentNode) dock.home.parentNode.insertBefore(st, dock.home); else document.body.appendChild(st);
+  if (instant && dock.io) { dock.io.disconnect(); dock.io = null; }
+  head && head.frame();
+  const back = () => { if (tk === dock.busy && head) head.cornerRect = probeRect; };
+  if (instant) { st.getAnimations().forEach((a) => a.cancel()); back(); return; }
+  flip(st, from, 600).then(back);
+}
+
+// ---------- полароид: растянули и замерли — снимок (Figma: «Полароид») ----------
+// Голову тянут и держат неподвижно полторы секунды — она говорит «Замри! Три… Два… Один…», вокруг неё рамка
+// видоискателя, и кадр снимается (js/polaroid.js): вспышка, карточка выползает сверху и проявляется. Отсчёт идёт, даже
+// если голову уже отпустили, — можно успеть скорчить рожу. Пока идёт отсчёт и открыта карточка, голова не отвечает
+// на щипки, не окликает и не плюётся. Включается в админке («Полароид»), в содержимом это site.polaroidOn.
+const polOn = () => !!(content.site && content.site.polaroidOn === true) && !content.preview;
+const POL = { state: 'idle', armed: true, ax: 0, ay: 0, since: 0, t: 0, ui: null, mod: null, finder: null };     // state: idle | count | edit
+const HOLD_MS = 1500, STILL_PX = 14, STRETCH_MIN = 0.16;     // сколько держать, насколько неподвижно и насколько растянуть
+const polBusy = () => POL.state !== 'idle';
+if (debug) window.__pol = POL;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// каждый кадр головы: держат ли её растянутой и неподвижной
+function holdTick(now) {
+  if (POL.state !== 'idle' || !head) return;
+  if (!head.drags.size) { POL.armed = true; POL.since = 0; return; }       // отпустили — можно снимать снова
+  if (!POL.armed || head.drags.size !== 1 || view !== 'hero' || !polOn() || head.intro.on || spit.state !== 'off' || dragging) { POL.since = 0; return; }
+  const d = head.drags.values().next().value, h = d && d.handle;
+  if (!h) { POL.since = 0; return; }                                         // держат очки — это не позирование
+  const s = Math.hypot(h.d.x + h.e.x, h.d.y + h.e.y, h.d.z + h.e.z);
+  if (s < STRETCH_MIN) { POL.since = 0; return; }
+  if (!POL.since || Math.hypot(d.px - POL.ax, d.py - POL.ay) > STILL_PX) { POL.ax = d.px; POL.ay = d.py; POL.since = now; return; }
+  if (now - POL.since >= HOLD_MS) { POL.armed = false; polCountdown(); }
+}
+// рамка видоискателя вокруг головы — квадрат, как будущий кадр
+function finder(on) {
+  if (POL.finder) { POL.finder.remove(); POL.finder = null; }
+  const r = on && head && head.rect;
+  if (!r) return;
+  const side = Math.min(Math.max(r.w, r.h) * 1.12, window.innerWidth - 16), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const el = document.createElement('div');
+  el.className = 'pol-finder';
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = '<i></i><i></i><i></i><i></i><b></b>';
+  Object.assign(el.style, { left: `${(cx - side / 2).toFixed(1)}px`, top: `${(cy - side / 2).toFixed(1)}px`, width: `${side.toFixed(1)}px`, height: `${side.toFixed(1)}px` });
+  document.body.appendChild(el);
+  POL.finder = el;
+}
+function flash() {
+  if (reduced) return;
+  const f = document.createElement('div');
+  f.className = 'pol-flash';
+  f.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 900);
+}
+async function polCountdown(manual = false) {
+  if (POL.state !== 'idle' || !head || !head.loaded || view !== 'hero' || !polOn()) return;
+  POL.state = 'count';
+  const tk = ++POL.t;
+  const alive = () => POL.t === tk && POL.state === 'count' && view === 'hero' && !document.hidden;
+  if (!POL.mod) { POL.mod = import('./polaroid.js'); POL.mod.catch(() => { POL.mod = null; }); }      // модуль редактора качается, пока идёт отсчёт
+  closeFolder();
+  clearTimeout(pointT);
+  activity();
+  const r = head.rect;
+  if (r) head.lookAtClient(r.x + r.w / 2, r.y + r.h * 0.42);               // смотрит прямо в объектив
+  finder(true);
+  track('polaroid_countdown', { manual });
+  const steps = ['photo_3', 'photo_2', 'photo_1'];
+  for (let i = 0; i < steps.length; i++) {
+    if (!alive()) { polAbort(tk); return; }
+    say(steps[i], { force: true });
+    voice.beep(i === steps.length - 1);
+    await wait(reduced ? 800 : 1000);
+  }
+  let mod = null;
+  try { mod = await POL.mod; } catch (_) { mod = null; }
+  if (!alive()) { polAbort(tk); return; }
+  const shot = mod ? mod.capture(head) : null;
+  finder(false);
+  flash();
+  voice.shutter();
+  vibrate([12, 40, 8]);
+  head.clearLook();
+  if (!shot) { POL.state = 'idle'; say('photo_fail', { force: true }); return; }
+  POL.state = 'edit';
+  if (subs) subs.clear();
+  // карточку закрывает затемнение — голова под ним перестаёт рисоваться, чтобы не тратить батарею
+  setTimeout(() => { if (POL.state === 'edit' && head) head.sleep(true); }, 1700);
+  track('polaroid_shot');
+  POL.ui = mod.openPolaroid({ shot, reduced, voice, lines: subs.lines, fmt: subs.fmt, archive: els.archBtn, onClose: polClosed });
+}
+function polAbort(tk) {
+  if (POL.t !== tk) return;
+  finder(false);
+  POL.state = 'idle';
+  if (head) head.clearLook();
+}
+function polClosed(res, entry, again) {
+  POL.ui = null; POL.state = 'idle'; POL.armed = false; POL.since = 0;
+  if (head && view !== 'work') head.sleep(false);
+  if (view !== 'hero') return;
+  if (res === 'saved') { say(again ? 'photo_saved_again' : 'photo_saved', { force: true }); archMinis(); track('polaroid_saved', { again: !!again }); }
+  else if (res === 'retake') say('photo_retake', { force: true });
+  else if (res === 'failed') say('photo_fail', { force: true });
+  else say('photo_close', { force: true });
+}
+// прервать отсчёт и закрыть карточку (ушли с главной, Esc)
+function polStop() {
+  if (POL.state === 'count') { POL.t++; finder(false); POL.state = 'idle'; if (head) head.clearLook(); }
+  if (POL.ui) { const ui = POL.ui; POL.ui = null; ui.close(); }
+}
+// без мыши и пальца: невидимая кнопка (видна при переходе по Tab) запускает тот же отсчёт
+if (els.polShot) els.polShot.addEventListener('click', () => polCountdown(true));
+
+// Кружок «Архив» на главной (Figma: справа внизу, на телефоне — слева от кнопок): две свежие карточки
+async function archMinis(fresh = false) {
+  if (!els.archBtn || document.body.classList.contains('no-pol')) return;
+  let list = [];
+  try { list = await latestPhotos(2, fresh); } catch (_) { list = []; }
+  const put = (sel, src) => {
+    const im = els.archBtn.querySelector(sel);
+    if (!im) return;
+    if (src) { if (im.getAttribute('src') !== src) im.src = src; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
+  };
+  put('.arch-mini--b img', list[0]);
+  put('.arch-mini--a img', list[1]);
+}
+window.addEventListener('ph:polaroids', () => archMinis());
+
+// ---------- архив полароидов (#/archive, js/archive.js) ----------
+let archiveView = null;
+async function openArchive(prev) {
+  try {
+    if (!archiveView) {
+      const { createArchive } = await import('./archive.js');
+      archiveView = createArchive(els.views.archive, {
+        reduced,
+        onScroll: () => { if (view === 'archive') layout(); },
+        onLoad: (n) => { if (view === 'archive' && greetedOnce()) say(n ? 'archive_open' : 'archive_empty', { force: true }); },
+      });
+    }
+    if (view !== 'archive') return;
+    const p = archiveView.open();
+    if (prev && !content.preview) { const h = $('#archive-title'); if (h) h.focus({ preventScroll: true }); }
+    await p;
+  } catch (e) { console.warn('Архив полароидов не открылся', e); }
+}
+const greetedOnce = () => !!head && booted;            // голова уже собралась — может говорить и в архиве
 
 // ---------- проверка на телефоне: адрес …/?diag показывает, что видит сайт ----------
 // Удобно, когда «на телефоне что-то не так»: размер экрана, размер головы, защищено ли соединение и жив ли датчик наклона.
@@ -1102,6 +1409,7 @@ if (content.preview) {
 }
 
 // ---------- старт ----------
+const vars = {};                 // подстановки в реплики: {name}, {nameGen}, {role} — из настроек сайта, {n} — «3 кейса» (визитка)
 async function boot() {
   const voiceReady = voice.init();            // список записей голоса — не ждём его, он понадобится только к приветствию
   try {
@@ -1113,7 +1421,7 @@ async function boot() {
   }
   const site = content.site;
   SPIT_AFTER = spitDelay(site);
-  const vars = { name: tx(site.name), nameGen: tx(site.nameGen) || tx(site.name), role: tx(site.role) };
+  Object.assign(vars, { name: tx(site.name), nameGen: tx(site.nameGen) || tx(site.name), role: tx(site.role) });
   subs = new Subtitles({
     el: els.subs, srEl: $('[data-subs-sr]'), voice, reducedMotion: reduced,
     lines: linesFor(content.lang, site.lines),          // исходные реплики и поверх — свои, из админки
@@ -1181,6 +1489,8 @@ async function boot() {
   stage('ready');
   booted = true;
   spit.input = performance.now();      // бездействие считаем с момента, когда сайт готов, а не пока он грузился
+  // полароиды: свои неотправленные карточки уходят в архив, в кружок «Архив» встают две свежие
+  if (polOn()) { flushPolaroids(); setTimeout(() => archMinis(), 2500); }
   if (view === 'hero') greet();
   if (query.has('diag')) diag();
   // каталог откроют следующим шагом: первые папки подгружаем заранее, когда главный экран уже готов

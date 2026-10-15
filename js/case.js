@@ -134,6 +134,12 @@ const BLOCKS = {
     return `<figure class="blk blk-video blk--${widthOf(b)}">${h2(b)}<video src="${esc(src)}"${b.poster ? ` poster="${esc(b.poster)}"` : ''} preload="metadata" controls playsinline${loop ? ' muted loop data-loop' : ''}${tx(b.alt) ? ` aria-label="${esc(tx(b.alt))}"` : ''}></video>${cap(b)}</figure>`;
   },
 
+  // Реплика головы — точка между блоками (админка → блок «Реплика головы»): на экране её не видно, доехали до неё —
+  // голова в углу говорит текст. Сам текст — в поле say, как у реплики любого блока
+  say(b) {
+    return tx(b.say) ? '<div class="blk blk-say" aria-hidden="true"></div>' : '';
+  },
+
   palette(b) {
     const cs = (b.colors || []).filter((c) => color(c.hex));
     if (!cs.length) return '';
@@ -216,13 +222,18 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
       ${blocks ? `<div class="case-blocks">${blocks}</div>` : ''}
       ${tags.length ? `<ul class="case-tags" aria-label="${esc(t('tags'))}">${tags.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
       <section class="case-end">
-        <div class="case-contact">
-          ${mail || tg ? `<p>${esc(t('talk'))}</p>` : ''}
-          <div class="row">
-            ${mail ? `<a class="btn" href="mailto:${esc(mail)}" data-contact="email">${esc(t('write'))}</a>` : ''}
-            ${tg ? `<a class="btn${mail ? ' btn--line' : ''}" href="${esc(tg)}" target="_blank" rel="noopener" data-contact="telegram">${esc(t('telegram'))}</a>` : ''}
-            ${cv ? `<a class="btn btn--line" data-cv href="${esc(cv)}" download>${esc(t('downloadCv'))}</a>` : ''}
-            <a class="btn btn--line" href="#/work">${esc(t('allWork'))}</a>
+        <div class="vcard rv" data-vcard>
+          <div class="vcard-head" data-vcard-slot><span class="vcard-ph" aria-hidden="true"></span></div>
+          <div class="vcard-body">
+            <div class="vcard-top">${mail || tg ? `<p class="vcard-kicker">${esc(t('talk'))}</p>` : ''}<div class="vcard-say" data-vcard-say aria-hidden="true"></div></div>
+            <h2 class="vcard-name">${esc(tx(site.name))}</h2>
+            ${tx(site.role) ? `<p class="vcard-role">${esc(tx(site.role))}</p>` : ''}
+            <div class="vcard-acts">
+              ${mail ? `<a class="btn" href="mailto:${esc(mail)}" data-contact="email">${esc(t('write'))}</a>` : ''}
+              ${tg ? `<a class="btn${mail ? ' btn--line' : ''}" href="${esc(tg)}" target="_blank" rel="noopener" data-contact="telegram">${esc(t('telegram'))}</a>` : ''}
+              ${cv ? `<a class="btn btn--line" data-cv href="${esc(cv)}" download>${esc(t('downloadCv'))}</a>` : ''}
+            </div>
+            ${mail || tg ? `<p class="vcard-links">${[mail ? `<a href="mailto:${esc(mail)}" data-contact="email">${esc(mail)}</a>` : '', tg ? `<a href="${esc(tg)}" target="_blank" rel="noopener" data-contact="telegram">${esc(String(site.telegram || '').trim().replace(/^https?:\/\/t\.me\//i, '@'))}</a>` : ''].filter(Boolean).join('<span aria-hidden="true"> · </span>')}</p>` : ''}
           </div>
         </div>
         ${next ? `<div class="case-next">${folderHTML({
