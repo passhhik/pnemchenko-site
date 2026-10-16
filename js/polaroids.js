@@ -41,7 +41,7 @@ function cleanItem(it) {
 export async function fetchList(api, { before = '', n = 24, key = '', all = false } = {}) {
   const q = new URLSearchParams({ [all ? 'all' : 'list']: '1', n: String(n) });
   if (before) q.set('before', before);
-  const r = await fetch(`${api}?${q}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: key ? { authorization: `Bearer ${key}` } : {} });
+  const r = await fetch(`${api}?${q}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: key ? { 'x-mod-key': key } : {} });
   if (!r.ok) { const e = new Error(`архив ответил ${r.status}`); e.status = r.status; throw e; }
   const j = await r.json();
   return { items: (Array.isArray(j.items) ? j.items : []).map(cleanItem).filter(Boolean), next: typeof j.next === 'string' ? j.next : '' };
@@ -141,8 +141,9 @@ export async function latestPhotos(n = 2, fresh = false) {
 }
 
 // ---------- модерация (админка) ----------
+// Ключ — в заголовке X-Mod-Key, не в Authorization: тот Cloud Functions проверяет как IAM-токен и до функции не пускает
 async function modFetch(url, key, opts = {}) {
-  const r = await fetch(url, { ...opts, cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { authorization: `Bearer ${key}` } });
+  const r = await fetch(url, { ...opts, cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
   if (!r.ok) { const e = new Error(r.status === 401 || r.status === 403 ? 'ключ модератора не подошёл' : `архив ответил ${r.status}`); e.status = r.status; throw e; }
   return r;
 }

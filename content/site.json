@@ -85,7 +85,7 @@
   "heart": "#FF343A"
  },
  "polaroidOn": true,
- "polaroidsApi": "",
+ "polaroidsApi": "https://functions.yandexcloud.net/d4e9c256p9ar7dg0l4ib",
  "polaroid": {
   "stickers": [
    {

@@ -11,7 +11,8 @@
 //        key — секрет автора карточки (в базе лежит только его хеш). Карточка одна на человека: сайт присылает новую
 //        вместе с "replace":{"id":"<прошлая>","key":"<её секрет>"} — прошлая удаляется.
 //
-// Модерация — с заголовком Authorization: Bearer <MOD_KEY> (ключ — в переменных функции, его же вводят в админке):
+// Модерация — с заголовком X-Mod-Key: <MOD_KEY> (ключ — в переменных функции, его же вводят в админке). Не Authorization:
+// этим заголовком Cloud Functions проверяет IAM-токен вызова и чужое значение отбивает ответом 403 ещё до функции.
 //   GET  ?all=1[&before][&n]           → то же, что list, вместе со скрытыми (у них h: 1)
 //   GET  ?img=<id>                     → фото, даже у скрытой карточки
 //   POST ?hide=<id>&v=1                → скрыть (v=0 — вернуть)
@@ -20,7 +21,9 @@
 // Защита от мусора: формат и размер фото, длина подписи, проверка наклеек; не больше IP_HOUR карточек в час с одного
 // адреса и DAY_MAX в сутки на весь архив. Адрес посетителя не хранится — только хеш с секретной солью и номером часа
 // (счётчик на час); соль функция придумывает сама и хранит в базе. Мат в подписи — карточка сразу скрыта, её можно
-// вернуть в админке. PREMOD=1 — все новые карточки скрыты, пока их не покажут в админке. Как развернуть — README.md рядом.
+// вернуть в админке. PREMOD=1 — все новые карточки скрыты, пока их не покажут в админке. ALLOW_ORIGIN — адреса сайта
+// через запятую: браузер принимает ответы только для них, и карточки из браузера принимаются только с них.
+// Как развернуть — README.md рядом.
 const crypto = require('crypto');
 
 const BASE = process.env.TABLE || 'polaroids';
@@ -54,10 +57,10 @@ async function ddb(op, input) {
   }
   return j;
 }
+// Адрес сайта для браузера (Access-Control-Allow-Origin) дописывает handler: см. origins() ниже
 const CORS = {
-  'Access-Control-Allow-Origin': process.env.ALLOW_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
+  'Access-Control-Allow-Headers': 'content-type, x-mod-key, authorization',
   'Access-Control-Max-Age': '86400',
 };
 const reply = (statusCode, body) => ({ statusCode, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) });
@@ -158,12 +161,13 @@ async function rateOk(ip) {
   if ((await bump(`ip:${who}:${hour}`)) > IP_HOUR) return false;
   return (await bump(`day:${day}`)) <= DAY_MAX;
 }
-// модератор — тот, кто прислал ключ из переменной MOD_KEY (сравниваем хеши: время ответа не подсказывает ключ)
+// модератор — тот, кто прислал ключ из переменной MOD_KEY (сравниваем хеши: время ответа не подсказывает ключ).
+// Ключ — в X-Mod-Key; Authorization: Bearer — запасной путь, если функция стоит за API Gateway
 function isMod(event) {
   const key = process.env.MOD_KEY || '';
-  const m = /^Bearer\s+(.+)$/i.exec(header(event, 'authorization'));
-  if (key.length < 12 || !m) return false;
-  const a = crypto.createHash('sha256').update(m[1].trim()).digest(), b = crypto.createHash('sha256').update(key).digest();
+  const given = header(event, 'x-mod-key').trim() || ((/^Bearer\s+(.+)$/i.exec(header(event, 'authorization')) || [])[1] || '').trim();
+  if (key.length < 12 || !given) return false;
+  const a = crypto.createHash('sha256').update(given).digest(), b = crypto.createHash('sha256').update(key).digest();
   return crypto.timingSafeEqual(a, b);
 }
 
@@ -270,8 +274,16 @@ async function moderate(q) {
   return reply(200, { ok: true, h: Number(h) });
 }
 
-module.exports.handler = async (event, context) => {
-  TOKEN = (context && context.token && context.token.access_token) || process.env.YDB_TOKEN || '';
+// ---------- с какого сайта ----------
+// ALLOW_ORIGIN — адреса сайта через запятую: он открывается и с www, и без («https://pnemchenko.ru, https://www.pnemchenko.ru»).
+// Браузеру отвечаем тем адресом из списка, с которого пришёл запрос. Пусто — любой адрес (*).
+const origins = () => String(process.env.ALLOW_ORIGIN || '').split(/[\s,]+/).map((s) => s.replace(/\/+$/, '').toLowerCase()).filter(Boolean);
+const originOf = (event) => header(event, 'origin').replace(/\/+$/, '').toLowerCase();
+// Карточки шлёт только сам сайт: чужая страница не отправит их руками своих посетителей (CORS этого не запрещает —
+// он только прячет ответ). Запрос без Origin (не из браузера) пропускаем: заголовок и так подделывается, от этого — лимит на адрес
+const originOk = (event) => { const allow = origins(), from = originOf(event); return !allow.length || !from || allow.includes(from); };
+
+async function route(event) {
   const method = String(event.httpMethod || 'GET').toUpperCase();
   const q = event.queryStringParameters || {};
   try {
@@ -285,6 +297,7 @@ module.exports.handler = async (event, context) => {
     }
     if (method === 'POST') {
       if (q.hide || q.del) return mod ? await moderate(q) : reply(401, { error: 'moderator key required' });
+      if (!originOk(event)) return reply(403, { error: 'origin not allowed' });
       return await create(event);
     }
     return reply(405, { error: 'method not allowed' });
@@ -292,6 +305,15 @@ module.exports.handler = async (event, context) => {
     console.error(e);
     return reply(500, { error: e.name === 'Config' ? `not configured: ${e.message}` : 'server error' });
   }
+}
+
+module.exports.handler = async (event, context) => {
+  TOKEN = (context && context.token && context.token.access_token) || process.env.YDB_TOKEN || '';
+  const res = await route(event);
+  const allow = origins(), from = originOf(event);
+  res.headers = { ...res.headers, 'Access-Control-Allow-Origin': !allow.length ? '*' : (from && allow.includes(from) ? from : allow[0]) };
+  if (allow.length > 1) res.headers.Vary = 'Origin';
+  return res;
 };
 // для проверки фильтра мата (node -e "console.log(require('./index.js')._bad('…'))")
 module.exports._bad = bad;
