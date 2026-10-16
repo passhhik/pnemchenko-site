@@ -194,17 +194,31 @@ async function list({ before, n, all }) {
   }
   return { items, next };
 }
+// Фото карточек не меняются: тёплый экземпляр функции держит недавние в памяти и не читает их из базы заново
+// (фото — самая дорогая часть чтения). Карточка всё равно проверяется каждый раз: скрытую или удалённую не отдаём
+const IMG_CACHE = new Map(), IMG_CACHE_MAX = 24 * 1024 * 1024;
+let imgBytes = 0;
+function cachePut(id, v) {
+  if (IMG_CACHE.has(id)) return;
+  IMG_CACHE.set(id, v); imgBytes += v.b.length;
+  while (imgBytes > IMG_CACHE_MAX && IMG_CACHE.size) { const [k, o] = IMG_CACHE.entries().next().value; IMG_CACHE.delete(k); imgBytes -= o.b.length; }
+}
 async function image(id, mod) {
   const nf = { statusCode: 404, headers: { ...CORS, 'Cache-Control': 'no-store' }, body: '' };
   if (!ID.test(id)) return nf;
   const card = await withTable(T.cards, () => ddb('GetItem', ({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
   if (!card.Item || (Number(card.Item.h && card.Item.h.N) && !mod)) return nf;
-  const im = await withTable(T.img, () => ddb('GetItem', ({ TableName: T.img, Key: { id: { S: id } } })));
-  if (!im.Item || !im.Item.b) return nf;
+  let v = IMG_CACHE.get(id);
+  if (!v) {
+    const im = await withTable(T.img, () => ddb('GetItem', ({ TableName: T.img, Key: { id: { S: id } } })));
+    if (!im.Item || !im.Item.b) return nf;
+    v = { b: im.Item.b.S, m: (im.Item.m && im.Item.m.S) || 'image/webp' };
+    cachePut(id, v);
+  }
   return {
     statusCode: 200,
-    headers: { ...CORS, 'Content-Type': (im.Item.m && im.Item.m.S) || 'image/webp', 'Cache-Control': mod ? 'private, no-store' : 'public, max-age=31536000, immutable' },
-    body: im.Item.b.S, isBase64Encoded: true,
+    headers: { ...CORS, 'Content-Type': v.m, 'Cache-Control': mod ? 'private, no-store' : 'public, max-age=31536000, immutable' },
+    body: v.b, isBase64Encoded: true,
   };
 }
 async function create(event) {
@@ -237,6 +251,8 @@ async function create(event) {
 const sha = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 async function drop(id) {
+  const c = IMG_CACHE.get(id);
+  if (c) { IMG_CACHE.delete(id); imgBytes -= c.b.length; }
   await withTable(T.cards, () => ddb('DeleteItem', ({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
   await withTable(T.img, () => ddb('DeleteItem', ({ TableName: T.img, Key: { id: { S: id } } })));
 }
