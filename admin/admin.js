@@ -799,11 +799,15 @@ async function polModerate(id, act) {
   polRedraw();
 }
 
-// ---------- статистика ----------
+// ---------- статистика: дашборд ----------
 // Свой счётчик без cookie: сайт шлёт события визитов в функцию архива полароидов (js/stats.js), отчёт — с ключом
-// модератора. Здесь — сводки, ссылки для откликов (?from=…) и последние визиты. Админка помечает этот браузер как ваш:
-// свои заходы на сайт не считаются.
-st.stats = { days: 30, data: null, note: '', busy: false, co: '', me: true };
+// модератора. Дашборд: период сверху, ниже всё считается по нему — показатели с прошлым периодом, визиты по дням,
+// воронка, отклики (?from=…), источники и устройства, кейсы, когда заходят, последние визиты и таблица по дням.
+// Функция отдаёт до 92 суток: для сравнения грузим вдвое больше периода, поэтому у «90 дней» сравнения нет.
+// Админка помечает этот браузер как ваш — свои заходы на сайт не считаются.
+const PERIODS = [[1, '24 часа'], [7, '7 дней'], [30, '30 дней'], [90, '90 дней']];
+const VS_PREV = { 1: 'с предыдущими 24 часами', 7: 'с предыдущими 7 днями', 30: 'с предыдущими 30 днями' };
+st.stats = { days: 30, data: null, note: '', busy: false, co: '', me: true, more: 0, keyOpen: false, err: '' };
 markOwner(true);
 const coSlug = (v) => String(v || '').toLowerCase().replace(/[а-яё]/g, (c) => TR[c] ?? '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 const siteUrl = () => { const h = location.hostname; return /^(localhost|127\.)/.test(h) ? 'https://pnemchenko.ru/' : `${location.origin}/`; };
@@ -812,86 +816,243 @@ const REF = [[/(^|\.)hh\.ru$|headhunter/, 'hh.ru'], [/^t\.me$|telegram/, 'Telegr
 const refName = (h) => { for (const [re, n] of REF) if (re.test(h)) return n; return h; };
 const srcOf = (x) => (x.from ? `ссылка «${x.from}»` : x.ref ? refName(x.ref) : 'прямой заход');
 const DEV = { phone: 'Телефон', tablet: 'Планшет', desktop: 'Компьютер' };
-const dur = (s) => { s = Math.round(s || 0); if (s < 60) return `${s} с`; const m = Math.floor(s / 60); return m < 60 ? `${m} мин${s % 60 ? ` ${s % 60} с` : ''}` : `${Math.floor(m / 60)} ч ${m % 60} мин`; };
+const WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+const dur = (s) => { s = Math.round(s || 0); if (s < 60) return `${s} с`; const m = Math.floor(s / 60); return m < 60 ? `${m} мин${s % 60 && m < 10 ? ` ${s % 60} с` : ''}` : `${Math.floor(m / 60)} ч ${m % 60} мин`; };
 const when = (ms) => { try { return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+const dmy = (ms) => new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 const dayKey = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const caseName = (slug) => { const p = st.projects.find((x) => x.slug === slug); return p ? txAny(p.title) || slug : slug; };
-const pct = (n, all) => (all ? `${Math.round((n / all) * 100)}%` : '');
+const pl = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b === 1 ? one : b > 1 && b < 5 ? few : many; };
+const VIS = (n) => pl(n, 'визит', 'визита', 'визитов');
+const PPL = (n) => pl(n, 'человек', 'человека', 'человек');
+const pctN = (n, all) => (all ? Math.round((n / all) * 100) : 0);
+const num = (n) => Number(n || 0).toLocaleString('ru-RU');
+const tip = (title, rows) => `data-tip="${esc(title)}" data-tip-rows="${esc(rows.map(([v, l]) => `${v}~${l}`).join('|'))}"`;
+const vTime = (v) => v.act || Math.round((v.t1 - v.t0) / 1000);
+const watched = (v) => Object.values(v.c || {}).some((s) => s >= 30);
+const reached = (v) => v.cv || v.ct.length;
+const median = (a) => { const s = a.filter((x) => x > 0).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+
+// Сводные числа одного периода
+function summary(vs) {
+  return {
+    n: vs.length,
+    people: new Set(vs.flatMap((v) => v.u.map((u) => `${dayKey(v.t0)}|${u}`))).size,
+    cases: vs.filter((v) => v.open.length).length,
+    watched: vs.filter(watched).length,
+    cv: vs.filter((v) => v.cv).length,
+    ct: vs.filter((v) => v.ct.length).length,
+    reached: vs.filter(reached).length,
+    time: median(vs.map(vTime)),
+  };
+}
+// Корзины времени для графика: по часам за 24 часа, иначе по дням
+function buckets(days, now) {
+  const out = [];
+  if (days === 1) {
+    const h0 = new Date(now); h0.setMinutes(0, 0, 0);
+    for (let i = 23; i >= 0; i--) { const t = h0.getTime() - i * 36e5; out.push({ t, end: t + 36e5, label: `${String(new Date(t).getHours()).padStart(2, '0')}:00` }); }
+  } else {
+    const d0 = new Date(now); d0.setHours(0, 0, 0, 0);
+    for (let i = days - 1; i >= 0; i--) { const s = new Date(d0); s.setDate(s.getDate() - i); const e = new Date(s); e.setDate(e.getDate() + 1); out.push({ t: s.getTime(), end: e.getTime(), label: dmy(s.getTime()) }); }
+  }
+  return out;
+}
+const fill = (bs, vs) => bs.map((b) => { const list = vs.filter((v) => v.t0 >= b.t && v.t0 < b.end); return { ...b, n: list.length, s: summary(list) }; });
+
+// ---- показатели ----
+function deltaHTML(cur, prev, has, fmt = num) {
+  if (!has) return '';
+  const d = cur - prev;
+  if (!prev && !cur) return '<span class="db-delta">как в прошлый период: 0</span>';
+  const dir = d > 0 ? 'up' : d < 0 ? 'down' : 'flat';
+  const mark = d > 0 ? '▲' : d < 0 ? '▼' : '=';
+  const rel = prev ? ` · ${d > 0 ? '+' : ''}${Math.round((d / prev) * 100)}%` : '';
+  return `<span class="db-delta is-${dir}"><span aria-hidden="true">${mark}</span> было ${esc(fmt(prev))}${rel}</span>`;
+}
+function spark(series) {
+  if (series.length < 2) return '';
+  const max = Math.max(1, ...series), n = series.length - 1;
+  const pts = series.map((v, i) => `${((i / n) * 100).toFixed(2)},${(22 - (v / max) * 20).toFixed(2)}`);
+  const last = series[series.length - 1] / max;
+  return `<svg class="db-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.join(' ')}" vector-effect="non-scaling-stroke"/></svg><i class="db-spark-dot" style="bottom:${(12 + ((2 + last * 20) / 24) * 20 - 4).toFixed(1)}px"></i>`;
+}
+function kpi(label, value, cur, prev, has, series, opts = {}) {
+  return `<div class="db-kpi${opts.hero ? ' db-kpi--hero' : ''}">
+    <span class="db-kpi-l">${esc(label)}</span>
+    <b class="db-kpi-v">${esc(value)}</b>
+    ${opts.sub ? `<span class="db-kpi-sub">${esc(opts.sub)}</span>` : ''}
+    ${deltaHTML(cur, prev, has, opts.fmt)}
+    ${spark(series)}
+  </div>`;
+}
+
+// ---- визиты по времени: столбики этого периода, чёрточки — прошлого ----
+function niceMax(m) { if (m <= 4) return 4; const p = 10 ** Math.floor(Math.log10(m)), f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+function trendHTML(cur, prev, has, days) {
+  const top = niceMax(Math.max(1, ...cur.map((b) => b.n), ...(has ? prev.map((b) => b.n) : [])));
+  const ticks = [0, top / 2, top];
+  const every = Math.ceil(cur.length / 8);
+  const unit = days === 1 ? 'час' : 'день';
+  return `<div class="db-trend">
+    <div class="db-legend"><span><i class="db-lk db-lk--bar"></i>этот период</span>${has ? '<span><i class="db-lk db-lk--tick"></i>прошлый период</span>' : ''}<span class="hint">по ${unit}ам, наведите на столбик</span></div>
+    <div class="db-plot">
+      <div class="db-yaxis" aria-hidden="true">${ticks.slice().reverse().map((t) => `<span>${num(t)}</span>`).join('')}</div>
+      <div class="db-area">
+        ${ticks.map((t) => `<i class="db-grid" style="bottom:${(t / top) * 100}%"></i>`).join('')}
+        <div class="db-cols">${cur.map((b, i) => {
+    const p = has ? prev[i] : null;
+    const rows = [[b.n, VIS(b.n)], [b.s.people, PPL(b.s.people)], [b.s.cases, 'открыли кейс'], [b.s.cv, 'скачали резюме'], [b.s.ct, 'нажали на контакт']];
+    if (p) rows.push([p.n, `${VIS(p.n)} в прошлый период (${p.label})`]);
+    return `<span class="db-col" tabindex="0" ${tip(days === 1 ? `${dmy(b.t)}, ${b.label}` : `${WD[(new Date(b.t).getDay() + 6) % 7]}, ${b.label}`, rows)}>
+            <i class="db-bar" style="height:${(b.n / top) * 100}%"></i>${p ? `<i class="db-tick" style="bottom:${(p.n / top) * 100}%"></i>` : ''}</span>`;
+  }).join('')}</div>
+      </div>
+    </div>
+    <div class="db-xaxis" aria-hidden="true">${cur.map((b, i) => `<span>${(cur.length - 1 - i) % every === 0 ? esc(b.label) : ''}</span>`).join('')}</div>
+  </div>`;
+}
+
+// ---- воронка ----
+function funnelHTML(s) {
+  const steps = [['Зашли на сайт', s.n], ['Открыли кейс', s.cases], ['Смотрели кейс дольше 30 с', s.watched], ['Скачали резюме или написали', s.reached]];
+  return `<ol class="db-funnel">${steps.map(([l, n]) => `<li tabindex="0" ${tip(l, [[n, VIS(n)], [`${pctN(n, s.n)}%`, 'от всех визитов']])}>
+      <span class="db-f-l">${esc(l)}</span><span class="db-f-track"><i style="width:${s.n ? (n / s.n) * 100 : 0}%"></i></span><b>${num(n)}</b><span class="db-f-p">${pctN(n, s.n)}%</span></li>`).join('')}</ol>`;
+}
+
+// ---- разбивки: откуда, устройство… ----
 function tally(list, keyOf) {
   const m = new Map();
   for (const v of list) for (const k of [].concat(keyOf(v)).filter(Boolean)) m.set(k, (m.get(k) || 0) + 1);
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
-const tallyHTML = (title, rows, all) => `<div class="st-col"><h3>${esc(title)}</h3>${rows.length
-  ? `<ul class="st-list">${rows.slice(0, 8).map(([k, n]) => `<li><span>${esc(k)}</span><b>${n}</b><i>${pct(n, all)}</i><s style="--w:${all ? (n / all) * 100 : 0}%"></s></li>`).join('')}</ul>`
-  : '<p class="hint">Пока нет данных.</p>'}</div>`;
-function statsBody(d) {
-  const vs = d.visits || [], n = vs.length;
-  if (!n) return `<p class="hint">За ${d.days} дн. заходов не было — или функция ещё не получила ни одного события. Откройте сайт с телефона (не из этого браузера) и обновите отчёт через минуту.</p>`;
-  const withCases = vs.filter((v) => v.open.length).length, cv = vs.filter((v) => v.cv).length, ct = vs.filter((v) => v.ct.length).length;
-  const acts = vs.map((v) => v.act || Math.round((v.t1 - v.t0) / 1000)).filter((s) => s > 0).sort((a, b) => a - b);
-  const median = acts.length ? acts[Math.floor(acts.length / 2)] : 0;
-  const people = new Set(vs.flatMap((v) => v.u.map((u) => `${dayKey(v.t0)}|${u}`))).size;
-  // по дням — в местном времени
-  const days = [];
-  for (let i = d.days - 1; i >= 0; i--) { const t = Date.now() - i * 864e5; days.push({ k: dayKey(t), t, n: 0 }); }
-  const byDay = new Map(days.map((x) => [x.k, x]));
-  for (const v of vs) { const x = byDay.get(dayKey(v.t0)); if (x) x.n++; }
-  const top = Math.max(1, ...days.map((x) => x.n));
-  // отклики: ссылки ?from=
-  const froms = new Map();
-  for (const v of vs) if (v.x.from) { const a = froms.get(v.x.from) || []; a.push(v); froms.set(v.x.from, a); }
-  // кейсы
-  const cases = new Map();
-  for (const v of vs) for (const s of v.open) { const c = cases.get(s) || { n: 0, sec: [], lk: 0 }; c.n++; if (v.c[s]) c.sec.push(v.c[s]); cases.set(s, c); }
-  for (const v of vs) for (const s of v.lk) { const c = cases.get(s) || { n: 0, sec: [], lk: 0 }; c.lk++; cases.set(s, c); }
-  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
-  const visitRow = (v) => `<li class="st-visit">
-      <span class="st-v-when">${esc(when(v.t0))}</span>
-      <span class="st-v-main"><b>${esc(srcOf(v.x))}</b> · ${esc([DEV[v.x.dev], v.x.os, v.x.br].filter(Boolean).join(', ') || 'устройство неизвестно')}${v.x.scr ? ` · ${esc(v.x.scr)}` : ''}${v.x.tz ? ` · ${esc(v.x.tz.replace(/_/g, ' '))}` : ''}
-        <span class="hint">${esc(dur(v.act || (v.t1 - v.t0) / 1000))}${v.open.length ? ` · кейсы: ${esc(v.open.map((s) => `${caseName(s)}${v.c[s] ? ` (${dur(v.c[s])})` : ''}`).join(', '))}` : ' · кейсы не открывал'}${v.cv ? ' · <b>скачал резюме</b>' : ''}${v.ct.length ? ` · <b>нажал «${esc(v.ct.join(', '))}»</b>` : ''}${v.pol ? ' · сделал полароид' : ''}${v.fun.includes('glasses') ? ' · снял очки' : ''}${v.fun.includes('spit') ? ' · дождался плевков' : ''}</span></span>
-    </li>`;
-  return `
-    <div class="st-tiles">
-      <div class="st-tile"><b>${n}</b><span>визитов</span></div>
-      <div class="st-tile"><b>${people}</b><span>человек (уникальных за день)</span></div>
-      <div class="st-tile"><b>${withCases}</b><span>открыли кейс · ${pct(withCases, n)}</span></div>
-      <div class="st-tile"><b>${cv}</b><span>скачали резюме</span></div>
-      <div class="st-tile"><b>${ct}</b><span>нажали на контакт</span></div>
-      <div class="st-tile"><b>${esc(dur(median))}</b><span>обычно на сайте (медиана)</span></div>
-    </div>
-    <div class="st-chart" role="img" aria-label="Визиты по дням">${days.map((x) => `<span class="st-day" title="${esc(new Date(x.t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }))}: ${x.n}"><i style="--h:${(x.n / top) * 100}%"></i></span>`).join('')}</div>
-    <div class="st-axis hint"><span>${esc(new Date(days[0].t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }))}</span><span>сегодня</span></div>
-    ${froms.size ? `<h3 class="st-h">Ссылки из откликов</h3><ul class="st-from">${[...froms.entries()].sort((a, b) => b[1][0].t0 - a[1][0].t0).map(([f, list]) => {
+function barsHTML(title, rows, all, max = 6) {
+  let shown = rows;
+  if (rows.length > max) { const rest = rows.slice(max - 1).reduce((a, [, n]) => a + n, 0); shown = [...rows.slice(0, max - 1), ['другое', rest]]; }
+  return `<section class="db-card"><h3>${esc(title)}</h3>${shown.length
+    ? `<ul class="db-bars">${shown.map(([k, n]) => `<li tabindex="0" ${tip(k, [[n, VIS(n)], [`${pctN(n, all)}%`, 'от всех']])}><span class="db-b-l">${esc(k)}</span><b>${num(n)}</b><span class="db-b-p">${pctN(n, all)}%</span><span class="db-b-track"><i style="width:${all ? (n / all) * 100 : 0}%"></i></span></li>`).join('')}</ul>`
+    : '<p class="hint">Пока нет данных.</p>'}</section>`;
+}
+
+// ---- когда заходят: дни недели × часы ----
+function heatHTML(vs) {
+  const g = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const v of vs) { const d = new Date(v.t0); g[(d.getDay() + 6) % 7][d.getHours()]++; }
+  const max = Math.max(1, ...g.flat());
+  const lvl = (n) => (n ? Math.min(4, Math.ceil((n / max) * 4)) : 0);
+  return `<div class="db-heat" role="img" aria-label="Визиты по дням недели и часам">
+    <span></span>${Array.from({ length: 24 }, (_, h) => `<span class="db-h-x">${h % 3 === 0 ? h : ''}</span>`).join('')}
+    ${g.map((row, d) => `<span class="db-h-y">${WD[d]}</span>${row.map((n, h) => `<i class="db-cell l${lvl(n)}" tabindex="${n ? 0 : -1}" ${tip(`${WD[d]}, ${String(h).padStart(2, '0')}:00–${String((h + 1) % 24).padStart(2, '0')}:00`, [[n, VIS(n)]])}></i>`).join('')}`).join('')}
+  </div>
+  <div class="db-heat-key hint">меньше <i class="db-cell l1"></i><i class="db-cell l2"></i><i class="db-cell l3"></i><i class="db-cell l4"></i> больше · время — ваше местное</div>`;
+}
+
+// ---- отклики: ссылки ?from= ----
+function fromsHTML(vs) {
+  const m = new Map();
+  for (const v of vs) if (v.x.from) { const a = m.get(v.x.from) || []; a.push(v); m.set(v.x.from, a); }
+  const rows = [...m.entries()].map(([f, list]) => ({ f, list, last: Math.max(...list.map((v) => v.t0)), first: Math.min(...list.map((v) => v.t0)) })).sort((a, b) => b.last - a.last);
+  const ok = '<span class="db-yes">да</span>';
+  return rows.length ? `<table class="db-table"><thead><tr><th>Ссылка</th><th>Визитов</th><th>Первый заход</th><th>Последний</th><th>Что смотрели</th><th>Резюме</th><th>Контакт</th></tr></thead><tbody>
+    ${rows.map(({ f, list, first, last }) => {
     const opened = [...new Set(list.flatMap((v) => v.open))];
-    return `<li><b>${esc(f)}</b><span class="hint">визитов: ${list.length} · последний — ${esc(when(list[0].t0))}${opened.length ? ` · смотрели: ${esc(opened.map(caseName).join(', '))}` : ' · кейсы не открывали'}${list.some((v) => v.cv) ? ' · <b>скачали резюме</b>' : ''}${list.some((v) => v.ct.length) ? ' · <b>нажали на контакт</b>' : ''}</span></li>`;
-  }).join('')}</ul>` : ''}
-    <div class="st-cols">
-      ${tallyHTML('Откуда', tally(vs, (v) => srcOf(v.x)), n)}
-      ${tallyHTML('Устройство', tally(vs, (v) => DEV[v.x.dev] || 'неизвестно'), n)}
-      ${tallyHTML('Система', tally(vs, (v) => v.x.os || 'неизвестно'), n)}
-      ${tallyHTML('Браузер', tally(vs, (v) => v.x.br || 'другой'), n)}
+    return `<tr><td><b>${esc(f)}</b></td><td>${list.length}</td><td>${esc(when(first))}</td><td>${esc(when(last))}</td><td class="db-wrap">${opened.length ? esc(opened.map(caseName).join(', ')) : '<span class="hint">кейсы не открывали</span>'}</td><td>${list.some((v) => v.cv) ? ok : '—'}</td><td>${list.some((v) => v.ct.length) ? ok : '—'}</td></tr>`;
+  }).join('')}</tbody></table>`
+    : '<p class="hint">За этот период по ссылкам из откликов не заходили. Ссылку для отклика можно сделать прямо здесь, ниже.</p>';
+}
+
+// ---- кейсы ----
+function casesHTML(vs) {
+  const m = new Map();
+  for (const v of vs) {
+    for (const s of v.open) { const c = m.get(s) || { n: 0, sec: [], w: 0, lk: 0 }; c.n++; if (v.c[s]) c.sec.push(v.c[s]); if ((v.c[s] || 0) >= 30) c.w++; m.set(s, c); }
+    for (const s of v.lk) { const c = m.get(s) || { n: 0, sec: [], w: 0, lk: 0 }; c.lk++; m.set(s, c); }
+  }
+  const rows = [...m.entries()].sort((a, b) => b[1].n - a[1].n);
+  const top = Math.max(1, ...rows.map(([, c]) => c.n));
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+  return rows.length ? `<table class="db-table db-table--cases"><thead><tr><th>Кейс</th><th>Открыли</th><th>Доля визитов</th><th>Смотрят в среднем</th><th>Дольше 30 с</th><th>Лайки</th></tr></thead><tbody>
+    ${rows.map(([s, c]) => `<tr><td>${esc(caseName(s))}</td><td><span class="db-inline"><i style="width:${(c.n / top) * 100}%"></i></span>${c.n}</td><td>${pctN(c.n, vs.length)}%</td><td>${c.sec.length ? esc(dur(avg(c.sec))) : '—'}</td><td>${c.w}</td><td>${c.lk || '—'}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="hint">Кейсы за этот период не открывали.</p>';
+}
+
+// ---- последние визиты ----
+function visitHTML(v) {
+  const tags = [v.x.from ? `ссылка «${v.x.from}»` : '', v.cv ? 'резюме' : '', v.ct.length ? `написал: ${v.ct.join(', ')}` : '', v.pol ? 'полароид' : ''].filter(Boolean);
+  return `<li class="db-visit">
+    <span class="db-v-when">${esc(when(v.t0))}</span>
+    <span class="db-v-main"><b>${esc(v.x.from ? `ссылка «${v.x.from}»` : srcOf(v.x))}</b> · ${esc([DEV[v.x.dev], v.x.os, v.x.br].filter(Boolean).join(', ') || 'устройство неизвестно')}${v.x.scr ? ` · ${esc(v.x.scr)}` : ''}${v.x.tz ? ` · ${esc(v.x.tz.replace(/_/g, ' '))}` : ''}
+      <span class="hint">${esc(dur(vTime(v)))} на сайте · ${v.open.length ? `кейсы: ${esc(v.open.map((s) => `${caseName(s)}${v.c[s] ? ` (${dur(v.c[s])})` : ''}`).join(', '))}` : 'кейсы не открывал'}${v.fun.includes('glasses') ? ' · снял очки' : ''}${v.fun.includes('spit') ? ' · дождался плевков' : ''}</span></span>
+    <span class="db-v-tags">${tags.filter((t) => !t.startsWith('ссылка')).map((t) => `<span class="db-tag">${esc(t)}</span>`).join('')}</span>
+  </li>`;
+}
+
+// ---- таблица по дням (то же, что на графике, — числами) ----
+function dayTableHTML(cur, days) {
+  return `<details class="db-details"><summary>Таблица ${days === 1 ? 'по часам' : 'по дням'}</summary>
+    <table class="db-table"><thead><tr><th>${days === 1 ? 'Час' : 'День'}</th><th>Визиты</th><th>Люди</th><th>Открыли кейс</th><th>Резюме</th><th>Контакт</th></tr></thead><tbody>
+    ${cur.slice().reverse().map((b) => `<tr><td>${esc(days === 1 ? `${dmy(b.t)}, ${b.label}` : b.label)}</td><td>${b.n}</td><td>${b.s.people}</td><td>${b.s.cases}</td><td>${b.s.cv}</td><td>${b.s.ct}</td></tr>`).join('')}
+    </tbody></table></details>`;
+}
+
+function dashBody(d) {
+  const S = st.stats, days = S.days, now = d.now || Date.now(), span = days * 864e5;
+  const all = d.visits || [];
+  const vs = all.filter((v) => v.t0 >= now - span);
+  const has = (d.days || 0) >= days * 2;                       // прошлый период целиком попал в выборку
+  const pv = has ? all.filter((v) => v.t0 >= now - 2 * span && v.t0 < now - span) : [];
+  const s = summary(vs), p = summary(pv);
+  const cur = fill(buckets(days, now), vs), prev = has ? fill(buckets(days, now - span), pv) : [];
+  const ser = (k) => cur.map((b) => (k === 'n' ? b.n : b.s[k]));
+  const shown = vs.slice(0, 20 + S.more);
+  return `
+    <div class="db-kpis">
+      ${kpi('Визиты', num(s.n), s.n, p.n, has, ser('n'), { hero: 1 })}
+      ${kpi('Людей', num(s.people), s.people, p.people, has, ser('people'), { sub: 'разных за день' })}
+      ${kpi('Открыли кейс', `${pctN(s.cases, s.n)}%`, s.cases, p.cases, has, ser('cases'), { sub: `${num(s.cases)} визитов` })}
+      ${kpi('Скачали резюме', num(s.cv), s.cv, p.cv, has, ser('cv'))}
+      ${kpi('Нажали на контакт', num(s.ct), s.ct, p.ct, has, ser('ct'))}
+      ${kpi('Время на сайте', dur(s.time), s.time, p.time, has, [], { sub: 'медиана визита', fmt: dur })}
     </div>
-    <h3 class="st-h">Кейсы</h3>
-    ${cases.size ? `<table class="st-table"><thead><tr><th>Кейс</th><th>Открыли</th><th>Сколько смотрят</th><th>Лайки</th></tr></thead><tbody>${[...cases.entries()].sort((a, b) => b[1].n - a[1].n).map(([s, c]) => `<tr><td>${esc(caseName(s))}</td><td>${c.n}</td><td>${c.sec.length ? esc(dur(avg(c.sec))) : '—'}</td><td>${c.lk || ''}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">Кейсы пока не открывали.</p>'}
-    <h3 class="st-h">Последние визиты</h3>
-    <ul class="st-visits">${vs.slice(0, 60).map(visitRow).join('')}</ul>`;
+    ${s.n ? '' : `<p class="db-empty">За ${esc(PERIODS.find(([v]) => v === days)[1])} заходов не было — или функция ещё не получила ни одного события. Откройте сайт с телефона (не из этого браузера) и обновите через минуту.</p>`}
+    <section class="db-card db-card--wide"><h3>Визиты</h3>${trendHTML(cur, prev, has, days)}${dayTableHTML(cur, days)}</section>
+    <div class="db-row">
+      <section class="db-card"><h3>Воронка</h3>${funnelHTML(s)}<p class="hint">Доля — от всех визитов за период.</p></section>
+      <section class="db-card"><h3>Когда заходят</h3>${heatHTML(vs)}</section>
+    </div>
+    <section class="db-card db-card--wide"><h3>Отклики — заходы по вашим ссылкам</h3>${fromsHTML(vs)}
+      <div class="db-link"><label class="f st-co"><span>Ссылка для нового отклика: компания</span><input type="text" data-stats-co value="${esc(S.co)}" placeholder="Например, Яндекс" autocomplete="off"></label>
+        <code class="st-link" data-stats-link>${esc(statsLink() || '—')}</code><button class="btn btn--sm" type="button" data-act="stats-copy">Скопировать</button></div>
+    </section>
+    <div class="db-grid4">
+      ${barsHTML('Откуда', tally(vs, (v) => srcOf(v.x)), s.n)}
+      ${barsHTML('Устройство', tally(vs, (v) => DEV[v.x.dev] || 'неизвестно'), s.n)}
+      ${barsHTML('Система', tally(vs, (v) => v.x.os || 'неизвестно'), s.n)}
+      ${barsHTML('Браузер', tally(vs, (v) => v.x.br || 'другой'), s.n)}
+      ${barsHTML('Часовой пояс', tally(vs, (v) => (v.x.tz || 'неизвестно').replace(/_/g, ' ')), s.n)}
+      ${barsHTML('Экран', tally(vs, (v) => v.x.scr || 'неизвестно'), s.n)}
+    </div>
+    <section class="db-card db-card--wide"><h3>Кейсы</h3>${casesHTML(vs)}</section>
+    <section class="db-card db-card--wide"><h3>Последние визиты</h3>
+      ${shown.length ? `<ul class="db-visits">${shown.map(visitHTML).join('')}</ul>` : '<p class="hint">Пока пусто.</p>'}
+      ${vs.length > shown.length ? `<button class="btn btn--line btn--sm" type="button" data-act="stats-more">Показать ещё (${vs.length - shown.length})</button>` : ''}
+    </section>`;
 }
 function statsPane() {
-  const api = polaroidsApi(st.site), S = st.stats;
-  return `<p class="hint">Свой счётчик сайта, без cookie и баннеров: визиты, кейсы, скачанное резюме, клики по контактам, откуда пришли и с какого устройства. IP-адреса и данные браузера не хранятся. Данные — в той же облачной функции, что архив полароидов; смотреть их можно с ключом модератора.</p>
-    ${api ? `<div class="row st-ctrl"><label class="f"><span>Ключ модератора</span><input type="password" data-modkey value="${esc(modKey())}" autocomplete="off" spellcheck="false"></label>
-      <label class="f"><span>Период</span><select data-stats-days>${[[7, '7 дней'], [30, '30 дней'], [90, '90 дней']].map(([v, l]) => `<option value="${v}"${S.days === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
-      <button class="btn btn--line btn--sm" type="button" data-act="stats-load">${S.data ? 'Обновить' : 'Показать'}</button><span class="hint" data-stats-note>${esc(S.note)}</span></div>` : '<p class="hint">Счётчик работает через функцию архива полароидов: сначала впишите её адрес в «Настройках сайта» → «Полароид».</p>'}
-    <fieldset class="fs"><legend>Ссылка для отклика</legend>
-      <p class="hint">Вставляйте в отклик не просто адрес сайта, а ссылку с названием компании — в отчёте будет видно, когда оттуда зашли, что смотрели и скачали ли резюме.</p>
-      <div class="row"><label class="f st-co"><span>Компания</span><input type="text" data-stats-co value="${esc(S.co)}" placeholder="Например, Яндекс" autocomplete="off"></label>
-        <code class="st-link" data-stats-link>${esc(statsLink() || '—')}</code><button class="btn btn--sm" type="button" data-act="stats-copy">Скопировать</button></div>
-    </fieldset>
-    <p class="hint st-me">${S.me ? 'Этот браузер помечен как ваш — ваши заходы на сайт с него не считаются.' : 'Этот браузер сейчас считается как обычный посетитель.'}
+  const api = polaroidsApi(st.site), S = st.stats, key = modKey();
+  if (!api) return '<p class="hint">Счётчик работает через функцию архива полароидов: сначала впишите её адрес в «Настройках сайта» → «Полароид».</p>';
+  const keyField = `<label class="f db-key"><span>Ключ модератора</span><input type="password" data-modkey value="${esc(key)}" autocomplete="off" spellcheck="false"></label>`;
+  return `<div class="db-filters" role="group" aria-label="Период">
+      <div class="seg db-seg">${PERIODS.map(([v, l]) => `<button type="button" data-act="stats-days" data-days="${v}" aria-pressed="${S.days === v}">${esc(l)}</button>`).join('')}</div>
+      <button class="btn btn--line btn--sm" type="button" data-act="stats-load"${S.busy ? ' disabled' : ''}>${S.busy ? 'Загружаю…' : 'Обновить'}</button>
+      <span class="hint" data-stats-note>${esc([VS_PREV[S.days] ? `сравниваем ${VS_PREV[S.days]}` : 'у 90 дней сравнения с прошлым периодом нет', S.note].filter(Boolean).join(' · '))}</span>
+      <span class="db-filters-end">${key && !S.keyOpen && !S.err ? '<button class="linkish" type="button" data-act="stats-key">Ключ модератора</button>' : ''}</span>
+    </div>
+    ${!key || S.keyOpen || S.err ? `<div class="db-keyrow">${keyField}<button class="btn btn--sm" type="button" data-act="stats-load">Показать</button>${S.err ? `<span class="error">${esc(S.err)}</span>` : '<span class="hint">Тот же ключ, что в переменной MOD_KEY функции. Хранится только в этом браузере.</span>'}</div>` : ''}
+    <div class="db-body${S.busy && S.data ? ' is-busy' : ''}" data-stats-body>${S.data ? dashBody(S.data) : (S.busy ? '<p class="hint">Загружаю…</p>' : '')}</div>
+    <p class="hint db-me">${S.me ? 'Этот браузер помечен как ваш — ваши заходы на сайт с него не считаются.' : 'Этот браузер сейчас считается как обычный посетитель.'}
       <button class="linkish" type="button" data-act="stats-me">${S.me ? 'Считать и его' : 'Не считать мои заходы'}</button>
-      Телефон: откройте один раз ${esc(siteUrl())}?me=1 — и его заходы тоже перестанут считаться.</p>
-    <div data-stats-body>${S.data ? statsBody(S.data) : ''}</div>`;
+      Телефон: откройте один раз ${esc(siteUrl())}?me=1 — и его заходы тоже перестанут считаться. Cookie нет; IP и данные браузера не хранятся.</p>`;
 }
 function statsRedraw() {
   const box = $('[data-stats-pane]');
@@ -903,20 +1064,43 @@ function statsRedraw() {
 async function statsLoad() {
   const api = polaroidsApi(st.site), key = modKey(), S = st.stats;
   if (!api) return;
-  if (!key) { S.note = 'Вставьте ключ модератора.'; statsRedraw(); return; }
+  if (!key) { S.err = 'Вставьте ключ модератора.'; statsRedraw(); return; }
   if (S.busy) return;
-  S.busy = true; S.note = 'Загружаю…'; statsRedraw();
+  S.busy = true; S.err = ''; statsRedraw();
   try {
-    const r = await fetch(`${api}?stats=1&days=${S.days}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
+    const want = Math.min(92, S.days * 2);
+    const r = await fetch(`${api}?stats=1&days=${want}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
     if (!r.ok) { const e = new Error(String(r.status)); e.status = r.status; throw e; }
     S.data = await r.json();
-    S.note = `Обновлено в ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+    S.keyOpen = false;
+    S.note = `обновлено в ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
   } catch (e) {
-    S.note = e.status === 401 || e.status === 403 ? 'Ключ модератора не подошёл.' : 'Функция не ответила — попробуйте ещё раз.';
+    S.err = e.status === 401 || e.status === 403 ? 'Ключ модератора не подошёл.' : 'Функция не ответила — попробуйте ещё раз.';
   }
   S.busy = false;
   statsRedraw();
 }
+// подсказка у графиков: наведение и фокус с клавиатуры — одна и та же
+function tipShow(el) {
+  const box = $('[data-dbtip]') || document.body.appendChild(Object.assign(document.createElement('div'), { className: 'db-tip' }));
+  box.setAttribute('data-dbtip', '');
+  box.replaceChildren();
+  const h = document.createElement('div'); h.className = 'db-tip-h'; h.textContent = el.dataset.tip; box.append(h);
+  for (const row of (el.dataset.tipRows || '').split('|').filter(Boolean)) {
+    const [v, l] = row.split('~'), r = document.createElement('div'), b = document.createElement('b');
+    b.textContent = v; r.append(b, document.createTextNode(` ${l || ''}`)); box.append(r);
+  }
+  box.hidden = false;
+  const rc = el.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight;
+  let x = rc.left + rc.width / 2 - bw / 2, y = rc.top - bh - 8;
+  if (y < 64) y = rc.bottom + 8;
+  x = Math.max(8, Math.min(innerWidth - bw - 8, x));
+  box.style.left = `${x}px`; box.style.top = `${y}px`;
+}
+const tipHide = () => { const b = $('[data-dbtip]'); if (b) b.hidden = true; };
+document.addEventListener('pointerover', (e) => { const el = e.target.closest && e.target.closest('[data-stats-pane] [data-tip]'); if (el) tipShow(el); else tipHide(); });
+document.addEventListener('focusin', (e) => { const el = e.target.closest && e.target.closest('[data-stats-pane] [data-tip]'); if (el) tipShow(el); else tipHide(); });
+document.addEventListener('scroll', tipHide, true);
 
 // ---------- реплики головы ----------
 // Исходные тексты — в js/lines.js. Свои правки хранятся в настройках сайта (site.lines[язык][id]) и ложатся поверх;
@@ -949,8 +1133,10 @@ function linesPane() {
 function renderEdit() {
   const root = $('[data-edit]');
   const keep = root.scrollTop;
-  if (st.idx < 0 && st.tab === 'stats') {
-    root.innerHTML = `<div class="edit-head"><h1>Статистика</h1></div><div class="pane pane--stats" style="margin-top:16px" data-stats-pane>${statsPane()}</div>`;
+  const wide = st.idx < 0 && st.tab === 'stats', app = $('[data-app]');
+  if (app.classList.contains('is-wide') !== wide) { app.classList.toggle('is-wide', wide); requestAnimationFrame(fitFrame); }
+  if (wide) {
+    root.innerHTML = `<div class="edit-head"><h1>Статистика</h1></div><div class="pane pane--stats" style="margin-top:12px" data-stats-pane>${statsPane()}</div>`;
   } else if (st.idx < 0 && st.tab === 'lines') {
     root.innerHTML = `<div class="edit-head"><h1>Реплики головы</h1></div><div class="pane pane--lines" style="margin-top:16px">${linesPane()}</div>`;
   } else if (st.idx < 0) {
@@ -1328,6 +1514,9 @@ const ACT = {
     try { navigator.clipboard.writeText(url).then(ok, () => toast(url)); } catch (_) { toast(url); }
   },
   'stats-me'() { st.stats.me = !st.stats.me; markOwner(st.stats.me); statsRedraw(); },
+  'stats-days'(el) { const S = st.stats, d = Number(el.dataset.days) || 30; if (S.days === d) return; S.days = d; S.more = 0; statsRedraw(); if (!S.data || (S.data.days || 0) < Math.min(92, d * 2)) statsLoad(); },
+  'stats-more'() { st.stats.more += 40; statsRedraw(); },
+  'stats-key'() { st.stats.keyOpen = true; statsRedraw(); const i = $('[data-modkey]'); if (i) i.focus(); },
   'open-lines'() { st.idx = -1; st.tab = 'lines'; st.open.clear(); st.menu = false; renderSide(); renderEdit(); renderViews(); sendPreview(false); $('[data-edit]').scrollTop = 0; },
   'line-reset'(el) {
     const id = el.dataset.id, L = st.site.lines, m = L && L[st.lang];
@@ -1444,7 +1633,6 @@ document.addEventListener('input', (e) => {
     return;
   }
   if (el.matches && el.matches('[data-stats-co]')) { st.stats.co = el.value; const o = $('[data-stats-link]'); if (o) o.textContent = statsLink() || '—'; return; }
-  if (el.matches && el.matches('[data-stats-days]')) { st.stats.days = Number(el.value) || 30; statsLoad(); return; }
   if (el.matches && el.matches('[data-modkey]')) { try { localStorage.setItem(MODKEY, el.value.trim()); } catch (_) { /* не запомнится */ } return; }
   const path = el.dataset.path;
   if (!path || el.type === 'file') return;
