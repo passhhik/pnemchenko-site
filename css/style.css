@@ -548,12 +548,14 @@ body:not([data-view="case"]) .site-footer{ display:none; }
    Карточка — как настоящий полароид: бумага с холодным отливом, квадратное окно с фото, широкое поле снизу под подпись.
    Всё внутри неё задано в долях её ширины (единицы cqw), поэтому одна и та же карточка годится для редактора,
    сетки архива, крупного просмотра и кружка «Архив». Наклейки и их места — в долях карточки (x, y от 0 до 1). */
-.pc{ position:relative; display:block; width:100%; aspect-ratio:281/341; margin:0; padding:6% 6% 0; border:0; border-radius:1.4% / 1.15%;
+.pc{ position:relative; display:block; width:100%; aspect-ratio:281/341; margin:0; padding:0; border:0; border-radius:1.4% / 1.15%;
   background:linear-gradient(180deg, #E1E2EA 0%, #E6E7EE 68%, #EBEDF1 100%); color:#1D1D1F; text-align:center; container-type:inline-size;
   box-shadow:0 1px 1px rgba(20,22,40,.16), 0 3px 8px rgba(20,22,40,.12), 0 18px 34px rgba(20,22,40,.14); -webkit-tap-highlight-color:transparent; }
 .pc::before{ content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:var(--noise) 0 0/160px 160px; opacity:.32; mix-blend-mode:multiply; }
 .pc::after{ content:''; position:absolute; left:.6%; right:.6%; bottom:0; height:1.5px; border-radius:50%; background:rgba(66,70,168,.4); pointer-events:none; }   /* синеватый нижний край, как в макете */
-.pc-photo{ position:relative; display:block; aspect-ratio:1; overflow:hidden; background:#2A3030; }
+/* окно с фото стоит на месте само, а не в потоке: в архиве карточка — кнопка, а кнопка ставит своё содержимое
+   по вертикали в середину — фото съезжало вниз, на подпись */
+.pc-photo{ position:absolute; left:6cqw; right:6cqw; top:6cqw; display:block; aspect-ratio:1; overflow:hidden; background:#2A3030; }
 .pc-photo::after{ content:''; position:absolute; inset:0; z-index:2; pointer-events:none; mix-blend-mode:soft-light; opacity:.6;
   background:linear-gradient(128deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 36%), var(--noise) 0 0/140px 140px;
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.16), inset 0 1px 3px rgba(0,0,0,.3); }
@@ -611,11 +613,14 @@ textarea.pc-cap:focus{ background:rgba(255,255,255,.4); }
 @media (hover:hover){ .pol.is-up .pol-st:hover{ transform:translate(-50%,-50%) scale(1.12) rotate(-6deg); transition-delay:0s; } }
 .pol-st:focus-visible{ outline:2px solid var(--ink-dark); outline-offset:4px; }
 /* наклейку тащат: она приподнята; над другой наклейкой — бледнеет (туда не приклеится); приклеенная в палитре не видна */
-.pol.is-up .pol-st.is-held{ z-index:2; transition:none; transform:translate(-50%,-50%) scale(1.08) rotate(-4deg); filter:drop-shadow(0 12px 14px rgba(0,0,0,.35)); cursor:grabbing; }
+.pol.is-up .pol-st.is-held{ z-index:2; transition:transform .14s var(--ease), filter .14s; transition-delay:0s; transform:translate(-50%,-50%) scale(1.08) rotate(-4deg); filter:drop-shadow(0 12px 14px rgba(0,0,0,.35)); cursor:grabbing; }
 .pol-st.is-held img,.pol-st.is-flying img{ animation-play-state:paused; }
-.pol.is-up .pol-st.is-blocked{ opacity:.55; }
+/* над карточкой наклейка уже такая, какой ляжет: её размер на карточке и наклон карточки; над другой наклейкой — бледнеет */
+.pol.is-up .pol-st.is-held.is-over{ transform:translate(-50%,-50%) rotate(calc(8deg + var(--r, 0deg))) scale(var(--k, 1)); filter:drop-shadow(0 3px 5px rgba(0,0,0,.3)); }
+.pol.is-up .pol-st.is-blocked{ opacity:.45; }
 .pol .pol-st.is-flying{ z-index:3; transition:none; }
 .pol .pol-st.is-used{ visibility:hidden; opacity:0; pointer-events:none; transition:none; }
+.pol.is-dev .pol-st{ transition-delay:0s; }          /* очередь — только при появлении; дальше наклейки отзываются сразу */
 .pol.is-out .pol-st{ opacity:0; transform:translate(-50%,-50%) scale(.6); transition-delay:0s; }
 @keyframes st-bob{ 0%,100%{ transform:translateY(0) rotate(0deg); } 50%{ transform:translateY(-4%) rotate(2.5deg); } }
 /* окно с репликой (Figma: 518×184, радиус 56, поле 30, кнопки «Перефоткать» / «Сохранить») */
@@ -623,8 +628,11 @@ textarea.pc-cap:focus{ background:rgba(255,255,255,.4); }
   opacity:0; transform:translate(-50%, 24px); transition:opacity .35s ease, transform .5s var(--ease); outline:none; }
 .pol.is-up .pol-dlg{ opacity:1; transform:translate(-50%, 0); }
 .pol.is-out .pol-dlg{ opacity:0; transform:translate(-50%, 24px); transition-duration:.25s; }
-.pol-say{ width:100%; min-height:calc(var(--dfs, 24px) * 1.15 * 2); font:400 var(--dfs, 24px)/1.15 var(--font); text-align:center; text-wrap:balance; }
+/* реплика в окне — обычным абзацем во всю ширину окна: без переноса строки после каждого предложения (как на главной)
+   и без выравнивания строк по длине — иначе текст стоит узкой колонкой посреди широкого окна */
+.pol-say{ width:100%; min-height:calc(var(--dfs, 24px) * 1.15 * 2); font:400 var(--dfs, 24px)/1.15 var(--font); text-align:center; text-wrap:pretty; }
 .pol-say .subs-line{ margin:0; }
+body[data-view] .pol-say .subs-line .s{ display:inline; }
 .pol-acts{ display:flex; justify-content:center; gap:20px; }
 .pol-acts .btn{ min-width:135px; --fg:var(--ink); --on-fg:var(--paper); }
 .pol.is-busy .pol-acts .btn{ pointer-events:none; opacity:.6; }

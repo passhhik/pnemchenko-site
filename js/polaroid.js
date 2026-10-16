@@ -242,9 +242,10 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   const ask = () => { clearTimeout(askT); dsubs.say(again ? 'photo_ask_again' : 'photo_ask', { force: true }); };
 
   // ---------- наклейки ----------
-  // Каждая наклейка одна. Её таскают по экрану и оставляют где угодно; заехала на карточку — сразу приклеилась.
-  // Приклеенную не утащить — только отклеить нажатием, и она вернётся на своё место. На другую наклейку не клеится
-  // (если центр почти над другой — не прилипает, пока не найдёт свободное место); нижнюю не отклеить, пока сверху другая.
+  // Каждая наклейка одна. Её таскают по экрану и оставляют где угодно. Над карточкой она уже в том размере и наклоне,
+  // в каком ляжет, и приклеивается ровно там, где её отпустили, — заготовленных мест нет. На другую наклейку не клеится:
+  // над занятым местом она бледнеет, а отпущенная там — возвращается, откуда её взяли. Приклеенную не утащить — только
+  // отклеить нажатием, и она вернётся на своё место; нижнюю не отклеить, пока сверху другая.
   const rad = (ROT * Math.PI) / 180;
   const center = () => { const r = card.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
   function toCard(px, py) {
@@ -271,7 +272,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     el.dataset.i = String(i);
     el.setAttribute('aria-label', t('polPlaced', { name: st.name }));
     el.innerHTML = `<img src="${esc(st.src)}" alt="" draggable="false">`;
-    S[i].stuck = { x: clamp(x, 0.14, 0.86), y: clamp(y, 0.1, 0.9), r, el };
+    S[i].stuck = { x: clamp(x, 0, 1), y: clamp(y, 0, 1), r, el };
     S[i].at = null;
     el.style.left = `${(S[i].stuck.x * 100).toFixed(2)}%`;
     el.style.top = `${(S[i].stuck.y * 100).toFixed(2)}%`;
@@ -281,12 +282,17 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     b.classList.add('is-used');
     b.setAttribute('aria-hidden', 'true');
     b.tabIndex = -1;
+    // прилетела сама — подпрыгивает; донесли рукой — её прижимают к карточке
     if (pop && !reduced) {
-      el.animate([
+      el.animate(pop === 'press' ? [
+        { transform: `translate(-50%,-50%) rotate(${r}deg) scale(1.06)` },
+        { transform: `translate(-50%,-50%) rotate(${r}deg) scale(.97)`, offset: 0.55 },
+        { transform: `translate(-50%,-50%) rotate(${r}deg) scale(1)` },
+      ] : [
         { transform: `translate(-50%,-50%) rotate(${r}deg) scale(1.16)` },
         { transform: `translate(-50%,-50%) rotate(${r}deg) scale(.95)`, offset: 0.6 },
         { transform: `translate(-50%,-50%) rotate(${r}deg) scale(1)` },
-      ], { duration: 260, easing: 'ease-out' });
+      ], { duration: pop === 'press' ? 200 : 260, easing: 'ease-out' });
     }
     vibrate(8);
     announce(t('polAdded', { name: st.name, n: order.length }));
@@ -350,7 +356,12 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     }, () => b.classList.remove('is-flying'));
   }
 
-  // перетаскивание наклейки из палитры: тащится сама наклейка; заехала на свободное место карточки — прилипла
+  // нажали наклейку и не потащили — она подпрыгивает, а голова подсказывает, что её надо тащить
+  function hint(b) {
+    if (!reduced) b.animate([{ transform: 'translate(-50%,-50%) scale(1)' }, { transform: 'translate(-50%,-50%) scale(1.14) rotate(-8deg)', offset: 0.35 }, { transform: 'translate(-50%,-50%) scale(.96) rotate(5deg)', offset: 0.7 }, { transform: 'translate(-50%,-50%) scale(1)' }], { duration: 420, easing: 'ease-out' });
+    line('photo_drag');
+  }
+  // перетаскивание наклейки: идёт за пальцем куда угодно; над карточкой — в размере и наклоне, как ляжет
   let drag = null;
   function onMove(e) {
     const d = drag;
@@ -359,31 +370,32 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     if (!d.moved) {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
       d.moved = true;
+      d.b.style.setProperty('--r', `${d.r}deg`);
+      d.b.style.setProperty('--k', ((geo.cw * STK) / (d.b.offsetWidth || ss)).toFixed(3));
       d.b.classList.add('is-held');
       root.classList.add('is-dragging');
     }
     d.b.style.setProperty('--x', `${x.toFixed(1)}px`);
     d.b.style.setProperty('--y', `${y.toFixed(1)}px`);
-    const c = toCard(x, y);
-    if (!onCard(c)) { d.b.classList.remove('is-blocked'); return; }
-    if (blocked(c)) { d.b.classList.add('is-blocked'); return; }
-    // прилипла: дальше палец её не ведёт
-    d.b.classList.remove('is-held', 'is-blocked');
-    stick(d.i, c.x, c.y);
-    stopDrag();
+    const c = toCard(x, y), over = onCard(c);
+    d.b.classList.toggle('is-over', over);
+    d.b.classList.toggle('is-blocked', over && blocked(c));
   }
   function onUp(e) {
     const d = drag;
     if (!d || e.pointerId !== d.pid) return;
     stopDrag();
-    d.b.classList.remove('is-held', 'is-blocked');
-    if (!d.moved) { autoPlace(d.i); return; }
+    d.b.classList.remove('is-held', 'is-over', 'is-blocked');
+    if (!d.moved) { if (e.type === 'pointerup') hint(d.b); return; }
     const x = e.clientX - d.ox, y = e.clientY - d.oy, W = window.innerWidth, H = window.innerHeight;
-    if (onCard(toCard(x, y))) {                          // бросили на занятое место — возвращается, откуда взяли
-      const to = d.from;
+    const c = toCard(x, y);
+    if (onCard(c)) {
+      if (!blocked(c) && e.type === 'pointerup') { stick(d.i, c.x, c.y, d.r, 'press'); return; }      // отпустили над карточкой — приклеилась ровно тут
+      const to = d.from;                                 // на другую наклейку не клеится — возвращается, откуда взяли
       d.b.style.setProperty('--x', `${to.x.toFixed(1)}px`);
       d.b.style.setProperty('--y', `${to.y.toFixed(1)}px`);
       fly(d.b, { x, y }, to, 320);
+      if (e.type === 'pointerup') line('photo_on_sticker');
       return;
     }
     // оставили на экране — там и лежит (не за краем)
@@ -404,14 +416,35 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     if (!b || b.classList.contains('is-used') || b.classList.contains('is-flying') || !ready || busy || (e.pointerType === 'mouse' && e.button !== 0)) return;
     e.preventDefault();
     const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    drag = { i: Number(b.dataset.i), b, pid: e.pointerId, x0: e.clientX, y0: e.clientY, ox: e.clientX - cx, oy: e.clientY - cy, from: { x: cx, y: cy }, moved: false };
+    drag = { i: Number(b.dataset.i), b, pid: e.pointerId, x0: e.clientX, y0: e.clientY, ox: e.clientX - cx, oy: e.clientY - cy, from: { x: cx, y: cy }, moved: false, r: Math.round(rnd(-14, 14)) };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
   });
   // клавиатура: Enter на наклейке в палитре — наклеить; на карточке — Enter или Delete отклеивают
   pal.addEventListener('click', (e) => { const b = e.target.closest('.pol-st'); if (b && e.detail === 0) autoPlace(Number(b.dataset.i)); });
-  layer.addEventListener('click', (e) => { const el = e.target.closest('.pc-stk'); if (el) peel(Number(el.dataset.i)); });
+  // приклеенная отклеивается нажатием; если её пытались тащить — нет: отклеить перетаскиванием нельзя,
+  // она только качнётся — держится
+  let press = null;
+  const pressMove = (e) => { if (press && e.pointerId === press.pid && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press.moved = true; };
+  const pressEnd = (e) => { if (press && e.pointerId === press.pid) { window.removeEventListener('pointermove', pressMove); window.removeEventListener('pointerup', pressEnd); window.removeEventListener('pointercancel', pressEnd); } };
+  layer.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.pc-stk')) return;
+    press = { pid: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    window.addEventListener('pointermove', pressMove);
+    window.addEventListener('pointerup', pressEnd);
+    window.addEventListener('pointercancel', pressEnd);
+  });
+  layer.addEventListener('click', (e) => {
+    const el = e.target.closest('.pc-stk');
+    if (!el) return;
+    if (e.detail !== 0 && press && press.moved) {
+      const p = S[Number(el.dataset.i)].stuck;
+      if (p && !reduced) p.el.animate([{ transform: `translate(-50%,-50%) rotate(${p.r}deg)` }, { transform: `translate(-50%,-50%) rotate(${p.r - 4}deg)` }, { transform: `translate(-50%,-50%) rotate(${p.r + 3}deg)` }, { transform: `translate(-50%,-50%) rotate(${p.r}deg)` }], { duration: 260 });
+      return;
+    }
+    peel(Number(el.dataset.i));
+  });
   layer.addEventListener('keydown', (e) => {
     const el = e.target.closest('.pc-stk');
     if (el && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); peel(Number(el.dataset.i)); }

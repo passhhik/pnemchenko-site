@@ -15,7 +15,7 @@ export const DEFAULT_STICKERS = [
   { id: 'poo', name: 'Какашка', emoji: '💩' },
   { id: 'heart', name: 'Сердечко', emoji: '❤️' },
   { id: 'like', name: 'Класс', emoji: '👍' },
-  { id: 'devil', name: 'Чорт', emoji: '😈' },
+  { id: 'devil', name: 'Чорт', emoji: '👹' },
   { id: 'rock', name: 'Рок', emoji: '🤘' },
 ];
 export const STICKER_ID = /^[a-z0-9][a-z0-9-]{0,23}$/;

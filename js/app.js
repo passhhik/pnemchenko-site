@@ -1115,12 +1115,15 @@ async function dockIn() {
   if (!dock.home) { dock.home = document.createComment('stage'); st.parentNode.insertBefore(dock.home, st); }
   dock.on = true;
   if (subs) subs.clear();
-  head.cornerRect = () => st.getBoundingClientRect();      // в визитке голова вписана в свой кружок, а не летит к главной
+  // В визитке голова вписана ровно в свой кружок. Размер — без transform: пока идёт перелёт, сцена ещё «в углу»
+  // (сжата и сдвинута), и кадр, посчитанный по такой рамке, оставлял голову мелкой и съехавшей вниз
+  head.cornerRect = () => ({ left: 0, top: 0, width: st.offsetWidth, height: st.offsetHeight });
   st.classList.add('is-dock');
   dock.slot.insertBefore(st, dock.slot.firstChild);
   head.frame();
   await flip(st, from, 750);
   if (!dock.on || tk !== dock.busy) return;
+  head.frame();                                                // долетела — кадр по настоящему кружку
   head.clearLook();
   if (dock.fired) return;
   dock.fired = true;
@@ -1163,7 +1166,7 @@ function dockOut(instant = false) {
   if (dock.home && dock.home.parentNode) dock.home.parentNode.insertBefore(st, dock.home); else document.body.appendChild(st);
   if (instant && dock.io) { dock.io.disconnect(); dock.io = null; }
   head && head.frame();
-  const back = () => { if (tk === dock.busy && head) head.cornerRect = probeRect; };
+  const back = () => { if (tk === dock.busy && head) { head.cornerRect = probeRect; head.frame(); } };
   if (instant) { st.getAnimations().forEach((a) => a.cancel()); back(); return; }
   flip(st, from, 600).then(back);
 }

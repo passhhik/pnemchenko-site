@@ -1,6 +1,9 @@
-// Архив полароидов для портфолио — облачная функция Yandex Cloud Functions (Node.js 18 и новее).
+// Архив полароидов для портфолио — облачная функция Yandex Cloud Functions (Node.js 18 и новее, без зависимостей).
 // Карточка посетителя: фото головы, подпись до 56 знаков и наклейки. Хранится в документных таблицах YDB
-// (совместимы с Amazon DynamoDB, поэтому клиент — AWS SDK); таблицы создаются сами при первом обращении.
+// (совместимы с Amazon DynamoDB); таблицы создаются сами при первом обращении.
+//
+// Ключей доступа нет: в базу функция ходит от имени своего сервисного аккаунта (роль ydb.editor). Cloud Functions
+// на каждый вызов кладёт IAM-токен этого аккаунта в context.token — он и идёт в Document API (Authorization: Bearer).
 //
 //   GET  ?list=1[&before=<id>][&n=24]  → { items: [{ id, c, s, t }], next }   видимые карточки, новые первыми
 //   GET  ?img=<id>                     → фото карточки (webp или jpeg); браузер кэширует его навсегда
@@ -16,10 +19,9 @@
 //
 // Защита от мусора: формат и размер фото, длина подписи, проверка наклеек; не больше IP_HOUR карточек в час с одного
 // адреса и DAY_MAX в сутки на весь архив. Адрес посетителя не хранится — только хеш с секретной солью и номером часа
-// (счётчик на час). Мат в подписи — карточка сразу скрыта, её можно вернуть в админке. PREMOD=1 — все новые карточки
-// скрыты, пока их не покажут в админке. Как развернуть — README.md рядом.
+// (счётчик на час); соль функция придумывает сама и хранит в базе. Мат в подписи — карточка сразу скрыта, её можно
+// вернуть в админке. PREMOD=1 — все новые карточки скрыты, пока их не покажут в админке. Как развернуть — README.md рядом.
 const crypto = require('crypto');
-const { DynamoDBClient, PutItemCommand, GetItemCommand, QueryCommand, UpdateItemCommand, DeleteItemCommand, CreateTableCommand } = require('@aws-sdk/client-dynamodb');
 
 const BASE = process.env.TABLE || 'polaroids';
 const T = { cards: BASE, img: `${BASE}_img`, rate: `${BASE}_rate` };
@@ -31,11 +33,27 @@ const CAPTION_MAX = 56, STICKERS_MAX = 12;
 const ID = /^[a-z0-9]{6,32}$/, STICKER = /^[a-z0-9][a-z0-9-]{0,23}$/;
 const P = { S: 'a' };                                      // все карточки — в одном разделе таблицы, по порядку id (он растёт со временем)
 
-const db = new DynamoDBClient({
-  region: 'ru-central1',
-  endpoint: process.env.DOCAPI_ENDPOINT,                   // «Document API эндпоинт» базы YDB
-  credentials: { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY },
-});
+// Document API — тот же протокол, что у DynamoDB: POST с операцией в заголовке X-Amz-Target и телом в JSON.
+// Ошибка приходит JSON-ом с __type вида «…#ResourceNotFoundException» — её имя и становится именем исключения.
+let TOKEN = '';                                            // IAM-токен сервисного аккаунта функции (из context.token)
+async function ddb(op, input) {
+  const endpoint = process.env.DOCAPI_ENDPOINT;            // «Document API эндпоинт» базы YDB
+  if (!endpoint) throw Object.assign(new Error('DOCAPI_ENDPOINT не задан'), { name: 'Config' });
+  if (!TOKEN) throw Object.assign(new Error('нет IAM-токена: у функции не указан сервисный аккаунт'), { name: 'Config' });
+  const r = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-amz-json-1.0', 'X-Amz-Target': `DynamoDB_20120810.${op}`, Authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify(input),
+  });
+  const text = await r.text();
+  let j = {};
+  try { j = text ? JSON.parse(text) : {}; } catch (_) { j = {}; }
+  if (!r.ok) {
+    const type = String(j.__type || j.code || j.name || '').split('#').pop() || `HTTP${r.status}`;
+    throw Object.assign(new Error(`${op}: ${type}: ${j.message || j.Message || text.slice(0, 300)}`), { name: type, status: r.status });
+  }
+  return j;
+}
 const CORS = {
   'Access-Control-Allow-Origin': process.env.ALLOW_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -47,7 +65,7 @@ const reply = (statusCode, body) => ({ statusCode, headers: { ...CORS, 'Content-
 // ---------- таблицы ----------
 async function ensure(table) {
   try {
-    await db.send(new CreateTableCommand({
+    await ddb('CreateTable', ({
       TableName: table,
       KeySchema: KEYS[table].map(([AttributeName, KeyType]) => ({ AttributeName, KeyType })),
       AttributeDefinitions: KEYS[table].map(([AttributeName]) => ({ AttributeName, AttributeType: 'S' })),
@@ -108,15 +126,35 @@ function ipOf(event) {
   return (id && id.sourceIp) || header(event, 'x-forwarded-for').split(',')[0].trim() || 'unknown';
 }
 async function bump(k) {
-  const r = await withTable(T.rate, () => db.send(new UpdateItemCommand({
+  const r = await withTable(T.rate, () => ddb('UpdateItem', ({
     TableName: T.rate, Key: { k: { S: k } }, UpdateExpression: 'ADD n :one',
     ExpressionAttributeValues: { ':one': { N: '1' } }, ReturnValues: 'UPDATED_NEW',
   })));
   return Number(r && r.Attributes && r.Attributes.n && r.Attributes.n.N) || 1;
 }
+// Соль для хеша адреса: своя у этого архива — функция придумывает её при первом запуске и хранит в базе
+// (переменная SALT, если задана, важнее). Таблицу счётчиков можно чистить: появится новая соль, вреда нет
+let SALT = '';
+async function salt() {
+  if (process.env.SALT) return process.env.SALT;
+  if (SALT) return SALT;
+  const Key = { k: { S: 'salt' } };
+  const r = await withTable(T.rate, () => ddb('GetItem', { TableName: T.rate, Key }));
+  if (r.Item && r.Item.v && r.Item.v.S) return (SALT = r.Item.v.S);
+  const v = crypto.randomBytes(24).toString('hex');
+  try {
+    await ddb('PutItem', { TableName: T.rate, Item: { ...Key, v: { S: v } }, ConditionExpression: 'attribute_not_exists(k)' });
+    SALT = v;
+  } catch (e) {
+    if (e.name !== 'ConditionalCheckFailedException') throw e;
+    const again = await ddb('GetItem', { TableName: T.rate, Key });     // соль успел записать соседний вызов
+    SALT = (again.Item && again.Item.v && again.Item.v.S) || v;
+  }
+  return SALT;
+}
 async function rateOk(ip) {
   const hour = Math.floor(Date.now() / 3600e3), day = new Date().toISOString().slice(0, 10);
-  const who = crypto.createHash('sha256').update(`${process.env.SALT || 'polaroids'}|${ip}|${hour}`).digest('hex').slice(0, 24);
+  const who = crypto.createHash('sha256').update(`${await salt()}|${ip}|${hour}`).digest('hex').slice(0, 24);
   if ((await bump(`ip:${who}:${hour}`)) > IP_HOUR) return false;
   return (await bump(`day:${day}`)) <= DAY_MAX;
 }
@@ -142,7 +180,7 @@ async function list({ before, n, all }) {
   const items = [];
   let start = before && ID.test(before) ? { p: P, id: { S: before } } : undefined, next = '';
   for (let guard = 0; guard < 12; guard++) {
-    const r = await withTable(T.cards, () => db.send(new QueryCommand({
+    const r = await withTable(T.cards, () => ddb('Query', ({
       TableName: T.cards, KeyConditionExpression: 'p = :p', ExpressionAttributeValues: { ':p': P },
       ScanIndexForward: false, Limit: Math.min(100, want * 2), ExclusiveStartKey: start,
     })));
@@ -159,9 +197,9 @@ async function list({ before, n, all }) {
 async function image(id, mod) {
   const nf = { statusCode: 404, headers: { ...CORS, 'Cache-Control': 'no-store' }, body: '' };
   if (!ID.test(id)) return nf;
-  const card = await withTable(T.cards, () => db.send(new GetItemCommand({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
+  const card = await withTable(T.cards, () => ddb('GetItem', ({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
   if (!card.Item || (Number(card.Item.h && card.Item.h.N) && !mod)) return nf;
-  const im = await withTable(T.img, () => db.send(new GetItemCommand({ TableName: T.img, Key: { id: { S: id } } })));
+  const im = await withTable(T.img, () => ddb('GetItem', ({ TableName: T.img, Key: { id: { S: id } } })));
   if (!im.Item || !im.Item.b) return nf;
   return {
     statusCode: 200,
@@ -183,15 +221,15 @@ async function create(event) {
   const id = Date.now().toString(36).padStart(9, '0') + crypto.randomBytes(3).toString('hex');
   const key = crypto.randomBytes(16).toString('hex');
   const flagged = bad(c), hidden = flagged || process.env.PREMOD === '1';
-  await withTable(T.img, () => db.send(new PutItemCommand({ TableName: T.img, Item: { id: { S: id }, b: { S: buf.toString('base64') }, m: { S: mime } } })));
+  await withTable(T.img, () => ddb('PutItem', ({ TableName: T.img, Item: { id: { S: id }, b: { S: buf.toString('base64') }, m: { S: mime } } })));
   const item = { p: P, id: { S: id }, s: { S: JSON.stringify(s) }, t: { N: String(Date.now()) }, h: { N: hidden ? '1' : '0' }, f: { N: flagged ? '1' : '0' }, k: { S: sha(key) } };
   if (c) item.c = { S: c };
-  await withTable(T.cards, () => db.send(new PutItemCommand({ TableName: T.cards, Item: item })));
+  await withTable(T.cards, () => ddb('PutItem', ({ TableName: T.cards, Item: item })));
   // карточка одна на человека: прошлая уходит, если прислан её секрет
   let replaced = 0;
   const old = msg.replace && typeof msg.replace === 'object' ? msg.replace : null;
   if (old && ID.test(String(old.id || '')) && typeof old.key === 'string' && /^[0-9a-f]{32}$/.test(old.key) && old.id !== id) {
-    const prev = await db.send(new GetItemCommand({ TableName: T.cards, Key: { p: P, id: { S: old.id } } }));
+    const prev = await ddb('GetItem', ({ TableName: T.cards, Key: { p: P, id: { S: old.id } } }));
     if (prev.Item && prev.Item.k && safeEq(prev.Item.k.S, sha(old.key))) { await drop(old.id); replaced = 1; }
   }
   return reply(200, { ok: true, id, key, hidden: hidden ? 1 : 0, replaced });
@@ -199,8 +237,8 @@ async function create(event) {
 const sha = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 async function drop(id) {
-  await withTable(T.cards, () => db.send(new DeleteItemCommand({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
-  await withTable(T.img, () => db.send(new DeleteItemCommand({ TableName: T.img, Key: { id: { S: id } } })));
+  await withTable(T.cards, () => ddb('DeleteItem', ({ TableName: T.cards, Key: { p: P, id: { S: id } } })));
+  await withTable(T.img, () => ddb('DeleteItem', ({ TableName: T.img, Key: { id: { S: id } } })));
 }
 async function moderate(q) {
   const id = String(q.hide || q.del || '');
@@ -208,7 +246,7 @@ async function moderate(q) {
   if (q.del) { await drop(id); return reply(200, { ok: true }); }
   const h = String(q.v) === '0' ? '0' : '1';
   try {
-    await withTable(T.cards, () => db.send(new UpdateItemCommand({
+    await withTable(T.cards, () => ddb('UpdateItem', ({
       TableName: T.cards, Key: { p: P, id: { S: id } }, UpdateExpression: 'SET h = :h',
       ConditionExpression: 'attribute_exists(id)', ExpressionAttributeValues: { ':h': { N: h } },
     })));
@@ -216,7 +254,8 @@ async function moderate(q) {
   return reply(200, { ok: true, h: Number(h) });
 }
 
-module.exports.handler = async (event) => {
+module.exports.handler = async (event, context) => {
+  TOKEN = (context && context.token && context.token.access_token) || process.env.YDB_TOKEN || '';
   const method = String(event.httpMethod || 'GET').toUpperCase();
   const q = event.queryStringParameters || {};
   try {
@@ -235,7 +274,7 @@ module.exports.handler = async (event) => {
     return reply(405, { error: 'method not allowed' });
   } catch (e) {
     console.error(e);
-    return reply(500, { error: 'server error' });
+    return reply(500, { error: e.name === 'Config' ? `not configured: ${e.message}` : 'server error' });
   }
 };
 // для проверки фильтра мата (node -e "console.log(require('./index.js')._bad('…'))")
