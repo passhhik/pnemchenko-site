@@ -17,6 +17,9 @@
 //   GET  ?img=<id>                     → фото, даже у скрытой карточки
 //   POST ?hide=<id>&v=1                → скрыть (v=0 — вернуть)
 //   POST ?del=<id>                     → удалить совсем
+//   GET  ?stats=1&days=30              → статистика посещений (см. «статистика посещений» ниже)
+//
+// Статистика: POST ?hit=1 — пачка событий визита со страницы сайта (без ключа).
 //
 // Защита от мусора: формат и размер фото, длина подписи, проверка наклеек; не больше IP_HOUR карточек в час с одного
 // адреса и DAY_MAX в сутки на весь архив. Адрес посетителя не хранится — только хеш с секретной солью и номером часа
@@ -27,8 +30,8 @@
 const crypto = require('crypto');
 
 const BASE = process.env.TABLE || 'polaroids';
-const T = { cards: BASE, img: `${BASE}_img`, rate: `${BASE}_rate` };
-const KEYS = { [T.cards]: [['p', 'HASH'], ['id', 'RANGE']], [T.img]: [['id', 'HASH']], [T.rate]: [['k', 'HASH']] };
+const T = { cards: BASE, img: `${BASE}_img`, rate: `${BASE}_rate`, stats: `${BASE}_stats` };
+const KEYS = { [T.cards]: [['p', 'HASH'], ['id', 'RANGE']], [T.img]: [['id', 'HASH']], [T.rate]: [['k', 'HASH']], [T.stats]: [['d', 'HASH'], ['k', 'RANGE']] };
 const IP_HOUR = Number(process.env.IP_HOUR) || 6;          // карточек в час с одного адреса
 const DAY_MAX = Number(process.env.DAY_MAX) || 300;        // карточек в сутки на весь архив
 const MAX_IMG = 200 * 1024;                                // фото не больше 200 КБ (сайт присылает 30–90 КБ)
@@ -274,6 +277,117 @@ async function moderate(q) {
   return reply(200, { ok: true, h: Number(h) });
 }
 
+// ---------- статистика посещений ----------
+// Свой счётчик без cookie (js/stats.js на сайте). Сайт присылает пачки событий визита: POST ?hit=1, тело text/plain
+// {"v":"<id визита>","x":{откуда, устройство…},"ev":[{"e":"case","s":"slug","a":<сколько мс назад>}…]}.
+// Хранится только то, что ниже в cleanCtx/cleanEvents: ни IP, ни строки браузера. «Посетитель за день» — хеш соли, дня,
+// адреса и браузера: по нему считаются уникальные за день, а на следующий день тот же человек — уже другой хеш.
+// Отчёт — GET ?stats=1&days=30 с ключом модератора: визиты со сводкой, считает их админка.
+const HITS_DAY = Number(process.env.HITS_DAY) || 20000;           // пачек событий в сутки — дальше молча не пишем
+const BOT = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pingdom|uptime/i;      // счётчик шлёт сам сайт из браузера — роботов без JS тут и так нет
+const EV = new Set(['home', 'catalog', 'case', 'archive', 'cv', 'contact', 'like', 'polaroid', 'folder', 'glasses', 'spit', 'tilt', 'dock', 'end']);
+const SLUG = /^[a-z0-9][a-z0-9-]{0,59}$/;
+const word = (v, n, re = /^[\p{L}\p{N} ._:/+×-]+$/u) => { const s = String(v ?? '').trim().slice(0, n); return s && re.test(s) ? s : ''; };
+function cleanCtx(x) {
+  if (!x || typeof x !== 'object') return null;
+  const o = {
+    from: word(x.from, 40, /^[a-z0-9][a-z0-9_-]*$/i).toLowerCase(),
+    ref: word(x.ref, 80, /^[a-z0-9.-]+$/i).toLowerCase(),
+    dev: ['phone', 'tablet', 'desktop'].includes(x.dev) ? x.dev : '',
+    os: word(x.os, 20), br: word(x.br, 24), scr: word(x.scr, 11, /^\d{2,5}×\d{2,5}$/),
+    tz: word(x.tz, 40, /^[A-Za-z0-9_/+-]+$/), lang: word(x.lang, 10, /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i), ui: word(x.ui, 4, /^[a-z]{2}$/),
+  };
+  for (const k of Object.keys(o)) if (!o[k]) delete o[k];
+  return Object.keys(o).length ? o : null;
+}
+function cleanEvents(list, now) {
+  const out = [];
+  for (const e of Array.isArray(list) ? list.slice(0, 60) : []) {
+    if (!e || !EV.has(e.e)) continue;
+    const o = { e: e.e, t: now - Math.round(num(e.a, 0, 36e5) || 0) };
+    if (e.s && SLUG.test(String(e.s))) o.s = String(e.s);
+    if (e.e === 'contact') o.via = word(e.via, 16, /^[a-z]+$/);
+    if (e.e === 'folder' || e.e === 'catalog') o.sec = word(e.sec, 24, /^[a-z0-9-]+$/);
+    if (e.e === 'like') o.on = e.on ? 1 : 0;
+    if (e.e === 'end') {
+      o.act = Math.round(num(e.act, 0, 86400) || 0);
+      const c = {};
+      for (const [k, sec] of Object.entries(e.c && typeof e.c === 'object' ? e.c : {}).slice(0, 40)) if (SLUG.test(k)) c[k] = Math.round(num(sec, 0, 86400) || 0);
+      o.c = c;
+    }
+    out.push(o);
+  }
+  return out;
+}
+async function hit(event) {
+  const none = { statusCode: 204, headers: { ...CORS }, body: '' };
+  const ua = header(event, 'user-agent');
+  if (!ua || BOT.test(ua)) return none;
+  let raw = event.body || '';
+  if (event.isBase64Encoded) raw = Buffer.from(raw, 'base64').toString('utf8');
+  if (raw.length > 12000) return reply(413, { error: 'too large' });
+  let msg;
+  try { msg = JSON.parse(raw); } catch (_) { return reply(400, { error: 'bad json' }); }
+  const v = String((msg && msg.v) || '');
+  if (!/^[a-z0-9]{8,24}$/.test(v)) return reply(400, { error: 'bad visit' });
+  const now = Date.now(), ev = cleanEvents(msg.ev, now);
+  if (!ev.length) return none;
+  const day = new Date(now).toISOString().slice(0, 10);
+  if ((await bump(`hits:${day}`)) > HITS_DAY) return none;
+  const u = sha(`${await salt()}|${day}|${ipOf(event)}|${ua}`).slice(0, 16);
+  const item = { d: { S: day }, k: { S: now.toString(36).padStart(9, '0') + crypto.randomBytes(3).toString('hex') }, v: { S: v }, u: { S: u }, t: { N: String(now) }, e: { S: JSON.stringify(ev) } };
+  const x = cleanCtx(msg.x);
+  if (x) item.x = { S: JSON.stringify(x) };
+  await withTable(T.stats, () => ddb('PutItem', { TableName: T.stats, Item: item }));
+  return none;
+}
+async function dayItems(day) {
+  const items = [];
+  let start;
+  for (let guard = 0; guard < 50; guard++) {
+    const r = await withTable(T.stats, () => ddb('Query', { TableName: T.stats, KeyConditionExpression: 'd = :d', ExpressionAttributeValues: { ':d': { S: day } }, ExclusiveStartKey: start }));
+    items.push(...(r.Items || []));
+    start = r.LastEvaluatedKey;
+    if (!start) break;
+  }
+  return items;
+}
+// Визиты за последние days суток: по визиту — когда, откуда, устройство и что делал. Сводки и графики строит админка
+async function stats(q) {
+  const days = Math.min(92, Math.max(1, Number(q.days) || 30)), now = Date.now(), from = now - days * 864e5;
+  const list = [];
+  for (let i = 0; i <= days; i++) list.push(new Date(now - i * 864e5).toISOString().slice(0, 10));
+  const all = [];
+  for (let i = 0; i < list.length; i += 8) (await Promise.all(list.slice(i, i + 8).map(dayItems))).forEach((a) => all.push(...a));
+  const V = new Map();
+  for (const it of all) {
+    const t = Number(it.t && it.t.N) || 0;
+    if (t < from) continue;
+    const id = it.v.S;
+    let o = V.get(id);
+    if (!o) V.set(id, (o = { v: id, t0: t, t1: t, u: [], x: {}, ev: [] }));
+    o.t0 = Math.min(o.t0, t); o.t1 = Math.max(o.t1, t);
+    const u = it.u && it.u.S; if (u && !o.u.includes(u)) o.u.push(u);
+    try { Object.assign(o.x, JSON.parse((it.x && it.x.S) || '{}')); } catch (_) { /* без контекста */ }
+    try { o.ev.push(...JSON.parse((it.e && it.e.S) || '[]')); } catch (_) { /* битая пачка */ }
+  }
+  const visits = [...V.values()].map((o) => {
+    o.ev.sort((a, b) => a.t - b.t);
+    const r = { v: o.v, t0: Math.min(o.t0, ...o.ev.map((e) => e.t)), t1: o.t1, u: o.u, x: o.x, open: [], c: {}, act: 0, cv: 0, ct: [], lk: [], pol: 0, fun: [] };
+    for (const e of o.ev) {
+      if (e.e === 'case' && e.s && !r.open.includes(e.s)) r.open.push(e.s);
+      else if (e.e === 'cv') r.cv++;
+      else if (e.e === 'contact' && e.via && !r.ct.includes(e.via)) r.ct.push(e.via);
+      else if (e.e === 'like' && e.on && e.s && !r.lk.includes(e.s)) r.lk.push(e.s);
+      else if (e.e === 'polaroid') r.pol++;
+      else if (e.e === 'end') { r.act = Math.max(r.act, e.act || 0); for (const [k, s] of Object.entries(e.c || {})) r.c[k] = Math.max(r.c[k] || 0, s); }
+      else if (['glasses', 'spit', 'tilt', 'dock', 'archive'].includes(e.e) && !r.fun.includes(e.e)) r.fun.push(e.e);
+    }
+    return r;
+  }).sort((a, b) => b.t0 - a.t0).slice(0, 3000);
+  return { days, now, visits };
+}
+
 // ---------- с какого сайта ----------
 // ALLOW_ORIGIN — адреса сайта через запятую: он открывается и с www, и без («https://pnemchenko.ru, https://www.pnemchenko.ru»).
 // Браузеру отвечаем тем адресом из списка, с которого пришёл запрос. Пусто — любой адрес (*).
@@ -291,6 +405,7 @@ async function route(event) {
     const mod = isMod(event);
     if (method === 'GET') {
       if (q.img) return await image(String(q.img), mod);
+      if (q.stats) return mod ? reply(200, await stats(q)) : reply(401, { error: 'moderator key required' });
       if (q.all) return mod ? reply(200, await list({ before: q.before, n: q.n, all: true })) : reply(401, { error: 'moderator key required' });
       if (q.list) return reply(200, await list({ before: q.before, n: q.n, all: false }));
       return reply(200, { ok: true, service: 'polaroids' });
@@ -298,6 +413,7 @@ async function route(event) {
     if (method === 'POST') {
       if (q.hide || q.del) return mod ? await moderate(q) : reply(401, { error: 'moderator key required' });
       if (!originOk(event)) return reply(403, { error: 'origin not allowed' });
+      if (q.hit) return await hit(event);
       return await create(event);
     }
     return reply(405, { error: 'method not allowed' });

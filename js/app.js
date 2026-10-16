@@ -13,6 +13,7 @@ import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
 import { latestPhotos, flush as flushPolaroids } from './polaroids.js';
+import { stat } from './stats.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -30,9 +31,11 @@ const rs = document.documentElement.style;
 const query = new URLSearchParams(location.search);
 document.documentElement.classList.toggle('is-touch', touchUI);      // стилям: наведения нет — каталог защёлкивается на папке
 
-// Аналитика: подключите счётчик (Метрика, GA4, Plausible…) к window.dataLayer
+// Аналитика: свой счётчик без cookie (js/stats.js, отчёт — в админке). Те же события лежат в window.dataLayer —
+// для стороннего счётчика, если он когда-нибудь появится
 export function track(event, props = {}) {
   (window.dataLayer = window.dataLayer || []).push({ event, ...props });
+  stat(event, props);
   if (debug) console.debug('[track]', event, props);
 }
 
@@ -678,6 +681,7 @@ function show(next, opts = {}) {
   } else {
     window.scrollTo(0, 0);
     document.title = `${name} — ${tx(content.site.role)}`;
+    track('view_home');
     if (prev) {
       if (subs) subs.clear();
       $('#hero-title').focus({ preventScroll: true });
