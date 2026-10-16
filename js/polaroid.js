@@ -1,11 +1,11 @@
 // Полароид (Figma: страница «Полароид»). Голову растянули и замерли — она считает «три, два, один» (js/app.js),
-// и capture() снимает её прямо с 3D-холста. Карточка-картридж выползает сверху, переворачивается, и снимок на ней мягко
-// проявляется. Дальше посетитель лепит наклейки из палитры по бокам, подписывает карточку и сохраняет — она улетает
+// и capture() снимает её прямо с 3D-холста. Карточка выезжает сверху, переворачивается, и снимок на ней спокойно
+// проступает. Дальше посетитель лепит наклейки из палитры по бокам, подписывает карточку и сохраняет — она улетает
 // в архив (кружок с фотками на главной и страница #/archive, js/archive.js).
 import { content, tx, t, esc, isStack } from './content.js';
 import { stickerSet, stickerSrc } from './stickers.js';
 import { Subtitles } from './subtitles.js';
-import { savePolaroid, hasPolaroid, CAPTION_MAX } from './polaroids.js';
+import { savePolaroid, hasPolaroid, CAPTION_MAX, capSize } from './polaroids.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -56,7 +56,7 @@ export function capture(head) {
   }
 }
 
-// Кадр: квадрат вокруг головы на «стене», которую освещает вспышка, жёсткая тень от вспышки и плёночный цвет.
+// Кадр: квадрат вокруг головы на светлой стене, мягкая тень от вспышки и чуть приглушённый цвет — без «старой плёнки».
 // Зерно в файл не кладём (оно раздувает его вдвое) — его добавляет страница поверх фото.
 function develop(roi, hr) {
   const W = roi.width, H = roi.height, d = roi.getContext('2d').getImageData(0, 0, W, H).data;
@@ -69,11 +69,11 @@ function develop(roi, hr) {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 - side * 0.01;
   const out = mk(SHOT, SHOT), o = out.getContext('2d', { willReadFrequently: true });
   const bg = o.createRadialGradient(SHOT * 0.5, SHOT * 0.4, SHOT * 0.04, SHOT * 0.5, SHOT * 0.5, SHOT * 0.8);
-  bg.addColorStop(0, '#F3F0EA'); bg.addColorStop(0.55, '#DDD9D1'); bg.addColorStop(1, '#A9A59D');
+  bg.addColorStop(0, '#F7F8FA'); bg.addColorStop(0.6, '#E9EAED'); bg.addColorStop(1, '#CDD0D5');
   o.fillStyle = bg; o.fillRect(0, 0, SHOT, SHOT);
   const k = SHOT / side, dx = SHOT / 2 - cx * k, dy = SHOT / 2 - cy * k, off = SHOT * 4;
   o.save();
-  o.shadowColor = 'rgba(46,38,32,.36)'; o.shadowBlur = SHOT * 0.02;
+  o.shadowColor = 'rgba(28,30,38,.2)'; o.shadowBlur = SHOT * 0.03;
   o.shadowOffsetX = off + SHOT * 0.03; o.shadowOffsetY = SHOT * 0.032;
   o.drawImage(roi, dx - off, dy, W * k, H * k);          // рисуем за краем — на холсте остаётся только тень
   o.restore();
@@ -81,14 +81,14 @@ function develop(roi, hr) {
   grade(o);
   return out;
 }
-// Плёнка: приподнятые тени (холоднее), мягкие светлые (теплее), чуть меньше цвета, затемнённые углы
+// Цвет: чуть приподнятые тени, мягкие светлые, немного меньше цвета и едва заметные углы
 const LUT = (() => {
   const curve = (lift, top, gm) => {
     const a = new Uint8ClampedArray(256);
     for (let i = 0; i < 256; i++) { const x = i / 255, s = x * x * (3 - 2 * x), y = 0.72 * x + 0.28 * s; a[i] = Math.round((lift + (top - lift) * Math.pow(y, gm)) * 255); }
     return a;
   };
-  return [curve(0.06, 0.975, 1), curve(0.075, 0.965, 1.02), curve(0.1, 0.93, 1.05)];
+  return [curve(0.025, 0.99, 1), curve(0.028, 0.985, 1), curve(0.032, 0.98, 1.01)];
 })();
 function grade(o) {
   const img = o.getImageData(0, 0, SHOT, SHOT), d = img.data, c = SHOT / 2, R2 = c * c * 2;
@@ -99,8 +99,8 @@ function grade(o) {
       const i = (y * SHOT + x) * 4;
       let r = LR[d[i]], g = LG[d[i + 1]], b = LB[d[i + 2]];
       const l = 0.299 * r + 0.587 * g + 0.114 * b;
-      r = l + (r - l) * 0.86; g = l + (g - l) * 0.86; b = l + (b - l) * 0.86;
-      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.36 * q * Math.sqrt(q);
+      r = l + (r - l) * 0.95; g = l + (g - l) * 0.95; b = l + (b - l) * 0.95;
+      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.12 * q * Math.sqrt(q);
       d[i] = r * v; d[i + 1] = g * v; d[i + 2] = b * v; d[i + 3] = 255;
     }
   }
@@ -128,12 +128,11 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-label', t('polaroid'));
-  root.innerHTML = `<div class="pol-scrim"></div>
-    <div class="pol-stage">
+  root.innerHTML = `<div class="pol-stage">
       <div class="pol-card"><div class="pol-turn">
         <div class="pc pc--edit pol-front">
           <span class="pc-photo"><i class="pc-dev"></i></span>
-          <textarea class="pc-cap" rows="2" maxlength="${CAPTION_MAX}" placeholder="${esc(t('polCaptionPh'))}" aria-label="${esc(t('polCaption'))}" spellcheck="false" autocomplete="off" enterkeyhint="done"></textarea>
+          <span class="pc-capbox"><textarea class="pc-cap" rows="1" maxlength="${CAPTION_MAX}" placeholder="${esc(t('polCaptionPh'))}" aria-label="${esc(t('polCaption'))}" spellcheck="false" autocomplete="off" enterkeyhint="done"></textarea></span>
           <span class="pc-stks"></span>
         </div>
         <div class="pol-back" aria-hidden="true"></div>
@@ -151,6 +150,13 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   const photo = $('.pc-photo'), pal = $('.pol-pal'), dlg = $('.pol-dlg'), sr = $('[data-sr]');
   shot.classList.add('pc-shot');
   photo.insertBefore(shot, photo.firstChild);
+  // Затемнение — отдельным слоем под логотипом и кружком «Архив»; сам редактор — над ними: наклейки, карточка и окно
+  // перекрывают всё (наклейку можно утащить хоть на логотип)
+  const scrim = document.createElement('div');
+  scrim.className = 'pol-scrim';
+  scrim.setAttribute('aria-hidden', 'true');
+  const mark = (c) => { root.classList.add(c); scrim.classList.add(c); };
+  document.body.appendChild(scrim);
   document.body.appendChild(root);
   document.body.classList.add('is-pol');
   const dsubs = new Subtitles({ el: $('.pol-say'), srEl: sr, voice, lines, fmt, reducedMotion: reduced });
@@ -208,12 +214,13 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     return p;
   }
   let raf = 0;
-  const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { layout(); keyboard(); }); };
+  const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { layout(); fitCap(); keyboard(); }); };
 
   // ---------- появление: картридж сверху, переворот, проявка ----------
   function enter() {
     layout();
-    requestAnimationFrame(() => root.classList.add('is-in'));          // затемнение проявляется
+    fitCap();
+    requestAnimationFrame(() => mark('is-in'));                        // затемнение проявляется
     if (reduced) { root.classList.add('is-up', 'is-dev'); reveal(); return; }
     turn.style.transform = 'rotateY(180deg)';                            // выезжает рубашкой вверх
     const slide = card.animate([
@@ -452,10 +459,17 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
 
   // ---------- подпись ----------
   cap.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.metaKey || e.ctrlKey) save(); } });
+  // подпись стоит посередине белого поля, как на готовой карточке в архиве: поле растёт по строкам, кегль — как там
+  function fitCap() {
+    cap.className = `pc-cap${capSize(cap.value || cap.placeholder)}`;
+    cap.style.height = '0px';
+    cap.style.height = `${cap.scrollHeight}px`;
+  }
   cap.addEventListener('input', () => {
     const v = cap.value.replace(/\s*\n\s*/g, ' ');
     const cut = [...v].slice(0, CAPTION_MAX).join('');
     if (cut !== cap.value) cap.value = cut;
+    fitCap();
   });
   // Телефон: клавиатура закрывает низ экрана — сдвигаем всё вверх ровно настолько, чтобы подпись осталась видна
   const vv = window.visualViewport;
@@ -488,7 +502,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   // карточка уменьшается и улетает в кружок «Архив»
   function flyAway() {
     document.body.classList.remove('is-pol');              // шапка и кружок архива возвращаются, пока карточка летит
-    root.classList.add('is-out');
+    mark('is-out');
     stage.style.setProperty('--kb', '0px');
     if (reduced) return Promise.resolve();
     const b = archive && archive.getBoundingClientRect();
@@ -507,7 +521,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   function retake() {
     if (busy) return;
     busy = true;
-    root.classList.add('is-out');
+    mark('is-out');
     if (reduced) { finish('retake'); return; }
     card.animate([
       { transform: `translate(-50%,-50%) rotate(${ROT}deg)` },
@@ -517,7 +531,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   function dismiss() {
     if (busy) return;
     busy = true;
-    root.classList.add('is-out');
+    mark('is-out');
     if (reduced) { finish('close'); return; }
     card.animate([{ opacity: 1 }, { opacity: 0, transform: `translate(-50%, -46%) rotate(${ROT + 3}deg) scale(.92)` }], { duration: 260, easing: 'ease-in', fill: 'forwards' })
       .finished.then(() => finish('close'), () => finish('close'));
@@ -550,6 +564,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     if (vv) { vv.removeEventListener('resize', keyboard); vv.removeEventListener('scroll', keyboard); }
     document.body.classList.remove('is-pol');
     root.remove();
+    scrim.remove();
     if (prevFocus && prevFocus.focus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true });
     onClose(res, entry, again);
   }

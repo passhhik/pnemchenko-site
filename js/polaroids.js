@@ -16,6 +16,8 @@ export function polaroidsApi(site = content.site) {
   return /^https:\/\/[^\s?#]+$/i.test(u) ? u.replace(/\/+$/, '') : '';
 }
 export const imgUrl = (api, id) => `${api}?img=${encodeURIComponent(id)}`;
+// Подпись встаёт в белое поле под фото (до трёх строк): чем длиннее, тем мельче кегль — класс у .pc-cap
+export const capSize = (c) => { const n = [...String(c || '')].length; return n > 44 ? ' is-xlong' : n > 30 ? ' is-long' : ''; };
 
 const num = (v, a, b) => { const n = Number(v); return Number.isFinite(n) ? Math.min(b, Math.max(a, n)) : null; };
 // подпись и наклейки — такие же проверки, как у функции архива
@@ -106,7 +108,7 @@ export function flush(mem = null) {
       write(v);
       // карточка уже в общем архиве — в кружок «Архив» она встаёт сразу (скрытая проверкой — нет), прошлая уходит
       recent.list = recent.list.filter((x) => x.id !== old && x.id !== id);
-      if (id && !res.hidden) recent.list.unshift({ id });
+      if (id && !res.hidden) recent.list.unshift({ id, s: it.s });
       changed();
     } catch (e) {
       if (e.status && e.status >= 400 && e.status < 500 && e.status !== 429 && e.status !== 408) {
@@ -127,15 +129,16 @@ async function post(api, it, mine) {
   return r.json();
 }
 
-// Две свежие фотографии — для кружка «Архив» на главной: свои неотправленные, потом общий архив (его — раз в минуту)
+// Две свежие карточки — для кружка «Архив» на главной: { src, s } — фото и наклейки. Сначала свои неотправленные,
+// потом общий архив (его — раз в минуту)
 export async function latestPhotos(n = 2, fresh = false) {
-  const out = localPolaroids().map((it) => it.img);
+  const out = localPolaroids().map((it) => ({ src: it.img, s: it.s || [] }));
   const api = polaroidsApi();
   if (out.length < n && api && !content.preview) {
     if (fresh || Date.now() - recent.at > 60000) {
       try { recent = { at: Date.now(), list: (await fetchList(api, { n: 4 })).items }; } catch (_) { recent.at = Date.now(); }
     }
-    for (const it of recent.list) if (out.length < n) out.push(imgUrl(api, it.id));
+    for (const it of recent.list) if (out.length < n) out.push({ src: imgUrl(api, it.id), s: it.s || [] });
   }
   return out.slice(0, n);
 }

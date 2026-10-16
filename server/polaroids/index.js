@@ -17,7 +17,7 @@
 //   GET  ?img=<id>                     → фото, даже у скрытой карточки
 //   POST ?hide=<id>&v=1                → скрыть (v=0 — вернуть)
 //   POST ?del=<id>                     → удалить совсем
-//   GET  ?stats=1&days=30              → статистика посещений (см. «статистика посещений» ниже)
+//   GET  ?stats=1&days=30|all          → статистика посещений (см. «статистика посещений» ниже)
 //
 // Статистика: POST ?hit=1 — пачка событий визита со страницы сайта (без ключа).
 //
@@ -352,13 +352,30 @@ async function dayItems(day) {
   }
   return items;
 }
-// Визиты за последние days суток: по визиту — когда, откуда, устройство и что делал. Сводки и графики строит админка
+// Вся таблица разом — для длинных периодов и «за всё время»: на портфолио это сотни и тысячи небольших записей
+async function scanAll() {
+  const items = [];
+  let start;
+  for (let guard = 0; guard < 400; guard++) {
+    const r = await withTable(T.stats, () => ddb('Scan', { TableName: T.stats, ExclusiveStartKey: start }));
+    items.push(...(r.Items || []));
+    start = r.LastEvaluatedKey;
+    if (!start) break;
+  }
+  return items;
+}
+// Визиты за последние days суток (days=all — за всё время): по визиту — когда, откуда, устройство и что делал.
+// Сводки и графики строит админка. До 92 суток — по разделам-дням, дольше — одним проходом по таблице
 async function stats(q) {
-  const days = Math.min(92, Math.max(1, Number(q.days) || 30)), now = Date.now(), from = now - days * 864e5;
-  const list = [];
-  for (let i = 0; i <= days; i++) list.push(new Date(now - i * 864e5).toISOString().slice(0, 10));
+  const ever = String(q.days) === 'all';
+  const days = ever ? 0 : Math.min(3660, Math.max(1, Number(q.days) || 30)), now = Date.now(), from = ever ? 0 : now - days * 864e5;
   const all = [];
-  for (let i = 0; i < list.length; i += 8) (await Promise.all(list.slice(i, i + 8).map(dayItems))).forEach((a) => all.push(...a));
+  if (ever || days > 92) all.push(...(await scanAll()));
+  else {
+    const list = [];
+    for (let i = 0; i <= days; i++) list.push(new Date(now - i * 864e5).toISOString().slice(0, 10));
+    for (let i = 0; i < list.length; i += 8) (await Promise.all(list.slice(i, i + 8).map(dayItems))).forEach((a) => all.push(...a));
+  }
   const V = new Map();
   for (const it of all) {
     const t = Number(it.t && it.t.N) || 0;
@@ -384,8 +401,8 @@ async function stats(q) {
       else if (['glasses', 'spit', 'tilt', 'dock', 'archive'].includes(e.e) && !r.fun.includes(e.e)) r.fun.push(e.e);
     }
     return r;
-  }).sort((a, b) => b.t0 - a.t0).slice(0, 3000);
-  return { days, now, visits };
+  }).sort((a, b) => b.t0 - a.t0).slice(0, 5000);
+  return { days: ever ? 'all' : days, now, visits };
 }
 
 // ---------- с какого сайта ----------

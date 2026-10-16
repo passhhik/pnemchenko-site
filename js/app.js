@@ -13,6 +13,7 @@ import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
 import { latestPhotos, flush as flushPolaroids } from './polaroids.js';
+import { stickerSet, stickerSrc, stickerById } from './stickers.js';
 import { stat } from './stats.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -1177,9 +1178,9 @@ function dockOut(instant = false) {
 
 // ---------- полароид: растянули и замерли — снимок (Figma: «Полароид») ----------
 // Голову тянут и держат неподвижно полторы секунды — она говорит «Замри! Три… Два… Один…», вокруг неё рамка
-// видоискателя, и кадр снимается (js/polaroid.js): вспышка, карточка выползает сверху и проявляется. Отсчёт идёт, даже
-// если голову уже отпустили, — можно успеть скорчить рожу. Пока идёт отсчёт и открыта карточка, голова не отвечает
-// на щипки, не окликает и не плюётся. Включается в админке («Полароид»), в содержимом это site.polaroidOn.
+// видоискателя, и кадр снимается (js/polaroid.js): вспышка, карточка выползает сверху и проявляется. Голову держат до
+// щелчка: отпустили во время отсчёта — снимка не будет, голова просит держать до конца. С клавиатуры (кнопка-невидимка)
+// отсчёт идёт сам. Пока идёт отсчёт и открыта карточка, голова не отвечает на щипки, не окликает и не плюётся. Включается в админке («Полароид»), в содержимом это site.polaroidOn.
 const polOn = () => !!(content.site && content.site.polaroidOn === true) && !content.preview;
 const POL = { state: 'idle', armed: true, ax: 0, ay: 0, since: 0, t: 0, ui: null, mod: null, finder: null };     // state: idle | count | edit
 const HOLD_MS = 1500, STILL_PX = 14, STRETCH_MIN = 0.16;     // сколько держать, насколько неподвижно и насколько растянуть
@@ -1225,6 +1226,9 @@ async function polCountdown(manual = false) {
   POL.state = 'count';
   const tk = ++POL.t;
   const alive = () => POL.t === tk && POL.state === 'count' && view === 'hero' && !document.hidden;
+  const held = () => manual || (head && head.drags.size > 0);           // голову всё ещё держат
+  // ждём шаг отсчёта, но проверяем часто: отпустили — отсчёт обрывается сразу, а не на следующей цифре
+  const step = async (ms) => { const end = performance.now() + ms; while (performance.now() < end) { if (!alive() || !held()) return false; await wait(40); } return alive() && held(); };
   if (!POL.mod) { POL.mod = import('./polaroid.js'); POL.mod.catch(() => { POL.mod = null; }); }      // модуль редактора качается, пока идёт отсчёт
   closeFolder();
   clearTimeout(pointT);
@@ -1236,13 +1240,15 @@ async function polCountdown(manual = false) {
   const steps = ['photo_3', 'photo_2', 'photo_1'];
   for (let i = 0; i < steps.length; i++) {
     if (!alive()) { polAbort(tk); return; }
+    if (!held()) { polRelease(tk); return; }
     say(steps[i], { force: true });
     voice.beep(i === steps.length - 1);
-    await wait(reduced ? 800 : 1000);
+    if (!(await step(reduced ? 800 : 1000))) { if (alive()) polRelease(tk); else polAbort(tk); return; }
   }
   let mod = null;
   try { mod = await POL.mod; } catch (_) { mod = null; }
   if (!alive()) { polAbort(tk); return; }
+  if (!held()) { polRelease(tk); return; }
   const shot = mod ? mod.capture(head) : null;
   finder(false);
   flash();
@@ -1262,6 +1268,13 @@ function polAbort(tk) {
   finder(false);
   POL.state = 'idle';
   if (head) head.clearLook();
+}
+// отпустили посреди отсчёта: снимка нет, голова просит держать до щелчка
+function polRelease(tk) {
+  if (POL.t !== tk) return;
+  polAbort(tk);
+  say('photo_release', { force: true });
+  track('polaroid_release');
 }
 function polClosed(res, entry, again) {
   POL.ui = null; POL.state = 'idle'; POL.armed = false; POL.since = 0;
@@ -1285,13 +1298,21 @@ async function archMinis(fresh = false) {
   if (!els.archBtn || document.body.classList.contains('no-pol')) return;
   let list = [];
   try { list = await latestPhotos(2, fresh); } catch (_) { list = []; }
-  const put = (sel, src) => {
-    const im = els.archBtn.querySelector(sel);
+  const set = stickerSet(content.site, tx);
+  // мини-карточка: фото и наклейки там же, где на настоящей (доли карточки)
+  const put = (sel, it) => {
+    const mini = els.archBtn.querySelector(sel), im = mini && mini.querySelector('img');
     if (!im) return;
-    if (src) { if (im.getAttribute('src') !== src) im.src = src; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
+    let layer = mini.querySelector('.arch-stks');
+    if (!layer) { layer = document.createElement('span'); layer.className = 'arch-stks'; mini.appendChild(layer); }
+    if (it && it.src) { if (im.getAttribute('src') !== it.src) im.src = it.src; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
+    layer.innerHTML = (it && it.src ? it.s || [] : []).map((p) => {
+      const st = stickerById(set, p.e), src = st && stickerSrc(st);
+      return src ? `<img src="${esc(src)}" alt="" style="left:${(Number(p.x) * 100).toFixed(1)}%;top:${(Number(p.y) * 100).toFixed(1)}%;--r:${Number(p.r) || 0}deg">` : '';
+    }).join('');
   };
-  put('.arch-mini--b img', list[0]);
-  put('.arch-mini--a img', list[1]);
+  put('.arch-mini--b', list[0]);
+  put('.arch-mini--a', list[1]);
 }
 window.addEventListener('ph:polaroids', () => archMinis());
 

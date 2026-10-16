@@ -803,10 +803,12 @@ async function polModerate(id, act) {
 // Свой счётчик без cookie: сайт шлёт события визитов в функцию архива полароидов (js/stats.js), отчёт — с ключом
 // модератора. Дашборд: период сверху, ниже всё считается по нему — показатели с прошлым периодом, визиты по дням,
 // воронка, отклики (?from=…), источники и устройства, кейсы, когда заходят, последние визиты и таблица по дням.
-// Функция отдаёт до 92 суток: для сравнения грузим вдвое больше периода, поэтому у «90 дней» сравнения нет.
+// Для сравнения грузим вдвое больше периода; «Всё время» — без сравнения, по дням или (если долго) по неделям.
 // Админка помечает этот браузер как ваш — свои заходы на сайт не считаются.
-const PERIODS = [[1, '24 часа'], [7, '7 дней'], [30, '30 дней'], [90, '90 дней']];
-const VS_PREV = { 1: 'с предыдущими 24 часами', 7: 'с предыдущими 7 днями', 30: 'с предыдущими 30 днями' };
+const PERIODS = [[1, '24 часа'], [7, '7 дней'], [30, '30 дней'], [90, '90 дней'], [0, 'Всё время']];      // 0 — за всё время
+const VS_PREV = { 1: 'с предыдущими 24 часами', 7: 'с предыдущими 7 днями', 30: 'с предыдущими 30 днями', 90: 'с предыдущими 90 днями' };
+const want = (d) => (d ? d * 2 : 'all');                                        // сколько грузить: период и прошлый — для сравнения
+const enough = (have, d) => have === 'all' || (d !== 0 && Number(have) >= d * 2);
 st.stats = { days: 30, data: null, note: '', busy: false, co: '', me: true, more: 0, keyOpen: false, err: '' };
 markOwner(true);
 const coSlug = (v) => String(v || '').toLowerCase().replace(/[а-яё]/g, (c) => TR[c] ?? '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
@@ -849,7 +851,10 @@ function summary(vs) {
 // Корзины времени для графика: по часам за 24 часа, иначе по дням
 function buckets(days, now) {
   const out = [];
-  if (days === 1) {
+  if (days > 120) {                                       // долгий период — по неделям, с понедельника
+    const d0 = new Date(now); d0.setHours(0, 0, 0, 0); d0.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));
+    for (let i = Math.ceil(days / 7) - 1; i >= 0; i--) { const s = new Date(d0); s.setDate(s.getDate() - i * 7); const e = new Date(s); e.setDate(e.getDate() + 7); out.push({ t: s.getTime(), end: e.getTime(), label: dmy(s.getTime()), week: 1 }); }
+  } else if (days === 1) {
     const h0 = new Date(now); h0.setMinutes(0, 0, 0);
     for (let i = 23; i >= 0; i--) { const t = h0.getTime() - i * 36e5; out.push({ t, end: t + 36e5, label: `${String(new Date(t).getHours()).padStart(2, '0')}:00` }); }
   } else {
@@ -893,9 +898,9 @@ function trendHTML(cur, prev, has, days) {
   const top = niceMax(Math.max(1, ...cur.map((b) => b.n), ...(has ? prev.map((b) => b.n) : [])));
   const ticks = [0, top / 2, top];
   const every = Math.ceil(cur.length / 8);
-  const unit = days === 1 ? 'час' : 'день';
+  const unit = days === 1 ? 'час' : cur[0] && cur[0].week ? 'недел' : 'день';
   return `<div class="db-trend">
-    <div class="db-legend"><span><i class="db-lk db-lk--bar"></i>этот период</span>${has ? '<span><i class="db-lk db-lk--tick"></i>прошлый период</span>' : ''}<span class="hint">по ${unit}ам, наведите на столбик</span></div>
+    <div class="db-legend"><span><i class="db-lk db-lk--bar"></i>этот период</span>${has ? '<span><i class="db-lk db-lk--tick"></i>прошлый период</span>' : ''}<span class="hint">по ${unit === 'недел' ? 'неделям' : `${unit}ам`}, наведите на столбик</span></div>
     <div class="db-plot">
       <div class="db-yaxis" aria-hidden="true">${ticks.slice().reverse().map((t) => `<span>${num(t)}</span>`).join('')}</div>
       <div class="db-area">
@@ -904,7 +909,7 @@ function trendHTML(cur, prev, has, days) {
     const p = has ? prev[i] : null;
     const rows = [[b.n, VIS(b.n)], [b.s.people, PPL(b.s.people)], [b.s.cases, 'открыли кейс'], [b.s.cv, 'скачали резюме'], [b.s.ct, 'нажали на контакт']];
     if (p) rows.push([p.n, `${VIS(p.n)} в прошлый период (${p.label})`]);
-    return `<span class="db-col" tabindex="0" ${tip(days === 1 ? `${dmy(b.t)}, ${b.label}` : `${WD[(new Date(b.t).getDay() + 6) % 7]}, ${b.label}`, rows)}>
+    return `<span class="db-col" tabindex="0" ${tip(days === 1 ? `${dmy(b.t)}, ${b.label}` : b.week ? `неделя с ${b.label}` : `${WD[(new Date(b.t).getDay() + 6) % 7]}, ${b.label}`, rows)}>
             <i class="db-bar" style="height:${(b.n / top) * 100}%"></i>${p ? `<i class="db-tick" style="bottom:${(p.n / top) * 100}%"></i>` : ''}</span>`;
   }).join('')}</div>
       </div>
@@ -989,17 +994,20 @@ function visitHTML(v) {
 
 // ---- таблица по дням (то же, что на графике, — числами) ----
 function dayTableHTML(cur, days) {
-  return `<details class="db-details"><summary>Таблица ${days === 1 ? 'по часам' : 'по дням'}</summary>
-    <table class="db-table"><thead><tr><th>${days === 1 ? 'Час' : 'День'}</th><th>Визиты</th><th>Люди</th><th>Открыли кейс</th><th>Резюме</th><th>Контакт</th></tr></thead><tbody>
+  const wk = cur[0] && cur[0].week;
+  return `<details class="db-details"><summary>Таблица ${days === 1 ? 'по часам' : wk ? 'по неделям' : 'по дням'}</summary>
+    <table class="db-table"><thead><tr><th>${days === 1 ? 'Час' : wk ? 'Неделя с' : 'День'}</th><th>Визиты</th><th>Люди</th><th>Открыли кейс</th><th>Резюме</th><th>Контакт</th></tr></thead><tbody>
     ${cur.slice().reverse().map((b) => `<tr><td>${esc(days === 1 ? `${dmy(b.t)}, ${b.label}` : b.label)}</td><td>${b.n}</td><td>${b.s.people}</td><td>${b.s.cases}</td><td>${b.s.cv}</td><td>${b.s.ct}</td></tr>`).join('')}
     </tbody></table></details>`;
 }
 
 function dashBody(d) {
-  const S = st.stats, days = S.days, now = d.now || Date.now(), span = days * 864e5;
-  const all = d.visits || [];
-  const vs = all.filter((v) => v.t0 >= now - span);
-  const has = (d.days || 0) >= days * 2;                       // прошлый период целиком попал в выборку
+  const S = st.stats, ever = S.days === 0, now = d.now || Date.now(), all = d.visits || [];
+  // «всё время» — с дня первого визита (не меньше недели)
+  const first = all.length ? Math.min(...all.map((v) => v.t0)) : now;
+  const days = ever ? Math.max(7, Math.ceil((now - new Date(first).setHours(0, 0, 0, 0)) / 864e5)) : S.days, span = days * 864e5;
+  const vs = ever ? all : all.filter((v) => v.t0 >= now - span);
+  const has = !ever && enough(d.days, S.days);                // прошлый период целиком попал в выборку
   const pv = has ? all.filter((v) => v.t0 >= now - 2 * span && v.t0 < now - span) : [];
   const s = summary(vs), p = summary(pv);
   const cur = fill(buckets(days, now), vs), prev = has ? fill(buckets(days, now - span), pv) : [];
@@ -1014,8 +1022,8 @@ function dashBody(d) {
       ${kpi('Нажали на контакт', num(s.ct), s.ct, p.ct, has, ser('ct'))}
       ${kpi('Время на сайте', dur(s.time), s.time, p.time, has, [], { sub: 'медиана визита', fmt: dur })}
     </div>
-    ${s.n ? '' : `<p class="db-empty">За ${esc(PERIODS.find(([v]) => v === days)[1])} заходов не было — или функция ещё не получила ни одного события. Откройте сайт с телефона (не из этого браузера) и обновите через минуту.</p>`}
-    <section class="db-card db-card--wide"><h3>Визиты</h3>${trendHTML(cur, prev, has, days)}${dayTableHTML(cur, days)}</section>
+    ${s.n ? '' : `<p class="db-empty">${ever ? 'Пока' : `За ${esc(PERIODS.find(([v]) => v === S.days)[1])}`} заходов не было — или функция ещё не получила ни одного события. Откройте сайт с телефона (не из этого браузера) и обновите через минуту.</p>`}
+    <section class="db-card db-card--wide"><h3>Визиты${ever ? ` с ${esc(dmy(first))}` : ''}</h3>${trendHTML(cur, prev, has, days)}${dayTableHTML(cur, days)}</section>
     <div class="db-row">
       <section class="db-card"><h3>Воронка</h3>${funnelHTML(s)}<p class="hint">Доля — от всех визитов за период.</p></section>
       <section class="db-card"><h3>Когда заходят</h3>${heatHTML(vs)}</section>
@@ -1045,7 +1053,7 @@ function statsPane() {
   return `<div class="db-filters" role="group" aria-label="Период">
       <div class="seg db-seg">${PERIODS.map(([v, l]) => `<button type="button" data-act="stats-days" data-days="${v}" aria-pressed="${S.days === v}">${esc(l)}</button>`).join('')}</div>
       <button class="btn btn--line btn--sm" type="button" data-act="stats-load"${S.busy ? ' disabled' : ''}>${S.busy ? 'Загружаю…' : 'Обновить'}</button>
-      <span class="hint" data-stats-note>${esc([VS_PREV[S.days] ? `сравниваем ${VS_PREV[S.days]}` : 'у 90 дней сравнения с прошлым периодом нет', S.note].filter(Boolean).join(' · '))}</span>
+      <span class="hint" data-stats-note>${esc([VS_PREV[S.days] ? `сравниваем ${VS_PREV[S.days]}` : '', S.note].filter(Boolean).join(' · '))}</span>
       <span class="db-filters-end">${key && !S.keyOpen && !S.err ? '<button class="linkish" type="button" data-act="stats-key">Ключ модератора</button>' : ''}</span>
     </div>
     ${!key || S.keyOpen || S.err ? `<div class="db-keyrow">${keyField}<button class="btn btn--sm" type="button" data-act="stats-load">Показать</button>${S.err ? `<span class="error">${esc(S.err)}</span>` : '<span class="hint">Тот же ключ, что в переменной MOD_KEY функции. Хранится только в этом браузере.</span>'}</div>` : ''}
@@ -1068,8 +1076,7 @@ async function statsLoad() {
   if (S.busy) return;
   S.busy = true; S.err = ''; statsRedraw();
   try {
-    const want = Math.min(92, S.days * 2);
-    const r = await fetch(`${api}?stats=1&days=${want}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
+    const r = await fetch(`${api}?stats=1&days=${want(S.days)}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
     if (!r.ok) { const e = new Error(String(r.status)); e.status = r.status; throw e; }
     S.data = await r.json();
     S.keyOpen = false;
@@ -1514,7 +1521,7 @@ const ACT = {
     try { navigator.clipboard.writeText(url).then(ok, () => toast(url)); } catch (_) { toast(url); }
   },
   'stats-me'() { st.stats.me = !st.stats.me; markOwner(st.stats.me); statsRedraw(); },
-  'stats-days'(el) { const S = st.stats, d = Number(el.dataset.days) || 30; if (S.days === d) return; S.days = d; S.more = 0; statsRedraw(); if (!S.data || (S.data.days || 0) < Math.min(92, d * 2)) statsLoad(); },
+  'stats-days'(el) { const S = st.stats, d = Number(el.dataset.days); if (S.days === d) return; S.days = d; S.more = 0; statsRedraw(); if (!S.data || !enough(S.data.days, d)) statsLoad(); },
   'stats-more'() { st.stats.more += 40; statsRedraw(); },
   'stats-key'() { st.stats.keyOpen = true; statsRedraw(); const i = $('[data-modkey]'); if (i) i.focus(); },
   'open-lines'() { st.idx = -1; st.tab = 'lines'; st.open.clear(); st.menu = false; renderSide(); renderEdit(); renderViews(); sendPreview(false); $('[data-edit]').scrollTop = 0; },
