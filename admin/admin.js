@@ -814,7 +814,7 @@ markOwner(true);
 const coSlug = (v) => String(v || '').toLowerCase().replace(/[а-яё]/g, (c) => TR[c] ?? '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 const siteUrl = () => { const h = location.hostname; return /^(localhost|127\.)/.test(h) ? 'https://pnemchenko.ru/' : `${location.origin}/`; };
 const statsLink = () => { const c = coSlug(st.stats.co); return c ? `${siteUrl()}?from=${c}` : ''; };
-const REF = [[/(^|\.)hh\.ru$|headhunter/, 'hh.ru'], [/^t\.me$|telegram/, 'Telegram'], [/linkedin/, 'LinkedIn'], [/(^|\.)google\./, 'Google'], [/yandex\.|^ya\.ru$/, 'Яндекс'], [/^vk\.com$|^m\.vk\.com$/, 'ВКонтакте'], [/behance/, 'Behance'], [/dribbble/, 'Dribbble'], [/habr/, 'Хабр'], [/github/, 'GitHub']];
+const REF = [[/(^|\.)hh\.ru$|headhunter/, 'hh.ru'], [/^t\.me$|telegram/, 'Telegram'], [/linkedin|^lnkd\.in$/, 'LinkedIn'], [/instagram/, 'Instagram'], [/facebook/, 'Facebook'], [/(^|\.)google\./, 'Google'], [/yandex\.|^ya\.ru$/, 'Яндекс'], [/(^|\.)vk\.com$/, 'ВКонтакте'], [/behance/, 'Behance'], [/dribbble/, 'Dribbble'], [/habr/, 'Хабр'], [/github/, 'GitHub']];
 const refName = (h) => { for (const [re, n] of REF) if (re.test(h)) return n; return h; };
 const srcOf = (x) => (x.from ? `ссылка «${x.from}»` : x.ref ? refName(x.ref) : 'прямой заход');
 const DEV = { phone: 'Телефон', tablet: 'Планшет', desktop: 'Компьютер' };

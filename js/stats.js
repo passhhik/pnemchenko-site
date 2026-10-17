@@ -33,11 +33,26 @@ function device() {
   try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) { /* старый браузер */ }
   return { dev, os, br, scr: s.width && s.height ? `${s.width}×${s.height}` : '', tz, lang: (navigator.language || '').split('@')[0].slice(0, 10) };
 }
-// откуда: своя ссылка ?from= (или utm_source) важнее сайта-источника; источник — только домен, без пути
+// Встроенные браузеры приложений подписываются в строке браузера — по ним видно, откуда пришли, даже когда
+// приложение не передаёт адрес-источник (Instagram, LinkedIn, Telegram на Android, Facebook, ВКонтакте)
+function appOf(ua) {
+  if (/Instagram/.test(ua)) return 'instagram.com';
+  if (/LinkedInApp/i.test(ua)) return 'linkedin.com';
+  if (/Telegram/i.test(ua) || window.TelegramWebviewProxy) return 't.me';
+  if (/FBAN|FBAV|FB_IAB/.test(ua)) return 'facebook.com';
+  if (/VKClient|VKAndroidApp|com\.vkontakte/i.test(ua)) return 'vk.com';
+  return '';
+}
+// служебные адреса переходов → сама площадка
+const HOP = [[/(^|\.)l\.instagram\.com$|^instagram\.com$/, 'instagram.com'], [/^lnkd\.in$|linkedin\.com$/, 'linkedin.com'], [/^t\.me$|telegram\.org$/, 't.me'], [/^l\.facebook\.com$|^m\.facebook\.com$/, 'facebook.com'], [/^away\.vk\.com$|^m\.vk\.com$/, 'vk.com']];
+// откуда: своя ссылка ?from= (или utm_source) важнее сайта-источника; источник — только домен, без пути;
+// нет источника — приложение, в чьём браузере открыли сайт
 function source() {
   const from = (params.get('from') || params.get('utm_source') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
   let ref = '';
   try { const h = new URL(document.referrer).hostname.replace(/^www\./, ''); if (h && h !== location.hostname.replace(/^www\./, '')) ref = h; } catch (_) { /* прямой заход */ }
+  for (const [re, name] of HOP) if (re.test(ref)) { ref = name; break; }
+  if (!ref) ref = appOf(navigator.userAgent || '');
   return { from, ref };
 }
 
