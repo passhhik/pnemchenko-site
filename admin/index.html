@@ -14,11 +14,12 @@
   <header class="bar">
     <div class="bar-l">
       <strong class="bar-title">Админка</strong>
-      <span class="bar-folder" data-folder></span>
+      <button class="bar-folder" type="button" data-act="page" data-page="settings" data-folder title="Подключение сайта и папки — в настройках"></button>
     </div>
     <div class="bar-r">
       <span class="langs" data-langs hidden></span>
       <span class="status" data-status role="status"></span>
+      <button class="btn btn--line btn--sm" type="button" data-act="prev-toggle" data-prev-show hidden>Предпросмотр</button>
       <a class="btn btn--line" href="../" target="_blank" rel="noopener" data-open-site>Открыть сайт</a>
       <button class="btn" type="button" data-act="save" disabled>Сохранить</button>
       <button class="btn" type="button" data-act="publish" hidden>Опубликовать</button>
@@ -53,7 +54,8 @@
   </section>
 
   <div class="app" data-app hidden>
-    <aside class="side" data-side aria-label="Проекты"></aside>
+    <nav class="rail" data-nav aria-label="Разделы админки"></nav>
+    <aside class="side" data-side aria-label="Кейсы"></aside>
     <main class="edit" data-edit></main>
     <section class="prev" aria-label="Предпросмотр">
       <div class="prev-bar">
@@ -64,6 +66,7 @@
           <button type="button" data-act="device" data-device="tablet" aria-pressed="false">Планшет</button>
           <button type="button" data-act="device" data-device="phone" aria-pressed="false">Телефон</button>
         </div>
+        <button class="ico prev-hide" type="button" data-act="prev-toggle" title="Свернуть предпросмотр" aria-label="Свернуть предпросмотр"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg></button>
       </div>
       <div class="prev-wrap" data-frame-wrap><iframe class="prev-frame" data-frame title="Предпросмотр сайта"></iframe></div>
     </section>

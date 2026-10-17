@@ -1,11 +1,11 @@
 // Полароид (Figma: страница «Полароид»). Голову растянули и замерли — она считает «три, два, один» (js/app.js),
-// и capture() снимает её прямо с 3D-холста. Карточка выезжает сверху, переворачивается, и снимок на ней спокойно
-// проступает. Дальше посетитель лепит наклейки из палитры по бокам, подписывает карточку и сохраняет — она улетает
+// и capture() снимает её прямо с 3D-холста. Карточка выезжает сверху, переворачивается, и снимок на ней мягко
+// проявляется. Дальше посетитель лепит наклейки из палитры по бокам, подписывает карточку и сохраняет — она улетает
 // в архив (кружок с фотками на главной и страница #/archive, js/archive.js).
 import { content, tx, t, esc, isStack } from './content.js';
 import { stickerSet, stickerSrc } from './stickers.js';
 import { Subtitles } from './subtitles.js';
-import { savePolaroid, hasPolaroid, CAPTION_MAX, capSize } from './polaroids.js';
+import { savePolaroid, hasPolaroid, CAPTION_MAX } from './polaroids.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -56,7 +56,8 @@ export function capture(head) {
   }
 }
 
-// Кадр: квадрат вокруг головы на светлой стене, мягкая тень от вспышки и чуть приглушённый цвет — без «старой плёнки».
+// Кадр: квадрат вокруг головы на «стене», которую освещает вспышка, тень от вспышки и плёночный цвет — мягче, чем у
+// настоящего полароида: винтаж угадывается, но лицо и цвет головы остаются чистыми.
 // Зерно в файл не кладём (оно раздувает его вдвое) — его добавляет страница поверх фото.
 function develop(roi, hr) {
   const W = roi.width, H = roi.height, d = roi.getContext('2d').getImageData(0, 0, W, H).data;
@@ -69,11 +70,11 @@ function develop(roi, hr) {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 - side * 0.01;
   const out = mk(SHOT, SHOT), o = out.getContext('2d', { willReadFrequently: true });
   const bg = o.createRadialGradient(SHOT * 0.5, SHOT * 0.4, SHOT * 0.04, SHOT * 0.5, SHOT * 0.5, SHOT * 0.8);
-  bg.addColorStop(0, '#F7F8FA'); bg.addColorStop(0.6, '#E9EAED'); bg.addColorStop(1, '#CDD0D5');
+  bg.addColorStop(0, '#F5F3EE'); bg.addColorStop(0.58, '#E4E1DB'); bg.addColorStop(1, '#BFBBB4');
   o.fillStyle = bg; o.fillRect(0, 0, SHOT, SHOT);
   const k = SHOT / side, dx = SHOT / 2 - cx * k, dy = SHOT / 2 - cy * k, off = SHOT * 4;
   o.save();
-  o.shadowColor = 'rgba(28,30,38,.2)'; o.shadowBlur = SHOT * 0.03;
+  o.shadowColor = 'rgba(40,34,30,.28)'; o.shadowBlur = SHOT * 0.024;
   o.shadowOffsetX = off + SHOT * 0.03; o.shadowOffsetY = SHOT * 0.032;
   o.drawImage(roi, dx - off, dy, W * k, H * k);          // рисуем за краем — на холсте остаётся только тень
   o.restore();
@@ -81,14 +82,14 @@ function develop(roi, hr) {
   grade(o);
   return out;
 }
-// Цвет: чуть приподнятые тени, мягкие светлые, немного меньше цвета и едва заметные углы
+// Плёнка, но вполсилы: тени чуть приподняты (холоднее), светлые мягче (теплее), цвета немного меньше, углы слегка темнее
 const LUT = (() => {
   const curve = (lift, top, gm) => {
     const a = new Uint8ClampedArray(256);
     for (let i = 0; i < 256; i++) { const x = i / 255, s = x * x * (3 - 2 * x), y = 0.72 * x + 0.28 * s; a[i] = Math.round((lift + (top - lift) * Math.pow(y, gm)) * 255); }
     return a;
   };
-  return [curve(0.025, 0.99, 1), curve(0.028, 0.985, 1), curve(0.032, 0.98, 1.01)];
+  return [curve(0.04, 0.985, 1), curve(0.05, 0.975, 1.01), curve(0.066, 0.955, 1.03)];
 })();
 function grade(o) {
   const img = o.getImageData(0, 0, SHOT, SHOT), d = img.data, c = SHOT / 2, R2 = c * c * 2;
@@ -99,8 +100,8 @@ function grade(o) {
       const i = (y * SHOT + x) * 4;
       let r = LR[d[i]], g = LG[d[i + 1]], b = LB[d[i + 2]];
       const l = 0.299 * r + 0.587 * g + 0.114 * b;
-      r = l + (r - l) * 0.95; g = l + (g - l) * 0.95; b = l + (b - l) * 0.95;
-      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.12 * q * Math.sqrt(q);
+      r = l + (r - l) * 0.91; g = l + (g - l) * 0.91; b = l + (b - l) * 0.91;
+      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.2 * q * Math.sqrt(q);
       d[i] = r * v; d[i + 1] = g * v; d[i + 2] = b * v; d[i + 3] = 255;
     }
   }
@@ -459,17 +460,25 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
 
   // ---------- подпись ----------
   cap.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.metaKey || e.ctrlKey) save(); } });
-  // подпись стоит посередине белого поля, как на готовой карточке в архиве: поле растёт по строкам, кегль — как там
+  // Подпись стоит посередине белого поля, как на готовой карточке в архиве, тем же кеглем: поле растёт по строкам,
+  // а третьей строки не будет — текст, который в две не влезает, просто не печатается
+  const twoLines = () => parseFloat(getComputedStyle(cap).lineHeight) * 2 + 1;
   function fitCap() {
-    cap.className = `pc-cap${capSize(cap.value || cap.placeholder)}`;
     cap.style.height = '0px';
     cap.style.height = `${cap.scrollHeight}px`;
   }
+  let capOk = '';
   cap.addEventListener('input', () => {
     const v = cap.value.replace(/\s*\n\s*/g, ' ');
-    const cut = [...v].slice(0, CAPTION_MAX).join('');
+    let cut = [...v].slice(0, CAPTION_MAX).join('');
     if (cut !== cap.value) cap.value = cut;
     fitCap();
+    if (cap.scrollHeight > twoLines()) {
+      const pos = Math.max(0, cap.selectionStart - (cap.value.length - capOk.length));
+      cap.value = capOk; fitCap();
+      try { cap.setSelectionRange(pos, pos); } catch (_) { /* поле не в фокусе */ }
+    }
+    capOk = cap.value;
   });
   // Телефон: клавиатура закрывает низ экрана — сдвигаем всё вверх ровно настолько, чтобы подпись осталась видна
   const vv = window.visualViewport;

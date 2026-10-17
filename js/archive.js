@@ -1,9 +1,9 @@
 // Архив полароидов (#/archive; Figma: «Архив»). Карточки гостей сеткой — четыре в ряд на компьютере, две на телефоне,
 // каждая чуть повёрнута. Их только смотрят: крупно не открываются, даты нет. Своя карточка (и та, что ещё не ушла
-// в общий архив) отличается лишь чуть другим цветом бумаги — без надписей; незрячему это говорит подпись карточки.
+// в общий архив) лежит ровно и чуть выше соседних — без цвета и надписей; незрячему это говорит подпись карточки.
 import { content, tx, t, esc } from './content.js';
 import { stickerSet, stickerSrc, stickerById } from './stickers.js';
-import { polaroidsApi, fetchList, imgUrl, localPolaroids, myIds, flush, capSize } from './polaroids.js';
+import { polaroidsApi, fetchList, imgUrl, localPolaroids, myIds, flush } from './polaroids.js';
 
 const PAGE = 24;
 // поворот и сдвиг карточки — по её id: у каждой свой, и от раза к разу он не меняется
@@ -20,7 +20,7 @@ export function cardInner(it, set) {
     const st = stickerById(set, p.e), src = st && stickerSrc(st);
     return src ? `<img class="pc-stk" src="${esc(src)}" alt="" draggable="false" style="left:${(p.x * 100).toFixed(1)}%;top:${(p.y * 100).toFixed(1)}%;--r:${Number(p.r) || 0}deg">` : '';
   }).join('');
-  return `<span class="pc-photo"><img class="pc-shot" src="${esc(it.src)}" alt="" loading="lazy" decoding="async" draggable="false"></span><span class="pc-capbox"><span class="pc-cap${capSize(it.c)}">${esc(it.c)}</span></span><span class="pc-stks">${stk}</span>`;
+  return `<span class="pc-photo"><img class="pc-shot" src="${esc(it.src)}" alt="" loading="lazy" decoding="async" draggable="false"></span><span class="pc-capbox"><span class="pc-cap">${esc(it.c)}</span></span><span class="pc-stks">${stk}</span>`;
 }
 
 export function createArchive(root, { onLoad = () => {}, onScroll = () => {} } = {}) {

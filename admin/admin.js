@@ -43,8 +43,24 @@ const BLOCKS = {
   palette: { name: 'Палитра', hint: 'Цвета проекта', make: () => ({ type: 'palette', title: '', colors: [{ hex: '#000000', name: '' }] }) },
   say: { name: 'Реплика головы', hint: 'Точка между блоками: докрутили до неё — голова говорит', make: () => ({ type: 'say', say: '' }) },
 };
-// Банк идей (админка → «Настройки сайта»): концепции, которые ещё не собраны. key — выключатель, когда идея готова
+// Банк идей (админка → «Настройки» → «Заметки для себя»): концепции, которые ещё не собраны. key — выключатель, когда идея готова
 const IDEAS = [];      // полароид собран — у него свой раздел настроек («Полароид»)
+// Разделы админки — колонка слева. Внутри некоторых — вкладки (SUBS). Предпросмотр справа — только там, где он
+// что-то показывает (hasPrev): кейсы, разделы главной, профиль и стиль; остальным разделам отдаётся вся ширина
+const NAV = [
+  { id: 'cases', name: 'Кейсы', hint: 'Проекты: тексты, обложки, блоки', ico: SVG('<rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1.2"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1.2"/><rect x="9" y="9" width="4.5" height="4.5" rx="1.2"/>') },
+  { id: 'home', name: 'Главная', hint: 'Папки разделов, реплики головы, пасхалки', ico: SVG('<path d="M2.5 7.2 8 2.75l5.5 4.45v5.8a.75.75 0 0 1-.75.75H10V10H6v3.75H3.25a.75.75 0 0 1-.75-.75z"/>') },
+  { id: 'pol', name: 'Полароиды', hint: 'Карточки гостей и наклейки', ico: SVG('<rect x="3" y="2" width="10" height="12" rx="1.2"/><rect x="4.8" y="3.8" width="6.4" height="6.4" rx=".4"/>') },
+  { id: 'stats', name: 'Статистика', hint: 'Кто заходил и что смотрел', ico: SVG('<path d="M3 13.5V9.5M8 13.5V3M13 13.5V7"/>') },
+  { id: 'profile', name: 'Профиль', hint: 'Имя, контакты, резюме, языки', ico: SVG('<circle cx="8" cy="5.4" r="2.7"/><path d="M2.8 13.8c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4"/>') },
+  { id: 'style', name: 'Стиль', hint: 'Цвета и размеры сайта', ico: SVG('<path d="M8 2.3S3.8 6.6 3.8 9.5a4.2 4.2 0 0 0 8.4 0C12.2 6.6 8 2.3 8 2.3z"/>') },
+  { id: 'settings', name: 'Настройки', hint: 'Подключение, функции, ключи, пароль', ico: SVG('<path d="M2.5 4.5h6.2M11.7 4.5h1.8M2.5 11.5h1.8M7.3 11.5h6.2"/><circle cx="10.2" cy="4.5" r="1.5"/><circle cx="5.8" cy="11.5" r="1.5"/>') },
+];
+const SUBS = { home: [['sections', 'Разделы'], ['lines', 'Реплики головы'], ['fun', 'Пасхалки и звук']], pol: [['cards', 'Карточки'], ['stickers', 'Наклейки']] };
+const subOf = (page) => (SUBS[page] && SUBS[page].some(([k]) => k === st.sub[page]) ? st.sub[page] : SUBS[page] ? SUBS[page][0][0] : '');
+// предпросмотру нужно хотя бы ~420 пикселей рядом со страницей; уже — он прячется сам (в «Кейсах» мешает ещё и список)
+const narrowScreen = () => window.innerWidth - 84 - (st.page === 'cases' ? 272 : 0) - 440 < 420;
+const hasPrev = () => (st.page === 'cases' ? st.idx >= 0 : st.page === 'home' ? subOf('home') === 'sections' : st.page === 'profile' || st.page === 'style');
 const MAKE = { metric: () => ({ v: '', l: '' }), step: () => ({ title: '', text: '' }), color: () => ({ hex: '#000000', name: '' }), link: () => ({ label: '', url: '' }) };
 
 const st = {
@@ -55,6 +71,8 @@ const st = {
   pending: new Map(),          // новые файлы, ещё не записанные в папку: путь → Blob
   urls: new Map(),             // путь → адрес для показа в админке и в предпросмотре
   idx: 0, tab: 'main', lang: 'ru', device: 'desktop', view: 'case',
+  page: 'cases', sub: {}, lastIdx: 0,     // раздел админки (см. NAV), вкладка внутри раздела, последний открытый кейс
+  prevOn: (() => { try { return localStorage.getItem('ph:admin-prev') !== '0'; } catch (_) { return true; } })(),     // предпросмотр не свёрнут
   open: new Set(), menu: false, undo: null,
 };
 const autoSlug = new WeakSet();   // у новых проектов адрес следует за названием, пока его не поправили руками
@@ -152,11 +170,12 @@ function init(site, projects) {
   st.saved = snapshot();
   st.pending.clear();
   st.idx = projects.length ? 0 : -1;
-  st.tab = 'main'; st.open.clear();
+  st.tab = 'main'; st.open.clear(); st.page = 'cases';
   st.lang = defLang();
   $('[data-gate]').hidden = true;
   $('[data-app]').hidden = false;
   renderAll();
+  if (!readHash()) syncHash();
   sendPreview(true);
   loadLikes();
 }
@@ -352,11 +371,8 @@ function TOKEN(tok) {
 }
 function stylePane() {
   const own = st.site.style && Object.keys(st.site.style).length;
-  return `<fieldset class="fs"><legend>Стиль</legend>
-      <p class="hint">Дизайн-токены сайта. Правки сразу видны в предпросмотре справа; на сайт уходят с «Опубликовать». Пустой цвет — значение по умолчанию.</p>
-      ${STYLE_GROUPS.map((g) => `<fieldset class="fs"><legend>${esc(g.title)}</legend>${g.hint ? `<p class="hint">${esc(g.hint)}</p>` : ''}<div class="grid2">${g.items.map(TOKEN).join('')}</div></fieldset>`).join('')}
-      ${own ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="style-reset">Сбросить стиль</button></div>' : ''}
-    </fieldset>`;
+  return `${STYLE_GROUPS.map((g) => SEC(g.title, `<div class="grid2">${g.items.map(TOKEN).join('')}</div>`, g.hint ? esc(g.hint) : '')).join('')}
+      ${own ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="style-reset">Сбросить к исходному</button></div>' : ''}`;
 }
 function RANGE(label, path, min, max, step, unit = '') {
   const v = Number(val(path)) || 0;
@@ -514,13 +530,11 @@ function contrastHTML(p) {
 // ---------- отрисовка ----------
 const onSite = () => st.src === 'github' && gh.on;         // содержимое открыто с сайта и публикуется туда же
 function renderBar() {
-  const link = (act, text) => `<button type="button" data-act="${act}">${text}</button>`;
-  const site = gh.on ? `сайт ${esc(gh.name)} ${link('gh-off', 'отключить')}` : (gh.secure ? link('gh-open', 'подключить сайт') : '');
-  let src;
-  if (st.dir) src = `Папка «${esc(st.dir.name)}» ${link('pick-dir', 'сменить')}`;
-  else if (onSite()) src = '';
-  else src = HAS_FS ? `Без папки: изменения скачиваются архивом ${link('pick-dir', 'подключить папку')}` : 'Изменения скачиваются архивом';
-  $('[data-folder]').innerHTML = [src, site && (src ? site : site.replace(/^с/, 'С'))].filter(Boolean).join('<i class="sep" aria-hidden="true"></i>');
+  // куда уходят правки — одной строкой; подключить или отключить сайт и папку — в «Настройках» (клик по строке ведёт туда)
+  const where = st.dir ? `Папка «${st.dir.name}»${gh.on ? ` · сайт ${gh.name}` : ''}` : gh.on ? `Сайт ${gh.name}` : 'Без папки — изменения скачиваются архивом';
+  const fb = $('[data-folder]');
+  fb.textContent = where;
+  fb.classList.toggle('is-warn', !st.dir && !gh.on);
   const langs = (st.site.languages || []).filter((l) => l === 'ru' || l === 'en');
   $('[data-langs]').innerHTML = langs.length > 1 ? langs.map((l) => `<button type="button" data-act="lang" data-lang="${l}" aria-pressed="${l === st.lang}">${l === 'ru' ? 'Русский' : 'English'}</button>`).join('') : '';
   $('[data-langs]').hidden = langs.length < 2;
@@ -548,9 +562,15 @@ function updateStatus() {
   // с папкой кнопка публикации доступна всегда: в папке могло накопиться то, чего нет на сайте
   $('[data-act="publish"]').disabled = st.busy || (!st.dir && !d);
 }
+function renderNav() {
+  $('[data-nav]').innerHTML = NAV.map((n) => `<button class="rail-it${st.page === n.id ? ' is-cur' : ''}" type="button" data-act="page" data-page="${n.id}" title="${esc(n.hint)}"${st.page === n.id ? ' aria-current="page"' : ''}>${n.ico}<span>${esc(n.name)}</span></button>`).join('');
+}
 function renderSide() {
-  $('[data-side]').innerHTML = `
-    <div class="side-head"><h2>Проекты</h2><button class="btn btn--sm" type="button" data-act="new">Новый проект</button></div>
+  renderNav();
+  const side = $('[data-side]');
+  if (st.page !== 'cases') { side.innerHTML = ''; return; }
+  side.innerHTML = `
+    <div class="side-head"><h2>Кейсы <span class="side-n">${st.projects.length}</span></h2><button class="btn btn--sm" type="button" data-act="new">Новый</button></div>
     <ol class="plist">${st.projects.map((p, i) => `
       <li class="pitem${i === st.idx ? ' is-cur' : ''}${p.published === false ? ' is-draft' : ''}" data-i="${i}" draggable="true">
         <button class="pitem-main" type="button" data-act="open" data-i="${i}"${i === st.idx ? ' aria-current="true"' : ''}>
@@ -561,10 +581,8 @@ function renderSide() {
         <span class="pitem-move"><button class="ico" type="button" data-act="up" data-i="${i}" aria-label="Поднять в списке"${i ? '' : ' disabled'}>${I.up}</button>
           <button class="ico" type="button" data-act="down" data-i="${i}" aria-label="Опустить в списке"${i < st.projects.length - 1 ? '' : ' disabled'}>${I.down}</button></span>
       </li>`).join('')}</ol>
-    <button class="side-site${st.idx < 0 && st.tab !== 'lines' && st.tab !== 'stats' ? ' is-cur' : ''}" type="button" data-act="open-site">Настройки сайта<span>Имя, контакты, резюме, разделы, языки</span></button>
-    <button class="side-site side-site--next${st.idx < 0 && st.tab === 'lines' ? ' is-cur' : ''}" type="button" data-act="open-lines">Реплики головы<span>Что и когда она говорит</span></button>
-    <button class="side-site side-site--next${st.idx < 0 && st.tab === 'stats' ? ' is-cur' : ''}" type="button" data-act="open-stats">Статистика<span>Кто заходил и что смотрел</span></button>`;
-  hydrate($('[data-side]'));
+    <p class="side-note hint">Порядок здесь — порядок в каталоге. Перетащите кейс или наведите на него и нажмите стрелку.</p>`;
+  hydrate(side);
 }
 const PANES = {
   main: (p) => `
@@ -646,66 +664,61 @@ const PANES = {
       ${st.menu ? `<ul class="add-menu">${Object.entries(BLOCKS).map(([k, d]) => `<li><button type="button" data-act="blk-add" data-type="${k}">${esc(d.name)}<span>${esc(d.hint)}</span></button></li>`).join('')}</ul>` : ''}
     </div>`,
 };
-function sitePane() {
+// Секция страницы: заголовок, пояснение одной-двумя строками и поля
+const SEC = (title, body, hint = '') => `<section class="sec"><h2 class="sec-h">${esc(title)}</h2>${hint ? `<p class="hint sec-hint">${hint}</p>` : ''}${body}</section>`;
+function profilePane() {
   const s = st.site, en = (s.languages || []).includes('en');
-  const used = (id) => st.projects.some((p) => p.section === id);
-  return `
-    <fieldset class="fs"><legend>Кто вы</legend>
-      ${F('Имя', 'name', { l: 1 })}
-      ${F('Имя в родительном падеже', 'nameGen', { l: 1, hint: 'Для реплики «Привет! Я голова …».' })}
+  return SEC('Кто вы', `
+      <div class="grid2">${F('Имя', 'name', { l: 1 })}${F('Имя в родительном падеже', 'nameGen', { l: 1, hint: 'Для реплики «Привет! Я голова …».' })}</div>
       ${F('Роль', 'role', { l: 1, ph: 'продуктовый дизайнер' })}
       ${F('Описание для поисковиков', 'description', { l: 1, type: 'area', rows: 2 })}
-    </fieldset>
-    ${stylePane()}
-    <fieldset class="fs"><legend>Контакты и резюме</legend>
-      <p class="hint">Почта и Telegram показываются в конце каждого кейса. Пустые поля на сайте не появляются.</p>
+      ${IMG('Логотип', 'logo', { kind: 'logo', hint: 'SVG или PNG с прозрачным фоном.' })}`)
+    + SEC('Контакты и резюме', `
       <div class="grid2">${F('Почта для связи', 'email', { ph: 'hello@example.com', attrs: 'spellcheck="false"' })}${F('Telegram', 'telegram', { ph: '@username', attrs: 'spellcheck="false"' })}</div>
       ${IMG('Резюме, PDF', 'cv', { kind: 'file', l: 1, fixed: st.lang === defLang() ? 'assets/cv.pdf' : `assets/cv-${st.lang}.pdf`, hint: 'Пока файла нет, кнопка CV на сайте скрыта.' })}
-      ${F('Имя файла при скачивании', 'cvFileName', { ph: 'Pavel-Nemchenko-CV.pdf', attrs: 'spellcheck="false"' })}
-      ${IMG('Логотип', 'logo', { kind: 'logo', hint: 'SVG или PNG с прозрачным фоном.' })}
-    </fieldset>
-    <fieldset class="fs"><legend>Разделы</legend>
-      ${F('Папки разделов на главной', 'heroFolders', { type: 'select', kind: 'opt', options: [['', 'На компьютере — да, на телефоне — нет'], ['all', 'Везде: на телефоне — лентой над кнопками'], ['none', 'Нигде'] ],
-        hint: 'Без папок главный экран чище: логотип, голова, реплика и кнопки. В разделы посетитель попадает через «Все работы».' })}
-      <p class="hint">Папки на главной можно расставить мышью прямо в предпросмотре — положение запомнится.</p>
-      ${(s.sections || []).map((sec, i) => `<fieldset class="fs"><legend>${esc(txAny(sec.label) || 'Раздел')}</legend>
+      ${F('Имя файла при скачивании', 'cvFileName', { ph: 'Pavel-Nemchenko-CV.pdf', attrs: 'spellcheck="false"' })}`, 'Почта и Telegram — в конце каждого кейса. Пустые поля на сайте не появляются.')
+    + SEC('Языки', `<div class="f"><label class="switch"><input type="checkbox" data-toggle="en"${en ? ' checked' : ''}><span>Английская версия сайта</span></label>
+        <small class="hint">Посетитель увидит переключатель RU / EN. После включения вверху появится выбор языка: переведите тексты — поля без перевода покажутся по-русски.</small></div>`);
+}
+function sectionsPane() {
+  const s = st.site, used = (id) => st.projects.some((p) => p.section === id);
+  return SEC('Папки на главной', F('Где показывать', 'heroFolders', { type: 'select', kind: 'opt', options: [['', 'На компьютере — да, на телефоне — нет'], ['all', 'Везде: на телефоне — лентой над кнопками'], ['none', 'Нигде'] ],
+        hint: 'Без папок главный экран чище; в разделы посетитель попадает через «Все работы». Папки можно расставить мышью прямо в предпросмотре — положение запомнится.' }))
+    + SEC('Разделы каталога', `<ol class="cards">${(s.sections || []).map((sec, i) => `<li class="card">
+        <div class="card-h"><b>${esc(txAny(sec.label) || 'Раздел')}</b><span class="hint">${st.projects.filter((p) => p.section === sec.id).length} в разделе</span></div>
         ${F('Название', `sections.${i}.label`, { l: 1 })}
         <div class="grid2">${RANGE('Наклон папки', `sections.${i}.tilt`, -20, 20, 1, '°')}${COLOR('Цвет папки', `sections.${i}.folder`, { optional: 1 })}</div>
-        <div class="f">${used(sec.id) ? '<span class="hint">В разделе есть проекты — удалить его нельзя.</span>' : `<button class="btn btn--line btn--sm" type="button" data-act="sec-del" data-i="${i}">Удалить раздел</button>`}</div>
-      </fieldset>`).join('')}
-      <div class="f"><button class="btn btn--line btn--sm" type="button" data-act="sec-add">Добавить раздел</button></div>
-    </fieldset>
-    <fieldset class="fs"><legend>Пасхалка: плевки</legend>
-      <p class="hint">Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.</p>
-      ${F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: 'Отсчёт — от последнего действия посетителя. 0 — выключить. Плевки идут неторопливо, примерно раз в минуту. В предпросмотре админки головы нет, поэтому плевков там не видно: смотрите на сайте после «Опубликовать». Посмотреть, не меняя настройку, — адрес сайта с ?spit=5 (через 5 секунд).' })}
-    </fieldset>
-    <fieldset class="fs"><legend>Звук</legend>
-      <p class="hint">Кнопка «Звук» в шапке: включает голос головы (записанные реплики). По макету её пока нет — голова говорит только субтитрами.</p>
-      ${CHECK('Показывать кнопку «Звук»', 'soundOn')}
-    </fieldset>
-    <fieldset class="fs"><legend>Банк идей</legend>
-      <p class="hint">Задумки, которые ещё не собраны. Выключатель появится у идеи, когда она будет готова к запуску.</p>
-      <ul class="ideas">${IDEAS.map((it) => `<li><b>${esc(it.title)}</b> <span class="hint">— ${esc(it.status)}</span><br><span>${esc(it.text)}</span>${it.key ? CHECK('Включить на сайте', it.key) : ''}</li>`).join('')}</ul>
-      ${F('Свои заметки', 'ideaNotes', { type: 'area', rows: 3, hint: 'Для себя: на сайт не выводится.' })}
-    </fieldset>
-    <fieldset class="fs"><legend>Лайки</legend>
-      <p class="hint">Посетитель ставит лайк проекту в каталоге; сердечко на карточке видит только он сам. Сколько лайков у каждого проекта, считает свой счётчик — облачная функция (как её завести — server/likes/README.md в репозитории сайта). Вставьте сюда её адрес и опубликуйте: числа появятся в списке проектов слева.</p>
-      ${CHECK('Показывать лайки на сайте', 'likesOn')}
-      ${F('Адрес счётчика', 'likesApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
-      <div class="row">${likesApi(s) ? '<button class="btn btn--line btn--sm" type="button" data-act="likes-refresh">Обновить числа</button>' : ''}<span class="hint" data-likes-note>${esc(st.likesNote || '')}</span></div>
-    </fieldset>
-    ${polaroidPane(s)}
-    <fieldset class="fs"><legend>Пароль админки</legend>
-      <p class="hint">${s.adminLock ? 'Пароль задан: без него админка не открывается.' : 'Пароля нет: админку откроет любой, кто знает адрес. Изменить сайт без токена GitHub он всё равно не сможет.'}</p>
-      <div class="row">
+        ${used(sec.id) ? '<p class="hint">В разделе есть кейсы — удалить его нельзя.</p>' : `<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="sec-del" data-i="${i}">Удалить раздел</button></div>`}
+      </li>`).join('')}</ol>
+      <div class="f"><button class="btn btn--line btn--sm" type="button" data-act="sec-add">Добавить раздел</button></div>`);
+}
+function funPane() {
+  return SEC('Плевки', F('Через сколько минут бездействия', 'spitAfter', { type: 'number', kind: 'num', ph: '10', attrs: 'min="0" step="0.1" inputmode="decimal"', hint: '0 — выключить. Плевки идут неторопливо, примерно раз в минуту. В предпросмотре головы нет: смотрите на сайте с ?spit=5 в адресе (начнёт через 5 секунд).' }),
+      'Если посетитель долго ничего не делает, голова заплёвывает экран. Любое его действие всё стирает.')
+    + SEC('Звук', CHECK('Показывать кнопку «Звук»', 'soundOn'), 'Кнопка в шапке включает голос головы — записанные реплики. По макету её пока нет: голова говорит субтитрами.');
+}
+function settingsPane() {
+  const s = st.site, api = polaroidsApi(s);
+  const site = gh.on
+    ? `<div class="kv"><span>Сайт</span><b>${esc(gh.name)}</b><button class="btn btn--line btn--sm" type="button" data-act="gh-off">Отключить</button></div>`
+    : gh.secure ? `<div class="kv"><span>Сайт</span><b class="hint">не подключён</b><button class="btn btn--sm" type="button" data-act="gh-open">Подключить</button></div>` : '';
+  const dir = st.dir
+    ? `<div class="kv"><span>Папка</span><b>${esc(st.dir.name)}</b><button class="btn btn--line btn--sm" type="button" data-act="pick-dir">Сменить</button></div>`
+    : HAS_FS ? `<div class="kv"><span>Папка</span><b class="hint">не выбрана</b><button class="btn btn--line btn--sm" type="button" data-act="pick-dir">Выбрать</button></div>` : '';
+  return SEC('Подключение', `<div class="kvs">${site}${dir}</div>`, gh.on ? 'Правки уходят на сайт кнопкой «Опубликовать» — через минуту-две они видны всем.' : 'Подключите сайт — правки будут публиковаться прямо отсюда. Без сайта и папки изменения скачиваются архивом.')
+    + SEC('Архив полароидов и статистика', F('Адрес функции', 'polaroidsApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })
+      + `<label class="f"><span>Ключ модератора</span><input type="password" class="inp" data-modkey value="${esc(modKey())}" autocomplete="off" spellcheck="false"><small class="hint">Тот же, что в переменной MOD_KEY функции. Нужен для модерации полароидов и статистики. Хранится только в этом браузере.</small></label>`,
+      `Одна облачная функция хранит карточки полароидов и считает посещения (server/polaroids/README.md в репозитории).${api ? '' : ' Пока адреса нет, карточку видит только её автор, а статистика не собирается.'}`)
+    + SEC('Лайки', CHECK('Показывать лайки на сайте', 'likesOn')
+      + F('Адрес счётчика', 'likesApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })
+      + `<div class="row">${likesApi(s) ? '<button class="btn btn--line btn--sm" type="button" data-act="likes-refresh">Обновить числа</button>' : ''}<span class="hint" data-likes-note>${esc(st.likesNote || '')}</span></div>`,
+      'Сердечко на карточке кейса видит только сам посетитель; сколько лайков у кейса — видно в списке кейсов (server/likes/README.md).')
+    + SEC('Пароль админки', `<div class="row">
         <button class="btn btn--line btn--sm" type="button" data-act="pass-set">${s.adminLock ? 'Сменить пароль' : 'Задать пароль'}</button>
-        ${s.adminLock ? '<button class="btn btn--line btn--sm" type="button" data-act="pass-off">Убрать пароль</button>' : ''}
-      </div>
-    </fieldset>
-    <fieldset class="fs"><legend>Языки</legend>
-      <div class="f"><label class="switch"><input type="checkbox" data-toggle="en"${en ? ' checked' : ''}><span>Английская версия сайта</span></label>
-        <small class="hint">Посетитель увидит переключатель RU / EN; язык по умолчанию выбирается по домену и языку браузера. После включения переведите тексты: вверху появится выбор языка, поля без перевода покажутся по-русски.</small></div>
-    </fieldset>`;
+        ${s.adminLock ? '<button class="btn btn--line btn--sm" type="button" data-act="pass-off">Убрать пароль</button>' : ''}</div>`,
+      s.adminLock ? 'Пароль задан: без него админка не открывается.' : 'Пароля нет: админку откроет любой, кто знает адрес. Изменить сайт без токена GitHub он всё равно не сможет.')
+    + SEC('Заметки для себя', `${IDEAS.length ? `<ul class="ideas">${IDEAS.map((it) => `<li><b>${esc(it.title)}</b> <span class="hint">— ${esc(it.status)}</span><br><span>${esc(it.text)}</span>${it.key ? CHECK('Включить на сайте', it.key) : ''}</li>`).join('')}</ul>` : ''}
+      ${F('Банк идей', 'ideaNotes', { type: 'area', rows: 4, hint: 'На сайт не выводится.' })}`);
 }
 // ---------- полароид: наклейки и модерация архива ----------
 // Наклейки — в настройках сайта (site.polaroid.stickers): название, эмодзи и своя картинка, которая заменяет эмодзи.
@@ -718,28 +731,24 @@ function stickerPrev(stk) {
   const src = stk.image || (stk.emoji ? dieCut(stk.emoji, 120) : '');
   return src ? `<img data-src="${esc(src)}" alt="">` : '<span class="hint">пусто</span>';
 }
-function polaroidPane(s) {
-  const api = polaroidsApi(s);
-  return `<fieldset class="fs" data-pol-pane><legend>Полароид</legend>
-      <p class="hint">Посетитель растягивает голову и держит пару секунд — она считает «три, два, один», и снимок выползает полароидом. На карточку можно налепить наклейки и написать пожелание; сохранённая уходит в архив: кружок с фотками на главной и страница «Архив». Общий архив — облачная функция (как её завести — server/polaroids/README.md в репозитории сайта). Пока её адреса здесь нет, карточку видит только её автор.</p>
-      ${CHECK('Полароид и архив на сайте', 'polaroidOn')}
-      ${F('Адрес архива', 'polaroidsApi', { ph: 'https://functions.yandexcloud.net/…', attrs: 'spellcheck="false" inputmode="url"' })}
-      <fieldset class="fs"><legend>Наклейки</legend>
-        <p class="hint">Десять наклеек по бокам карточки. Пока своей картинки нет, наклейка — эмодзи: на iPhone и Mac он выглядит как эмодзи Apple, на Android и Windows — как эмодзи этой системы. Своя картинка (PNG или WebP с прозрачным фоном, квадратная, от 240 пикселей) заменяет эмодзи везде — и на уже сохранённых карточках. Название видно при наведении и читается незрячим.</p>
-        <ol class="stk-list">${(s.polaroid.stickers || []).map((stk, i) => `<li class="stk-row">
-          <span class="stk-prev" aria-hidden="true">${stickerPrev(stk)}</span>
-          <div class="stk-fields"><div class="grid2">${F('Название', `polaroid.stickers.${i}.name`, { l: 1 })}${F('Эмодзи', `polaroid.stickers.${i}.emoji`, { attrs: 'maxlength="16" spellcheck="false" autocomplete="off"' })}</div>
-            ${IMG('Своя картинка', `polaroid.stickers.${i}.image`, { small: 1, max: 480, folder: 'assets/polaroid/stickers', hint: 'необязательно' })}</div>
-        </li>`).join('')}</ol>
-      </fieldset>
-      <fieldset class="fs"><legend>Карточки в архиве</legend>
-        <p class="hint">Новые карточки появляются в архиве сразу. Карточку с матом в подписи архив скрывает сам — её можно вернуть. Скрывать и возвращать можно с ключом модератора — тем же, что в переменной MOD_KEY функции. Ключ хранится только в этом браузере и на сайт не уходит.</p>
-        ${api ? `<div class="grid2"><label class="f"><span>Ключ модератора</span><input type="password" data-modkey value="${esc(modKey())}" autocomplete="off" spellcheck="false"></label></div>
-        <div class="row"><button class="btn btn--line btn--sm" type="button" data-act="pol-load">${st.pol.items.length ? 'Обновить' : 'Показать карточки'}</button><span class="hint" data-pol-note>${esc(st.pol.note)}</span></div>
-        <ul class="pol-mod" data-pol-list>${polItemsHTML()}</ul>
-        ${st.pol.next ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="pol-more">Показать ещё</button></div>' : ''}` : '<p class="hint">Сначала вставьте адрес архива и опубликуйте.</p>'}
-      </fieldset>
-    </fieldset>`;
+function polaroidPane() {
+  const s = st.site, api = polaroidsApi(s), key = modKey();
+  if (subOf('pol') === 'stickers') {
+    return `<p class="hint sec-hint">Десять наклеек по бокам карточки. Без своей картинки наклейка — эмодзи системы (на iPhone и Mac — Apple, на Android и Windows — свои). Своя картинка — PNG или WebP с прозрачным фоном, квадратная, от 240 пикселей — заменяет эмодзи везде, и на сохранённых карточках тоже.</p>
+      <ol class="stk-list">${(s.polaroid.stickers || []).map((stk, i) => `<li class="stk-row">
+        <span class="stk-prev" aria-hidden="true">${stickerPrev(stk)}</span>
+        <div class="stk-fields"><div class="grid2">${F('Название', `polaroid.stickers.${i}.name`, { l: 1 })}${F('Эмодзи', `polaroid.stickers.${i}.emoji`, { attrs: 'maxlength="16" spellcheck="false" autocomplete="off"' })}</div>
+          ${IMG('Своя картинка', `polaroid.stickers.${i}.image`, { small: 1, max: 480, folder: 'assets/polaroid/stickers', hint: 'необязательно' })}</div>
+      </li>`).join('')}</ol>`;
+  }
+  if (!api) return `<div class="empty"><p>Архив не подключён: без него карточку видит только её автор.</p><button class="btn btn--sm" type="button" data-act="page" data-page="settings">Вписать адрес функции</button></div>`;
+  const bad = /ключ/i.test(st.pol.note) && !st.pol.items.length;
+  const keyRow = !key || bad ? `<div class="keyrow"><label class="f"><span>Ключ модератора</span><input type="password" class="inp" data-modkey value="${esc(key)}" autocomplete="off" spellcheck="false"></label><button class="btn btn--sm" type="button" data-act="pol-load">Показать карточки</button>
+      <span class="${bad ? 'error' : 'hint'}">${bad ? esc(st.pol.note) : 'Тот же, что в MOD_KEY функции; запомнится в этом браузере.'}</span></div>` : '';
+  return `${keyRow}${key && !bad ? `<div class="toolbar"><button class="btn btn--line btn--sm" type="button" data-act="pol-load"${st.pol.busy ? ' disabled' : ''}>${st.pol.busy ? 'Загружаю…' : 'Обновить'}</button><span class="hint" data-pol-note>${esc(st.pol.note)}</span></div>` : ''}
+    <ul class="pol-mod" data-pol-list>${polItemsHTML()}</ul>
+    ${st.pol.next ? '<div class="f"><button class="btn btn--line btn--sm" type="button" data-act="pol-more">Показать ещё</button></div>' : ''}
+    <p class="hint sec-hint">Новые карточки появляются в архиве сразу; с матом в подписи архив скрывает сам — такую можно вернуть. «Скрыть» обратимо, «Удалить» — насовсем.</p>`;
 }
 const polDate = (ms) => { try { return new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
 function polItemsHTML() {
@@ -755,8 +764,8 @@ function polRedraw() {
   const box = $('[data-pol-pane]');
   if (!box) return;
   const keep = $('[data-edit]').scrollTop;
-  box.outerHTML = polaroidPane(st.site);
-  hydrate($('[data-pol-pane]'));
+  box.innerHTML = polaroidPane();
+  hydrate(box);
   $('[data-edit]').scrollTop = keep;
 }
 async function polLoad(more = false) {
@@ -1048,7 +1057,7 @@ function dashBody(d) {
 }
 function statsPane() {
   const api = polaroidsApi(st.site), S = st.stats, key = modKey();
-  if (!api) return '<p class="hint">Счётчик работает через функцию архива полароидов: сначала впишите её адрес в «Настройках сайта» → «Полароид».</p>';
+  if (!api) return '<div class="empty"><p>Счётчик работает через функцию архива полароидов — её адрес ещё не вписан.</p><button class="btn btn--sm" type="button" data-act="page" data-page="settings">Открыть настройки</button></div>';
   const keyField = `<label class="f db-key"><span>Ключ модератора</span><input type="password" data-modkey value="${esc(key)}" autocomplete="off" spellcheck="false"></label>`;
   return `<div class="db-filters" role="group" aria-label="Период">
       <div class="seg db-seg">${PERIODS.map(([v, l]) => `<button type="button" data-act="stats-days" data-days="${v}" aria-pressed="${S.days === v}">${esc(l)}</button>`).join('')}</div>
@@ -1126,47 +1135,103 @@ function lineRow(id, when) {
 const fitLine = (t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
 function linesPane() {
   const secs = st.site.sections || [], en = st.lang !== defLang();
-  const group = (g) => `<fieldset class="fs"><legend>${esc(g.title)}</legend>${g.note ? `<p class="hint">${esc(g.note)}</p>` : ''}
+  const group = (g) => `<section class="sec ln-group"><h2 class="sec-h">${esc(g.title)}</h2>${g.note ? `<p class="hint sec-hint">${esc(g.note)}</p>` : ''}
     ${g.items.map(([id, when]) => (id.includes('*')
     ? secs.map((sec) => lineRow(id.replace('*', sec.id), when.replace('{section}', txAny(sec.label) || sec.id))).join('')
-    : lineRow(id, when))).join('')}</fieldset>`;
-  return `<p class="hint">Слева — когда голова это говорит, справа — что. Поправьте текст и опубликуйте: на сайте реплика поменяется.
-      Пустое поле — в этой ситуации голова промолчит. Стрелка возвращает исходный текст.${en ? ' Сейчас вы правите английские реплики.' : ''}</p>
-    <p class="hint">В текст можно вставлять {name} — имя, {nameGen} — имя в родительном падеже, {role} — роль (из настроек сайта). Короткие реплики читаются лучше: до 80–90 знаков.
-      Если для реплики записан голос, после правки текста запись нужно обновить — иначе звук и субтитры разойдутся.</p>
-    ${LINE_INFO.map(group).join('')}`;
+    : lineRow(id, when))).join('')}</section>`;
+  const own = Object.keys((st.site.lines && st.site.lines[st.lang]) || {}).length;
+  return `<div class="toolbar toolbar--sticky"><input type="search" class="inp ln-find" data-line-find placeholder="Найти реплику или ситуацию" aria-label="Найти реплику">
+      <span class="hint">${own ? `Своих правок: ${own}` : 'Все реплики — исходные'}${en ? ' · английские' : ''}</span></div>
+    <p class="hint sec-hint">Слева — когда голова это говорит, справа — что. Пустое поле — промолчит, стрелка — вернуть исходный текст.
+      Можно вставлять {name}, {nameGen} и {role}. Короче читается лучше: до 80–90 знаков. Если для реплики записан голос, после правки запись нужно обновить.</p>
+    ${LINE_INFO.map(group).join('')}
+    <p class="hint" data-line-none hidden>Ничего не нашлось.</p>`;
 }
 
-function renderEdit() {
-  const root = $('[data-edit]');
-  const keep = root.scrollTop;
-  const wide = st.idx < 0 && st.tab === 'stats', app = $('[data-app]');
-  if (app.classList.contains('is-wide') !== wide) { app.classList.toggle('is-wide', wide); requestAnimationFrame(fitFrame); }
-  if (wide) {
-    root.innerHTML = `<div class="edit-head"><h1>Статистика</h1></div><div class="pane pane--stats" style="margin-top:12px" data-stats-pane>${statsPane()}</div>`;
-  } else if (st.idx < 0 && st.tab === 'lines') {
-    root.innerHTML = `<div class="edit-head"><h1>Реплики головы</h1></div><div class="pane pane--lines" style="margin-top:16px">${linesPane()}</div>`;
-  } else if (st.idx < 0) {
-    root.innerHTML = `<div class="edit-head"><h1>Настройки сайта</h1></div><div class="pane" style="margin-top:16px">${sitePane()}</div>`;
-  } else {
-    const p = cur();
-    const tabs = [['main', 'Основное'], ['look', 'Каталог и обложка'], ['results', 'Результаты'], ['blocks', `Блоки: ${(p.blocks || []).length}`]];
-    root.innerHTML = `
-      <div class="edit-head">
-        <h1 data-h1>${esc(txAny(p.title) || 'Без названия')}</h1>
-        <div class="edit-actions">
+// Шапка страницы: заголовок, действия справа от него, пояснение и вкладки раздела
+function head(title, { lead = '', actions = '', h1 = false } = {}) {
+  const tabs = SUBS[st.page] ? `<div class="tabs" role="tablist">${SUBS[st.page].map(([id, name]) => `<button type="button" role="tab" aria-selected="${subOf(st.page) === id}" data-act="sub" data-sub="${id}">${esc(name)}</button>`).join('')}</div>` : '';
+  return `<div class="edit-head"><div class="edit-title"><h1${h1 ? ' data-h1' : ''}>${esc(title)}</h1>${actions ? `<div class="edit-actions">${actions}</div>` : ''}</div>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${tabs}`;
+}
+function casePage() {
+  if (st.idx < 0) return `${head('Кейсы')}<div class="empty"><p>Кейсов пока нет.</p><button class="btn btn--sm" type="button" data-act="new">Новый кейс</button></div>`;
+  const p = cur();
+  const tabs = [['main', 'Основное'], ['look', 'Каталог и обложка'], ['results', 'Результаты'], ['blocks', `Блоки: ${(p.blocks || []).length}`]];
+  return `${head(txAny(p.title) || 'Без названия', { h1: true, actions: `
           <label class="switch"><input type="checkbox" data-path="published" data-kind="bool"${p.published !== false ? ' checked' : ''}><span>На сайте</span></label>
           <button class="btn btn--line btn--sm" type="button" data-act="dup">Дублировать</button>
-          <button class="btn btn--line btn--sm" type="button" data-act="del">Удалить</button>
-        </div>
-      </div>
+          <button class="btn btn--line btn--sm" type="button" data-act="del">Удалить</button>` })}
       <div class="tabs" role="tablist">${tabs.map(([id, name]) => `<button type="button" role="tab" aria-selected="${st.tab === id}" data-act="tab" data-tab="${id}">${esc(name)}</button>`).join('')}</div>
       <div class="pane">${PANES[st.tab](p)}</div>
       <div class="checks" data-checks>${checksHTML(p)}</div>`;
+}
+function pageHTML() {
+  const sw = (path, label) => `<label class="switch"><input type="checkbox" data-path="${path}" data-kind="bool"${st.site[path] ? ' checked' : ''}><span>${esc(label)}</span></label>`;
+  switch (st.page) {
+    case 'home': {
+      const t = subOf('home');
+      return `${head('Главная', { lead: 'Папки разделов на главном экране, что говорит голова и её пасхалки.' })}
+        <div class="pane${t === 'lines' ? ' pane--lines' : ''}">${t === 'lines' ? linesPane() : t === 'fun' ? funPane() : sectionsPane()}</div>`;
+    }
+    case 'pol': return `${head('Полароиды', { actions: sw('polaroidOn', 'На сайте'), lead: 'Голову растянули и подержали — она фоткается. Гости подписывают карточку, лепят наклейки и оставляют в архиве.' })}
+        <div class="pane" data-pol-pane>${polaroidPane()}</div>`;
+    case 'stats': return `${head('Статистика')}<div class="pane pane--stats" data-stats-pane>${statsPane()}</div>`;
+    case 'profile': return `${head('Профиль', { lead: 'Кто вы и как с вами связаться: это видно на главной, в каждом кейсе и в поисковиках.' })}<div class="pane">${profilePane()}</div>`;
+    case 'style': return `${head('Стиль', { lead: 'Дизайн-токены сайта. Правки сразу видны в предпросмотре; пустой цвет — значение по умолчанию.' })}<div class="pane">${stylePane()}</div>`;
+    case 'settings': return `${head('Настройки', { lead: 'Подключение сайта, облачные функции и доступ к админке.' })}<div class="pane">${settingsPane()}</div>`;
+    default: return casePage();
   }
+}
+function renderEdit() {
+  const root = $('[data-edit]');
+  const keep = root.scrollTop;
+  root.innerHTML = `<div class="edit-in${st.page === 'stats' ? ' edit-in--wide' : ''}">${pageHTML()}</div>`;
+  layout();
   for (const t of $$('.ln textarea', root)) fitLine(t);
   root.scrollTop = keep;
   hydrate(root);
+}
+// Колонки: разделы | список кейсов (только в «Кейсах») | страница | предпросмотр (где он нужен и не свёрнут)
+function layout() {
+  const app = $('[data-app]'), pv = hasPrev(), show = pv && st.prevOn && !narrowScreen();
+  app.dataset.list = st.page === 'cases' ? '1' : '0';
+  app.dataset.prev = show ? '1' : '0';
+  const btn = $('[data-prev-show]');
+  if (btn) btn.hidden = !(pv && !st.prevOn && !narrowScreen());
+  if (show) requestAnimationFrame(fitFrame);
+}
+// раздел админки — в адресе: обновили страницу — остались там же, кнопка «назад» работает
+function pageHash() {
+  if (st.page !== 'cases') return `#/${st.page}${SUBS[st.page] ? `/${subOf(st.page)}` : ''}`;
+  const p = st.idx >= 0 && st.projects[st.idx];
+  return p && p.slug ? `#/cases/${encodeURIComponent(p.slug)}` : '#/cases';
+}
+function syncHash(push = false) { const h = pageHash(); if (location.hash !== h) history[push ? 'pushState' : 'replaceState'](null, '', h); }
+function readHash() {
+  const [page, rest] = location.hash.replace(/^#\/?/, '').split('/').map((x) => decodeURIComponent(x || ''));
+  if (!NAV.some((n) => n.id === page)) return false;
+  if (page === 'cases') { const i = st.projects.findIndex((p) => p.slug === rest); go('cases', { idx: i >= 0 ? i : undefined, quiet: true }); }
+  else go(page, { sub: rest || undefined, quiet: true });
+  return true;
+}
+function go(page, { sub, idx, quiet = false } = {}) {
+  if (page === 'cases') {
+    st.idx = idx ?? (st.idx >= 0 ? st.idx : st.lastIdx);
+    if (st.idx >= st.projects.length) st.idx = st.projects.length - 1;
+    if (!PANES[st.tab]) st.tab = 'main';
+  } else {
+    if (st.idx >= 0) st.lastIdx = st.idx;
+    st.idx = -1;
+  }
+  const same = st.page === page && (!sub || subOf(page) === sub);
+  st.page = page;
+  if (sub && SUBS[page]) st.sub[page] = sub;
+  st.open.clear(); st.menu = false;
+  syncHash(!quiet);
+  renderSide(); renderEdit(); renderViews(); sendPreview(false);
+  if (!same && !quiet) $('[data-edit]').scrollTop = 0;
+  if (page === 'stats' && !st.stats.data && !st.stats.busy && modKey()) statsLoad();
+  if (page === 'pol' && subOf('pol') === 'cards' && !st.pol.items.length && !st.pol.busy && !st.pol.note && modKey() && polaroidsApi(st.site)) polLoad(false);
 }
 function renderViews() {
   const list = st.idx < 0 ? [['home', 'Главная'], ['archive', 'Архив']] : [['catalog', 'Каталог'], ['case', 'Кейс']];
@@ -1174,6 +1239,8 @@ function renderViews() {
   $('[data-views]').innerHTML = list.map(([k, n]) => `<button type="button" data-act="view" data-view="${k}" aria-pressed="${k === st.view}">${n}</button>`).join('');
 }
 function renderAll() { renderBar(); renderSide(); renderEdit(); renderViews(); fitFrame(); }
+window.addEventListener('resize', () => { if (st.site) layout(); });
+window.addEventListener('popstate', () => { if (st.site) readHash(); });
 
 // после любой правки: статус, заголовки, проверка и предпросмотр
 function changed(path = '') {
@@ -1454,7 +1521,7 @@ function newProject() {
   return p;
 }
 function move(arr, from, to) { if (to < 0 || to >= arr.length || from === to) return false; arr.splice(to, 0, arr.splice(from, 1)[0]); return true; }
-function openProject(i) { st.idx = i; st.open.clear(); st.menu = false; if (i < 0 || !PANES[st.tab]) st.tab = 'main'; renderSide(); renderEdit(); renderViews(); sendPreview(false); }
+function openProject(i) { if (!PANES[st.tab]) st.tab = 'main'; go('cases', { idx: i }); }
 let toastT = 0;
 function toast(text, undo) {
   const el = $('[data-toast]');
@@ -1506,13 +1573,14 @@ const ACT = {
     if (st.busy) return;
     gh.forget();
     st.unpub = false; st.pubNote = ''; st.pubAt = '';
-    if (st.site) renderBar(); else gateButtons();
+    if (st.site) { renderBar(); if (st.page === 'settings') renderEdit(); } else gateButtons();
     toast('Сайт отключён, токен удалён из этого браузера');
   },
   new() { st.projects.unshift(newProject()); st.tab = 'main'; openProject(0); changed('title'); const t = $('[data-path="title"]'); if (t) { t.focus(); t.select(); } },
   open(el) { openProject(Number(el.dataset.i)); },
-  'open-site'() { openProject(-1); },
-  'open-stats'() { st.idx = -1; st.tab = 'stats'; st.open.clear(); st.menu = false; renderSide(); renderEdit(); renderViews(); sendPreview(false); $('[data-edit]').scrollTop = 0; if (!st.stats.data && modKey()) statsLoad(); },
+  page(el) { if (st.site) go(el.dataset.page); },
+  sub(el) { go(st.page, { sub: el.dataset.sub }); },
+  'prev-toggle'() { st.prevOn = !st.prevOn; try { localStorage.setItem('ph:admin-prev', st.prevOn ? '1' : '0'); } catch (_) { /* не запомнится */ } layout(); if (st.prevOn) sendPreview(false); },
   'stats-load'() { statsLoad(); },
   'stats-copy'() {
     const url = statsLink();
@@ -1524,7 +1592,6 @@ const ACT = {
   'stats-days'(el) { const S = st.stats, d = Number(el.dataset.days); if (S.days === d) return; S.days = d; S.more = 0; statsRedraw(); if (!S.data || !enough(S.data.days, d)) statsLoad(); },
   'stats-more'() { st.stats.more += 40; statsRedraw(); },
   'stats-key'() { st.stats.keyOpen = true; statsRedraw(); const i = $('[data-modkey]'); if (i) i.focus(); },
-  'open-lines'() { st.idx = -1; st.tab = 'lines'; st.open.clear(); st.menu = false; renderSide(); renderEdit(); renderViews(); sendPreview(false); $('[data-edit]').scrollTop = 0; },
   'line-reset'(el) {
     const id = el.dataset.id, L = st.site.lines, m = L && L[st.lang];
     if (!m || !(id in m)) return;
@@ -1640,7 +1707,18 @@ document.addEventListener('input', (e) => {
     return;
   }
   if (el.matches && el.matches('[data-stats-co]')) { st.stats.co = el.value; const o = $('[data-stats-link]'); if (o) o.textContent = statsLink() || '—'; return; }
-  if (el.matches && el.matches('[data-modkey]')) { try { localStorage.setItem(MODKEY, el.value.trim()); } catch (_) { /* не запомнится */ } return; }
+  if (el.matches && el.matches('[data-modkey]')) { try { localStorage.setItem(MODKEY, el.value.trim()); } catch (_) { /* не запомнится */ } st.pol.note = ''; return; }
+  if (el.matches && el.matches('[data-line-find]')) {
+    const q = el.value.trim().toLowerCase();
+    let any = false;
+    for (const g of $$('.ln-group')) {
+      let n = 0;
+      for (const row of $$('.ln', g)) { const hit = !q || row.textContent.toLowerCase().includes(q) || row.querySelector('textarea').value.toLowerCase().includes(q); row.hidden = !hit; if (hit) n++; }
+      g.hidden = !n; if (n) any = true;
+    }
+    $('[data-line-none]').hidden = any;
+    return;
+  }
   const path = el.dataset.path;
   if (!path || el.type === 'file') return;
   const obj = cur(), kind = el.dataset.kind || '';
