@@ -555,10 +555,10 @@ body:not([data-view="case"]) .site-footer{ display:none; }
 .pc::after{ content:''; position:absolute; left:.6%; right:.6%; bottom:0; height:1.5px; border-radius:50%; background:rgba(66,70,168,.4); pointer-events:none; }   /* синеватый нижний край, как в макете */
 /* окно с фото стоит на месте само, а не в потоке */
 .pc-photo{ position:absolute; left:6cqw; right:6cqw; top:6cqw; display:block; aspect-ratio:1; overflow:hidden; background:#2A3030; }
-/* блик и зерно поверх фото — легче, чем было: плёнка угадывается, но не спорит со снимком */
-.pc-photo::after{ content:''; position:absolute; inset:0; z-index:2; pointer-events:none; mix-blend-mode:soft-light; opacity:.42;
-  background:linear-gradient(128deg, rgba(255,255,255,.24) 0%, rgba(255,255,255,0) 36%), var(--noise) 0 0/140px 140px;
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.12), inset 0 1px 2px rgba(0,0,0,.18); }
+/* блик и зерно поверх фото — еле заметные: плёнку чувствуешь, но снимок остаётся чистым */
+.pc-photo::after{ content:''; position:absolute; inset:0; z-index:2; pointer-events:none; mix-blend-mode:soft-light; opacity:.2;
+  background:linear-gradient(128deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 36%), var(--noise) 0 0/140px 140px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.08), inset 0 1px 2px rgba(0,0,0,.1); }
 .pc-shot{ display:block; width:100%; height:100%; object-fit:cover; -webkit-user-drag:none; }
 /* Подпись — в белом поле под фото (от низа фото, 94cqw, до низа карточки), по центру. Кегль один на любую длину:
    самая длинная подпись (56 знаков) встаёт ровно в две строки; длиннее двух строк редактор не пускает */

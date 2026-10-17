@@ -56,8 +56,8 @@ export function capture(head) {
   }
 }
 
-// Кадр: квадрат вокруг головы на «стене», которую освещает вспышка, тень от вспышки и плёночный цвет — мягче, чем у
-// настоящего полароида: винтаж угадывается, но лицо и цвет головы остаются чистыми.
+// Кадр: квадрат вокруг головы на светлой стене под вспышкой, мягкая тень и лёгкий плёночный оттенок — едва заметный:
+// винтаж только угадывается, лицо и цвет головы остаются чистыми, углы почти не темнеют.
 // Зерно в файл не кладём (оно раздувает его вдвое) — его добавляет страница поверх фото.
 function develop(roi, hr) {
   const W = roi.width, H = roi.height, d = roi.getContext('2d').getImageData(0, 0, W, H).data;
@@ -70,11 +70,11 @@ function develop(roi, hr) {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 - side * 0.01;
   const out = mk(SHOT, SHOT), o = out.getContext('2d', { willReadFrequently: true });
   const bg = o.createRadialGradient(SHOT * 0.5, SHOT * 0.4, SHOT * 0.04, SHOT * 0.5, SHOT * 0.5, SHOT * 0.8);
-  bg.addColorStop(0, '#F5F3EE'); bg.addColorStop(0.58, '#E4E1DB'); bg.addColorStop(1, '#BFBBB4');
+  bg.addColorStop(0, '#F7F6F3'); bg.addColorStop(0.6, '#EFEDE9'); bg.addColorStop(1, '#DEDBD5');
   o.fillStyle = bg; o.fillRect(0, 0, SHOT, SHOT);
   const k = SHOT / side, dx = SHOT / 2 - cx * k, dy = SHOT / 2 - cy * k, off = SHOT * 4;
   o.save();
-  o.shadowColor = 'rgba(40,34,30,.28)'; o.shadowBlur = SHOT * 0.024;
+  o.shadowColor = 'rgba(40,34,30,.2)'; o.shadowBlur = SHOT * 0.028;
   o.shadowOffsetX = off + SHOT * 0.03; o.shadowOffsetY = SHOT * 0.032;
   o.drawImage(roi, dx - off, dy, W * k, H * k);          // рисуем за краем — на холсте остаётся только тень
   o.restore();
@@ -82,14 +82,14 @@ function develop(roi, hr) {
   grade(o);
   return out;
 }
-// Плёнка, но вполсилы: тени чуть приподняты (холоднее), светлые мягче (теплее), цвета немного меньше, углы слегка темнее
+// Плёнка — намёком: тени едва приподняты, светлые чуть мягче, цвета чуть меньше, углы темнеют совсем немного
 const LUT = (() => {
   const curve = (lift, top, gm) => {
     const a = new Uint8ClampedArray(256);
     for (let i = 0; i < 256; i++) { const x = i / 255, s = x * x * (3 - 2 * x), y = 0.72 * x + 0.28 * s; a[i] = Math.round((lift + (top - lift) * Math.pow(y, gm)) * 255); }
     return a;
   };
-  return [curve(0.04, 0.985, 1), curve(0.05, 0.975, 1.01), curve(0.066, 0.955, 1.03)];
+  return [curve(0.018, 0.99, 1), curve(0.022, 0.985, 1), curve(0.03, 0.975, 1.01)];
 })();
 function grade(o) {
   const img = o.getImageData(0, 0, SHOT, SHOT), d = img.data, c = SHOT / 2, R2 = c * c * 2;
@@ -100,8 +100,8 @@ function grade(o) {
       const i = (y * SHOT + x) * 4;
       let r = LR[d[i]], g = LG[d[i + 1]], b = LB[d[i + 2]];
       const l = 0.299 * r + 0.587 * g + 0.114 * b;
-      r = l + (r - l) * 0.91; g = l + (g - l) * 0.91; b = l + (b - l) * 0.91;
-      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.2 * q * Math.sqrt(q);
+      r = l + (r - l) * 0.96; g = l + (g - l) * 0.96; b = l + (b - l) * 0.96;
+      const q = ((x - c) ** 2 + yy) / R2, v = 1 - 0.07 * q * Math.sqrt(q);
       d[i] = r * v; d[i + 1] = g * v; d[i + 2] = b * v; d[i + 3] = 255;
     }
   }
