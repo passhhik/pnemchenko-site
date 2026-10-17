@@ -86,7 +86,24 @@ export async function savePolaroid({ blob, c, s }) {
 }
 
 let flushing = null;
-let recent = { at: 0, list: [] };      // свежие карточки общего архива — для кружка «Архив» (см. latestPhotos)
+// Свежие карточки общего архива — для кружка «Архив» (см. latestPhotos). Последний список помним и в браузере
+// (ph:pol-recent): при следующем заходе превью встают сразу, а их картинки браузер берёт из своего кэша
+// (функция отдаёт их «навсегда»); свежий список приходит следом и, если что-то поменялось, подменяет превью.
+const RECENT = 'ph:pol-recent';
+let recent = (() => {
+  try { const v = JSON.parse(localStorage.getItem(RECENT) || 'null'); if (v && Array.isArray(v.list)) return { at: 0, list: v.list.filter((x) => x && typeof x.id === 'string').slice(0, 4), stale: true }; } catch (_) { /* нет памяти */ }
+  return { at: 0, list: [] };
+})();
+const keepRecent = () => { try { localStorage.setItem(RECENT, JSON.stringify({ list: recent.list.slice(0, 4).map(({ id, s }) => ({ id, s })) })); } catch (_) { /* не запомнится */ } };
+let warming = null;
+// список свежих карточек — заранее, пока голова ещё собирается: это маленький ответ, а функция успеет проснуться
+export function warmRecent() {
+  const api = polaroidsApi();
+  if (!api || content.preview || warming || Date.now() - recent.at < 60000) return warming || Promise.resolve();
+  warming = fetchList(api, { n: 4 }).then((r) => { recent = { at: Date.now(), list: r.items }; keepRecent(); }, () => { recent.at = Date.now(); })
+    .finally(() => { warming = null; });
+  return warming;
+}
 // Отправить свою карточку в общий архив. Отказ «по делу» (картинка битая) — карточка остаётся только у автора;
 // нет сети или архив перегружен — попробуем при следующем заходе
 export function flush(mem = null) {
@@ -107,6 +124,7 @@ export function flush(mem = null) {
       // карточка уже в общем архиве — в кружок «Архив» она встаёт сразу (скрытая проверкой — нет), прошлая уходит
       recent.list = recent.list.filter((x) => x.id !== old && x.id !== id);
       if (id && !res.hidden) recent.list.unshift({ id, s: it.s });
+      keepRecent();
       changed();
     } catch (e) {
       if (e.status && e.status >= 400 && e.status < 500 && e.status !== 429 && e.status !== 408) {
@@ -128,13 +146,14 @@ async function post(api, it, mine) {
 }
 
 // Две свежие карточки — для кружка «Архив» на главной: { src, s } — фото и наклейки. Сначала свои неотправленные,
-// потом общий архив (его — раз в минуту)
-export async function latestPhotos(n = 2, fresh = false) {
+// потом общий архив (его — раз в минуту). cached — без сети: что запомнено с прошлого раза
+export async function latestPhotos(n = 2, fresh = false, cached = false) {
   const out = localPolaroids().map((it) => ({ src: it.img, s: it.s || [] }));
   const api = polaroidsApi();
   if (out.length < n && api && !content.preview) {
-    if (fresh || Date.now() - recent.at > 60000) {
-      try { recent = { at: Date.now(), list: (await fetchList(api, { n: 4 })).items }; } catch (_) { recent.at = Date.now(); }
+    if (!cached && (fresh || Date.now() - recent.at > 60000)) {
+      if (fresh) recent.at = 0;
+      await warmRecent();
     }
     for (const it of recent.list) if (out.length < n) out.push({ src: imgUrl(api, it.id), s: it.s || [] });
   }

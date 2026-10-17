@@ -664,7 +664,8 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
 .arch-mini--a{ left:-6%; top:3%; transform:rotate(-21deg); }
 .arch-mini--b{ left:42%; top:21%; transform:rotate(5deg); }
 .arch-ph{ display:block; aspect-ratio:1; overflow:hidden; background:#CDD0D7; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
-.arch-ph img{ display:block; width:100%; height:100%; object-fit:cover; }
+.arch-ph img{ display:block; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .45s ease; }
+.arch-ph img.is-on{ opacity:1; }
 @media (hover:hover){
   .arch-btn:hover .arch-disc{ transform:scale(1.04); }
   .arch-btn:hover .arch-mini--a{ transform:translate(-5%,-5%) rotate(-27deg); }

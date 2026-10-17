@@ -12,7 +12,7 @@ import { applyStyle } from './style.js';
 import { createCatalog } from './catalog.js';
 import { renderCase } from './case.js';
 import { fetchModel, fetched, warmLoaders } from './model.js';
-import { latestPhotos, flush as flushPolaroids } from './polaroids.js';
+import { latestPhotos, warmRecent, flush as flushPolaroids } from './polaroids.js';
 import { stickerSet, stickerSrc, stickerById } from './stickers.js';
 import { stat } from './stats.js';
 
@@ -115,6 +115,8 @@ function applyContent() {
   // полароид и архив — выключатель в админке («Полароид»)
   document.body.classList.toggle('no-pol', site.polaroidOn !== true);
   if (els.archBtn) els.archBtn.setAttribute('aria-label', t('archive'));
+  // кружок «Архив»: превью с прошлого захода — сразу, список свежих карточек — заранее, пока собирается голова
+  if (polOn()) { archMinis(false, true); warmRecent(); }
   // кнопка «Звук» — тоже из админки; выключена — голова молчит, даже если посетитель включал звук раньше
   document.body.classList.toggle('no-sound', site.soundOn !== true);
   if (site.soundOn !== true && voice.enabled) { voice.setEnabled(false); els.sound.setAttribute('aria-pressed', 'false'); }
@@ -1294,10 +1296,11 @@ function polStop() {
 if (els.polShot) els.polShot.addEventListener('click', () => polCountdown(true));
 
 // Кружок «Архив» на главной (Figma: справа внизу, на телефоне — слева от кнопок): две свежие карточки
-async function archMinis(fresh = false) {
+async function archMinis(fresh = false, cached = false) {
   if (!els.archBtn || document.body.classList.contains('no-pol')) return;
   let list = [];
-  try { list = await latestPhotos(2, fresh); } catch (_) { list = []; }
+  try { list = await latestPhotos(2, fresh, cached); } catch (_) { list = []; }
+  if (cached && !list.length) return;
   const set = stickerSet(content.site, tx);
   // мини-карточка: фото и наклейки там же, где на настоящей (доли карточки)
   const put = (sel, it) => {
@@ -1305,7 +1308,12 @@ async function archMinis(fresh = false) {
     if (!im) return;
     let layer = mini.querySelector('.arch-stks');
     if (!layer) { layer = document.createElement('span'); layer.className = 'arch-stks'; mini.appendChild(layer); }
-    if (it && it.src) { if (im.getAttribute('src') !== it.src) im.src = it.src; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
+    // фото проявляется, когда догрузилось, — не «выпадает» кусками
+    if (it && it.src) {
+      if (im.getAttribute('src') !== it.src) { im.classList.remove('is-on'); im.onload = () => im.classList.add('is-on'); im.src = it.src; }
+      if (im.complete && im.naturalWidth) im.classList.add('is-on');
+      im.hidden = false;
+    } else { im.hidden = true; im.removeAttribute('src'); }
     layer.innerHTML = (it && it.src ? it.s || [] : []).map((p) => {
       const st = stickerById(set, p.e), src = st && stickerSrc(st);
       return src ? `<img src="${esc(src)}" alt="" style="left:${(Number(p.x) * 100).toFixed(1)}%;top:${(Number(p.y) * 100).toFixed(1)}%;--r:${Number(p.r) || 0}deg">` : '';
@@ -1518,7 +1526,7 @@ async function boot() {
   booted = true;
   spit.input = performance.now();      // бездействие считаем с момента, когда сайт готов, а не пока он грузился
   // полароиды: свои неотправленные карточки уходят в архив, в кружок «Архив» встают две свежие
-  if (polOn()) { flushPolaroids(); setTimeout(() => archMinis(), 2500); }
+  if (polOn()) { flushPolaroids(); archMinis(); }
   if (view === 'hero') greet();
   if (query.has('diag')) diag();
   // каталог откроют следующим шагом: первые папки подгружаем заранее, когда главный экран уже готов
