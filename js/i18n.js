@@ -38,7 +38,7 @@ export const UI = {
     tiltText: 'Буду следить за наклоном', tiltOn: 'Включить', tiltNo: 'Не надо', tiltLabel: 'Наклон телефона',
     // полароид и архив
     polaroid: 'Полароид', archive: 'Архив полароидов', polShot: 'Сфотографироваться с головой',
-    polCaption: 'Подпись на карточке', polCaptionPh: 'Тут можно написать пожелание или комент до 56 символов',
+    polCaption: 'Подпись на карточке', polCaptionPh: 'Тут можно написать пожелание или комент — в две строки',
     polRetake: 'Перефоткать', polSave: 'Сохранить', polClose: 'Закрыть',
     polStickers: 'Наклейки: перетащите на карточку или нажмите', polSticker: 'Наклейка «{name}»',
     polPlaced: 'Наклейка «{name}» на карточке: стрелки двигают, Delete отклеивает',
@@ -85,7 +85,7 @@ export const UI = {
     before: 'Before', after: 'After', compare: 'Before and after comparison',
     tiltText: 'I can follow your phone tilt', tiltOn: 'Enable', tiltNo: 'No thanks', tiltLabel: 'Phone tilt',
     polaroid: 'Polaroid', archive: 'Polaroid archive', polShot: 'Take a polaroid with the head',
-    polCaption: 'Caption on the card', polCaptionPh: 'Write a wish or a comment, up to 56 characters',
+    polCaption: 'Caption on the card', polCaptionPh: 'Write a wish or a comment — two lines',
     polRetake: 'Retake', polSave: 'Save', polClose: 'Close',
     polStickers: 'Stickers: drag onto the card or press', polSticker: 'Sticker “{name}”',
     polPlaced: 'Sticker “{name}” on the card: arrows move it, Delete peels it off',

@@ -7,6 +7,7 @@
 // Кейс открывается кнопкой «Смотреть проект» или нажатием на уже выбранную карточку.
 import { content, tx, t, esc, srcOf, thumbOf, sectionById, isStack } from './content.js';
 import { setTheme, toneOf, softTextOk, inkOf, buttonLight } from './theme.js';
+import { setTint } from './tint.js';
 import { liked, toggleLike } from './likes.js';
 import { styleValue } from './style.js';
 
@@ -99,7 +100,6 @@ function mixLch(A, B, f) {
   return at(C);
 }
 const ease = (f) => f * f * (3 - 2 * f);
-const themeMeta = document.querySelector('meta[name="theme-color"]');
 const hex2 = (n) => n.toString(16).padStart(2, '0');
 
 // свечение карточки: своё у проекта (админка) или по тону его фона — синее на светлом, светлое на тёмном (как в дизайн-системе)
@@ -248,7 +248,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     // Фон экрана идёт за лентой, а не меняется скачком: между двумя проектами его цвет смешивается ровно настолько,
     // насколько лента доехала до соседа. Тот же цвет у градиента внизу — поэтому под карточками нет «полосы» другого цвета.
     // Цвет ставится и всей странице (html): на iPhone под строкой Safari виден фон страницы, а не каталога, — там была
-    // белая полоса. Туда же — цвет полосы браузера (theme-color).
+    // белая полоса. Туда же — цвет полос браузера (js/tint.js: Safari 26 берёт его с полосок у краёв экрана), но только
+    // пока каталог открыт: раскладывается он и заранее, на главной, — тогда полоски окрашивались цветом первого проекта
     if (S.labs && S.labs.length) {
       const m = S.labs.length - 1, q = clamp(S.p, 0, m), i0 = Math.floor(q), f = q - i0;
       const A = S.labs[i0], B = S.labs[Math.min(i0 + 1, m)];
@@ -257,8 +258,8 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       if (S.ck !== ck) {
         S.ck = ck;
         document.documentElement.style.setProperty('--cat-c', `rgb(${ck})`);
-        if (themeMeta) themeMeta.content = `#${rgb.map(hex2).join('')}`;
       }
+      if (S.active && S.tint !== ck) { S.tint = ck; setTint(`#${rgb.map(hex2).join('')}`); }
     }
     // телефон: ленты не видно — за пальцем идут сами текст и визуал: уезжают влево и гаснут, новый проект въезжает справа
     const f = phone() && S.idx >= 0 ? clamp(S.p - S.idx, -0.6, 0.6) : 0;
@@ -597,7 +598,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       clearTimeout(S.swapT); clearTimeout(S.lookT);
       document.documentElement.classList.remove('is-cat');
       document.documentElement.style.removeProperty('--cat-c');
-      S.ck = '';
+      S.ck = ''; S.tint = '';
       root.querySelectorAll('video').forEach(pause);
       ctl.hidden = true;
       setTheme(null);

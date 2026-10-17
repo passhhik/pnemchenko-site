@@ -21,35 +21,13 @@ const POS = [[0.2837, 0.2534], [0.1205, 0.2983], [0.2045, 0.4776], [0.1094, 0.63
   [0.776, 0.2983], [0.8885, 0.4527], [0.7823, 0.5722], [0.9191, 0.2846], [0.9115, 0.6215]];
 
 // ---------- снимок ----------
-// Голова снимается с её же холста: кадр дорисовывается и тут же, пока картинка в буфере, копируется (WebGL
-// стирает буфер после показа). Снятые очки живут на отдельном холсте — их кладём сверху.
+// Голову снимает она сама (head.snapshot): своей камерой и в одном и том же разрешении — на компьютере и на телефоне
+// кадр получается одинаковый. Дальше — проявка: квадрат вокруг головы, стена, тень, плёнка.
 export function capture(head) {
-  const r = head && head.rect;
-  if (!r || !head.loaded || !head.canvas) return null;
+  if (!head || !head.loaded || !head.snapshot) return null;
   try {
-    head.renderer.render(head.scene, head.camera);
-    const src = head.canvas, cr = src.getBoundingClientRect();
-    if (!cr.width || !cr.height || !src.width) return null;
-    const kx = src.width / cr.width, ky = src.height / cr.height;
-    // с запасом вокруг головы: растянутое ухо или нос уходят далеко за её обычную рамку
-    const m = Math.max(r.w, r.h) * 0.6;
-    const x0 = Math.max(cr.left, r.x - m), y0 = Math.max(cr.top, r.y - m);
-    const x1 = Math.min(cr.right, r.x + r.w + m), y1 = Math.min(cr.bottom, r.y + r.h + m);
-    const w = x1 - x0, h = y1 - y0;
-    if (w < 8 || h < 8) return null;
-    const k = Math.min(1, 1200 / Math.max(w * kx, h * ky));
-    const roi = mk(Math.max(1, Math.round(w * kx * k)), Math.max(1, Math.round(h * ky * k)));
-    const g = roi.getContext('2d', { willReadFrequently: true });
-    g.drawImage(src, (x0 - cr.left) * kx, (y0 - cr.top) * ky, w * kx, h * ky, 0, 0, roi.width, roi.height);
-    const ov = head.ov;
-    if (ov && ov.on && ov.c && ov.c.width) {
-      head._renderOverlay();
-      const W = document.documentElement.clientWidth || window.innerWidth, H = document.documentElement.clientHeight || window.innerHeight;
-      const ox = ov.c.width / W, oy = ov.c.height / H;
-      g.drawImage(ov.c, x0 * ox, y0 * oy, w * ox, h * oy, 0, 0, roi.width, roi.height);
-    }
-    const s = roi.width / w;
-    return develop(roi, { x: (r.x - x0) * s, y: (r.y - y0) * s, w: r.w * s, h: r.h * s });
+    const snap = head.snapshot(1280);
+    return snap ? develop(snap.canvas, snap.head) : null;
   } catch (e) {
     console.warn('Полароид: голову снять не получилось', e);
     return null;
@@ -323,7 +301,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     b.removeAttribute('aria-hidden');
     b.tabIndex = 0;
     const to = spot(i);
-    fly(b, from, to);
+    fly(b, inStage(from.x, from.y), to);
     if (was) b.focus({ preventScroll: true });
     announce(t('polRemoved', { name: set[i].name }));
   }
@@ -369,7 +347,12 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     if (!reduced) b.animate([{ transform: 'translate(-50%,-50%) scale(1)' }, { transform: 'translate(-50%,-50%) scale(1.14) rotate(-8deg)', offset: 0.35 }, { transform: 'translate(-50%,-50%) scale(.96) rotate(5deg)', offset: 0.7 }, { transform: 'translate(-50%,-50%) scale(1)' }], { duration: 420, easing: 'ease-out' });
     line('photo_drag');
   }
-  // перетаскивание наклейки: идёт за пальцем куда угодно; над карточкой — в размере и наклоне, как ляжет
+  // перетаскивание наклейки: идёт за пальцем куда угодно; над карточкой — в размере и наклоне, как ляжет.
+  // Наклейки лежат внутри сцены редактора, а сцену на телефоне поднимает клавиатура (--kb): координаты пальца —
+  // экранные, поэтому место наклейки считаем от верхнего левого угла сцены. Иначе при открытой клавиатуре наклейка
+  // ехала выше пальца, а приклеивалась под ним
+  const inStage = (x, y) => { const r = stage.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
+  const place = (b, x, y) => { const p = inStage(x, y); b.style.setProperty('--x', `${p.x.toFixed(1)}px`); b.style.setProperty('--y', `${p.y.toFixed(1)}px`); };
   let drag = null;
   function onMove(e) {
     const d = drag;
@@ -383,8 +366,7 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
       d.b.classList.add('is-held');
       root.classList.add('is-dragging');
     }
-    d.b.style.setProperty('--x', `${x.toFixed(1)}px`);
-    d.b.style.setProperty('--y', `${y.toFixed(1)}px`);
+    place(d.b, x, y);
     const c = toCard(x, y), over = onCard(c);
     d.b.classList.toggle('is-over', over);
     d.b.classList.toggle('is-blocked', over && blocked(c));
@@ -400,17 +382,16 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
     if (onCard(c)) {
       if (!blocked(c) && e.type === 'pointerup') { stick(d.i, c.x, c.y, d.r, 'press'); return; }      // отпустили над карточкой — приклеилась ровно тут
       const to = d.from;                                 // на другую наклейку не клеится — возвращается, откуда взяли
-      d.b.style.setProperty('--x', `${to.x.toFixed(1)}px`);
-      d.b.style.setProperty('--y', `${to.y.toFixed(1)}px`);
+      place(d.b, to.x, to.y);
       fly(d.b, { x, y }, to, 320);
       if (e.type === 'pointerup') line('photo_on_sticker');
       return;
     }
-    // оставили на экране — там и лежит (не за краем)
-    const m = Math.max(24, ss * 0.45);
-    S[d.i].at = { fx: clamp(x, m, W - m) / W, fy: clamp(y, m, H - m) / H };
+    // оставили на экране — там и лежит (не за краем); место — в долях сцены
+    const m = Math.max(24, ss * 0.45), q = inStage(x, y);
+    S[d.i].at = { fx: clamp(q.x, m, W - m) / W, fy: clamp(q.y, m, H - m) / H };
     const p = spot(d.i);
-    if (Math.abs(p.x - x) > 1 || Math.abs(p.y - y) > 1) fly(d.b, { x, y }, p, 240);
+    if (Math.abs(p.x - q.x) > 1 || Math.abs(p.y - q.y) > 1) fly(d.b, q, p, 240);
   }
   function stopDrag() {
     window.removeEventListener('pointermove', onMove);
@@ -459,7 +440,13 @@ export function openPolaroid({ shot, reduced = false, voice, lines, fmt, archive
   });
 
   // ---------- подпись ----------
-  cap.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (e.metaKey || e.ctrlKey) save(); } });
+  // Enter: на компьютере ⌘/Ctrl+Enter — сохранить; на телефоне «Готово» на клавиатуре прячет её (новой строки в подписи нет)
+  cap.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (e.metaKey || e.ctrlKey) save();
+    else if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) cap.blur();
+  });
   // Подпись стоит посередине белого поля, как на готовой карточке в архиве, тем же кеглем: поле растёт по строкам,
   // а третьей строки не будет — текст, который в две не влезает, просто не печатается
   const twoLines = () => parseFloat(getComputedStyle(cap).lineHeight) * 2 + 1;

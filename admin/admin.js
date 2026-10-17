@@ -56,7 +56,7 @@ const NAV = [
   { id: 'style', name: 'Стиль', hint: 'Цвета и размеры сайта', ico: SVG('<path d="M8 2.3S3.8 6.6 3.8 9.5a4.2 4.2 0 0 0 8.4 0C12.2 6.6 8 2.3 8 2.3z"/>') },
   { id: 'settings', name: 'Настройки', hint: 'Подключение, функции, ключи, пароль', ico: SVG('<path d="M2.5 4.5h6.2M11.7 4.5h1.8M2.5 11.5h1.8M7.3 11.5h6.2"/><circle cx="10.2" cy="4.5" r="1.5"/><circle cx="5.8" cy="11.5" r="1.5"/>') },
 ];
-const SUBS = { home: [['sections', 'Разделы'], ['lines', 'Реплики головы'], ['fun', 'Пасхалки и звук']], pol: [['cards', 'Карточки'], ['stickers', 'Наклейки']] };
+const SUBS = { home: [['sections', 'Разделы'], ['lines', 'Реплики головы'], ['fun', 'Пасхалки и звук']], pol: [['cards', 'Карточки'], ['stickers', 'Наклейки'], ['shoot', 'Съёмка']] };
 const subOf = (page) => (SUBS[page] && SUBS[page].some(([k]) => k === st.sub[page]) ? st.sub[page] : SUBS[page] ? SUBS[page][0][0] : '');
 // предпросмотру нужно хотя бы ~420 пикселей рядом со страницей; уже — он прячется сам (в «Кейсах» мешает ещё и список)
 const narrowScreen = () => window.innerWidth - 84 - (st.page === 'cases' ? 272 : 0) - 440 < 420;
@@ -733,6 +733,11 @@ function stickerPrev(stk) {
 }
 function polaroidPane() {
   const s = st.site, api = polaroidsApi(s), key = modKey();
+  if (subOf('pol') === 'shoot') {
+    return SEC('Когда начинается съёмка', F('Сколько секунд держать голову растянутой', 'polaroidHold', { type: 'number', kind: 'num', ph: '1.5', attrs: 'min="0.3" max="10" step="0.1" inputmode="decimal"',
+        hint: 'Голову тянут — пальцем, несколькими пальцами или мышью — и держат неподвижно. Через столько секунд она говорит «Замри!» и считает «три, два, один». Пусто — 1,5 секунды. Меньше — снимок легко сделать случайно, больше — не все дотерпят.' }),
+      'Отсчёт после этого — всегда три секунды; отпустили голову посреди отсчёта — снимка нет.');
+  }
   if (subOf('pol') === 'stickers') {
     return `<p class="hint sec-hint">Десять наклеек по бокам карточки. Без своей картинки наклейка — эмодзи системы (на iPhone и Mac — Apple, на Android и Windows — свои). Своя картинка — PNG или WebP с прозрачным фоном, квадратная, от 240 пикселей — заменяет эмодзи везде, и на сохранённых карточках тоже.</p>
       <ol class="stk-list">${(s.polaroid.stickers || []).map((stk, i) => `<li class="stk-row">

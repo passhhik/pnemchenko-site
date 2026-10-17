@@ -25,6 +25,11 @@
   <link rel="preload" href="assets/fonts/roboto-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="content/site.json" as="fetch" crossorigin>
   <link rel="preload" href="content/projects.json" as="fetch" crossorigin>
+  <!-- архив полароидов и статистика — облачная функция: соединение с ней открываем, пока качается страница, — кружок
+       «Архив» получает свежие карточки на пару сотен миллисекунд раньше (на мобильной сети заметно). Две строки —
+       для запросов данных и для картинок: браузер держит для них разные соединения. Сменится адрес функции — поправьте -->
+  <link rel="preconnect" href="https://functions.yandexcloud.net" crossorigin>
+  <link rel="preconnect" href="https://functions.yandexcloud.net">
   <link rel="stylesheet" href="css/tokens.css">      <!-- дизайн-токены: шрифты, отступы, кнопки, цвета — править здесь -->
   <link rel="stylesheet" href="css/style.css">
   <!-- части интерфейса: качаются сразу и одновременно, а не по цепочке «скрипт → его зависимости» -->
@@ -34,6 +39,7 @@
   <link rel="modulepreload" href="js/lines.js">
   <link rel="modulepreload" href="js/folders.js">
   <link rel="modulepreload" href="js/theme.js">
+  <link rel="modulepreload" href="js/tint.js">
   <link rel="modulepreload" href="js/catalog.js">
   <link rel="modulepreload" href="js/likes.js">
   <link rel="modulepreload" href="js/style.js">

@@ -1,8 +1,8 @@
+import { setTint } from './tint.js';
 // Фон «в стиле проекта» — как на домашнем экране PlayStation: при наведении на проект страница
 // перекрашивается в его цвет с размытой обложкой, а интерфейс меняет тон (чёрный ↔ белый).
 const root = document.querySelector('[data-bg]');
 const [below, above] = root ? [...root.children] : [];
-const meta = document.querySelector('meta[name="theme-color"]');
 let key = '';
 
 // ---------- контраст: правило сайта, где текст светлый, а где тёмный ----------
@@ -123,9 +123,9 @@ export function setTheme(theme) {
   const prev = key;
   key = k;
   document.body.dataset.tone = theme ? (theme.tone || toneOf(theme.color)) : 'light';
-  // полоса браузера — цвета проекта или цвета листа (а не чисто белая: лист чуть серее, и на iPhone был виден шов)
+  // полосы браузера — цвета проекта или цвета листа (а не чисто белые: лист чуть серее, и на iPhone был виден шов)
   const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
-  if (meta) meta.content = theme ? theme.color : (/^#[0-9a-f]{6}$/i.test(paper) ? paper : '#F4F6F6');
+  setTint(theme ? theme.color : (/^#[0-9a-f]{6}$/i.test(paper) ? paper : '#F4F6F6'), true);
   document.body.style.setProperty('--theme-c', theme ? theme.color : '#FFFFFF');     // цвет фона — для дымки под шапкой каталога
   if (!root) return;
   if (!theme) { below.classList.remove('is-on'); above.classList.remove('is-on'); return; }

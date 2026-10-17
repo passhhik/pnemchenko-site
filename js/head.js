@@ -716,6 +716,48 @@ export class Head extends EventTarget {
     });
   }
 
+  // Снимок для полароида. Голова рисуется отдельно от экрана — своей камерой, в квадрат size×size, — поэтому кадр
+  // одинаковый на компьютере и на телефоне: не зависит от размера окна, плотности пикселей и места головы на экране и не
+  // обрезается краем экрана, если ухо вытянули далеко. Камера — на типичном расстоянии (перспектива как на экране), кадр —
+  // с большим запасом вокруг головы (растянутые уши и нос), обрезает его потом полароид по самой голове. Снятые очки
+  // (их рисует отдельный холст) на это время возвращаются на основной — рядом с головой они попадут в кадр.
+  // Всё происходит за один шаг: холст на мгновение меняет размер и тут же получает обычный кадр — на экране этого не видно.
+  // Возвращает { canvas, head: рамка головы в покое на снимке } или null.
+  snapshot(size = 1280) {
+    if (!this.loaded) return null;
+    const r = this.renderer, B = this.headBox || DEFAULT_BOX, S = this.sil || DEFAULT_SIL;
+    const span = Math.max(B.w, B.h) * 2.4;                       // сторона кадра в плоскости ушей
+    const dist = S.w * 5;                                         // от камеры до ушей — как на экране телефона и компьютера
+    const cam = this._snapCam || (this._snapCam = new THREE.PerspectiveCamera(26, 1, 0.1, 60));
+    cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(span / 2 / dist));
+    cam.aspect = 1; cam.near = 0.1; cam.far = 60;
+    cam.clearViewOffset();
+    cam.position.set(B.cx, B.cy, S.zx + dist);
+    cam.lookAt(B.cx, B.cy, 0);
+    cam.updateProjectionMatrix();
+    cam.layers.mask = this.camera.layers.mask;
+    const far = this.glasses.offset.length() > GLASSES_ON_TOP;
+    const keep = this.glassMeshes.map((o) => [o, o.material.colorWrite, o.material.depthWrite, o.material.depthTest, o.renderOrder]);
+    for (const [o] of keep) { const m = o.material; m.colorWrite = true; m.depthWrite = o.userData.dw; m.depthTest = !far; if (far) o.renderOrder = 6; }
+    const pr = r.getPixelRatio(), was = r.getSize(new THREE.Vector2());
+    const out = document.createElement('canvas');
+    out.width = out.height = size;
+    try {
+      r.setPixelRatio(1);
+      r.setSize(size, size, false);
+      this._updateMatrices();
+      r.render(this.scene, cam);
+      out.getContext('2d').drawImage(this.canvas, 0, 0, size, size, 0, 0, size, size);
+    } finally {
+      for (const [o, cw, dw, dt, ro] of keep) { const m = o.material; m.colorWrite = cw; m.depthWrite = dw; m.depthTest = dt; o.renderOrder = ro; }
+      r.setPixelRatio(pr);
+      r.setSize(was.x, was.y, false);
+      r.render(this.scene, this.camera);
+    }
+    const k = size / span;
+    return { canvas: out, head: { x: size / 2 - (B.w * k) / 2, y: size / 2 - (B.h * k) / 2, w: B.w * k, h: B.h * k } };
+  }
+
   // Контуры линз на экране (CSS-пиксели окна) — по ним в размытии страницы вырезаются «окна»
   lensOutlines() {
     const g = this.glasses.node;
@@ -789,14 +831,19 @@ export class Head extends EventTarget {
   _renderOverlay(warm = false) {
     const ov = this.ov;
     if (!ov) return;
-    const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
+    // Размер и место слоя — по его собственной рамке, а не по размеру окна. На iPhone (Safari 26) слой во всё окно
+    // уходит и под панель браузера, а clientHeight страницы её не считает: кадр растягивался по высоте, и оправа
+    // съезжала с резких «окошек» линз в размытии.
+    const box = ov.c.getBoundingClientRect(), shown = box.width > 0 && box.height > 0;
+    const W = shown ? Math.round(box.width) : document.documentElement.clientWidth, H = shown ? Math.round(box.height) : document.documentElement.clientHeight;
+    const bx = shown ? box.left : 0, by = shown ? box.top : 0;
     if (ov.w !== W || ov.h !== H) { ov.w = W; ov.h = H; ov.r.setSize(W, H, false); }
-    // та же камера, но кадр — всё окно: очки стоят ровно там же, где стояли бы на основном холсте
+    // та же камера, но кадр — весь слой: очки стоят ровно там же, где стояли бы на основном холсте
     const src = this.camera, cam = ov.cam, v = src.view;
     const cr = this.canvas.getBoundingClientRect();
     cam.position.copy(src.position); cam.quaternion.copy(src.quaternion);
     cam.fov = src.fov; cam.aspect = src.aspect; cam.near = src.near; cam.far = src.far;
-    cam.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX - cr.left, v.offsetY - cr.top, W, H);
+    cam.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX - cr.left + bx, v.offsetY - cr.top + by, W, H);
     const r = ov.r, key = this.lights.key, cast = key.castShadow, env = this.scene.environment;
     key.castShadow = false;
     this.scene.environment = ov.env;
@@ -1490,7 +1537,7 @@ export class Head extends EventTarget {
     const glasses = this._isGlasses(hit.object);
     const local = this._toHead(hit.point, new THREE.Vector3());
     const drag = { plane, x0: e.clientX, y0: e.clientY, px: e.clientX, py: e.clientY, t0: performance.now(), moved: 0, glasses, local,
-      touch: e.pointerType !== 'mouse', region: glasses ? 'glasses' : this._region(local, hit.object) };
+      touch: e.pointerType !== 'mouse', region: glasses ? 'glasses' : this._region(local, hit.object, hit.uv) };
     if (glasses) {
       drag.gl = this.glasses.node.worldToLocal(hit.point.clone());   // за какое место очков взялись
       this._ensureOverlay();
@@ -1601,20 +1648,61 @@ export class Head extends EventTarget {
     return best;
   }
 
-  _region(p, obj) {
+  // За что взялись. Волосы узнаём по цвету кожи под пальцем, а не по одной форме: ухо сидит позади линии, за которой
+  // начинается затылок, и верх его прикрыт прядями, а высокий лоб доходит почти до макушки — по одной форме голова
+  // принимала ухо и верх лба за причёску. Брови и ресницы тоже тёмные, но они на лице — это не волосы.
+  _region(p, obj, uv) {
     const base = obj?.userData?.base || '';
     if (/^Eye_/.test(base)) return 'eye';
     if (/^Piercing_EarCuff/.test(base)) return 'ear';
     if (/^Piercing_Septum/.test(base)) return 'nose';
     const ax = Math.abs(p.x);
-    if (p.y > 0.3 || p.z < -0.05) return 'hair';
-    if (ax > 0.6 && p.y > -0.45 && p.y < 0.2) return 'ear';
+    const face = p.z > 0.25 && p.y < 0.6 && ax < 0.48;
+    const ear = ax > 0.56 && p.y > -0.5 && p.y < 0.06 && p.z > -0.34 && p.z < 0.04;
+    const dark = this._darkAt(obj, uv);                       // null — цвет узнать не вышло: решает форма, как раньше
+    if (dark === null) {
+      if (ear && p.y < -0.06 && p.z > -0.28) return 'ear';
+      if (p.y > 0.3 || p.z < -0.05) return 'hair';
+    } else if (dark && !face) return 'hair';
+    if (ear) return 'ear';
+    if (p.z < -0.05 || p.y > 0.6) return 'hair';             // затылок и макушка — даже где прядь посветлее
     if (p.y < -0.74) return 'chin';
     if (p.y < -0.48 && ax < 0.24 && p.z > 0.55) return 'mouth';
     if (p.y < -0.18 && p.y > -0.48 && ax < 0.14 && p.z > 0.7) return 'nose';
     if (p.y > -0.24 && p.y < 0.04 && ax > 0.08 && ax < 0.36 && p.z > 0.45) return 'eye';
     if (p.y >= 0.04 && p.z > 0.35) return 'forehead';
     return 'cheek';
+  }
+
+  // Тёмное ли место кожи под пальцем (волосы, брови): по уменьшенной копии карты цвета, снятой один раз. Соседние
+  // точки усредняются — светлая прядь в волосах не делает их кожей. null — не кожа головы или карту не прочесть.
+  _darkAt(obj, uv) {
+    const map = uv && obj && obj.material && /^Head_Skin/.test(obj.material.name || '') ? obj.material.map : null;
+    const img = map && map.image;
+    if (!img) return null;
+    let S = this._skin;
+    if (!S || S.img !== img) {
+      S = this._skin = { img, n: 0, px: null };
+      try {
+        const n = 128, c = document.createElement('canvas');
+        c.width = c.height = n;
+        const g = c.getContext('2d', { willReadFrequently: true });
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(img, 0, 0, n, n);
+        S.px = g.getImageData(0, 0, n, n).data; S.n = n;
+      } catch (_) { /* карта недоступна — решит форма */ }
+    }
+    if (!S.n) return null;
+    const n = S.n, cx = Math.floor(clamp(uv.x, 0, 1) * (n - 1)), cy = Math.floor(clamp(map.flipY ? 1 - uv.y : uv.y, 0, 1) * (n - 1));
+    const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    let sum = 0, k = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= n || y >= n) continue;
+      const i = (y * n + x) * 4;
+      sum += 0.2126 * lin(S.px[i]) + 0.7152 * lin(S.px[i + 1]) + 0.0722 * lin(S.px[i + 2]); k++;
+    }
+    return sum / k < 0.13;
   }
 
   _emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }

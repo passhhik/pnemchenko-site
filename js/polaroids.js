@@ -7,7 +7,8 @@
 import { content } from './content.js';
 import { STICKER_ID } from './stickers.js';
 
-export const CAPTION_MAX = 56;
+// Подпись — сколько влезет в две строки шириной с фото (это решает редактор, js/polaroid.js); здесь — потолок на всякий случай
+export const CAPTION_MAX = 80;
 export const STICKERS_MAX = 12;
 const KEY = 'ph:pol';
 

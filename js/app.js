@@ -56,7 +56,7 @@ const CLEAN_LOGO = 0.56;          // ширина логотипа в долях
 const CLEAN_LOGO_MAX = 480;       // …но не шире: на планшете в портрете
 const CLEAN_HEAD = [0.72, 0.78];   // голова от уха до уха — не больше этой доли ширины экрана: на обычном экране и на вытянутом (там больше высоты)
 const CLEAN_HEAD_MAX = 540;       // …и не больше стольких точек (планшет в портрете)
-const CLEAN_DROP = 0.56;          // какая доля свободной высоты уходит над голову (остальное — под реплику): голова стоит чуть ниже середины
+const CLEAN_DROP = 0.2;           // какая доля свободной высоты уходит над голову (остальное — под реплику): голова стоит повыше, у реплики — воздух
 const SUBS_LH = 1.15;             // межстрочный интервал субтитров — тот же, что у .subs в css/style.css
 let head = null, subs = null, catalog = null, caseView = null;
 let view = null, folderEls = [], logoAR = 393 / 95;
@@ -645,7 +645,7 @@ function show(next, opts = {}) {
   els.stage.classList.toggle('is-corner', next !== 'hero');
   for (const [k, el] of Object.entries(els.views)) el.hidden = k !== next;
   if (next === 'work') els.allWork.setAttribute('aria-current', 'page'); else els.allWork.removeAttribute('aria-current');
-  if (head) { head.setMode(next === 'hero' ? 'hero' : 'corner'); head.clearLook(); head.setSceneColor(next === 'hero' ? '#FFFFFF' : '#D9D9D9'); }
+  if (head) { head.setMode(next === 'hero' ? 'hero' : 'corner'); head.clearLook(); head.setSceneColor(next === 'hero' ? '#FFFFFF' : '#EEF0F0'); }      // в кружке — светлое стекло дока
   // в каталоге головы нет: кружок гаснет (стили), а когда погас — голова перестаёт рисоваться; в кейсе она снова в углу
   clearTimeout(sleepT);
   if (next === 'work') { if (subs) subs.clear(); if (head) sleepT = setTimeout(() => { if (view === 'work' && head) head.sleep(true); }, prev ? 400 : 0); }
@@ -717,8 +717,10 @@ function updateVeil() {
   const st = els.veil.style;
   st.setProperty('--blind', b.toFixed(3));
   st.setProperty('--blur', (9 * Math.pow(b, 1.35)).toFixed(2));
-  let d = `M0 0H${window.innerWidth}V${window.innerHeight}H0Z`;
-  for (const poly of head.lensOutlines()) d += `M${poly.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('L')}Z`;
+  // контур — в координатах самого слоя: на iPhone он уходит и под панель браузера, и окно (innerHeight) его меньше
+  const vb = els.veil.getBoundingClientRect();
+  let d = `M-4 -4H${Math.ceil(vb.width + 4)}V${Math.ceil(vb.height + 4)}H-4Z`;
+  for (const poly of head.lensOutlines()) d += `M${poly.map((p) => `${(p[0] - vb.left).toFixed(1)} ${(p[1] - vb.top).toFixed(1)}`).join('L')}Z`;
   const cp = `path(evenodd, "${d}")`;
   st.clipPath = cp; st.webkitClipPath = cp;
 }
@@ -844,7 +846,7 @@ function offerTilt(instant = false) {
 
 // Вызывается один раз, когда голова создана: подписки на её события
 function wireHead() {
-  head.setSceneColor(view === 'hero' ? '#FFFFFF' : '#D9D9D9');      // контровой свет цвета фона: голова «сидит» в сцене
+  head.setSceneColor(view === 'hero' ? '#FFFFFF' : '#EEF0F0');      // контровой свет цвета фона: голова «сидит» в сцене
   head.cornerRect = probeRect;
   if (debug) window.__head = head;
 
@@ -1184,22 +1186,27 @@ function dockOut(instant = false) {
 // щелчка: отпустили во время отсчёта — снимка не будет, голова просит держать до конца. С клавиатуры (кнопка-невидимка)
 // отсчёт идёт сам. Пока идёт отсчёт и открыта карточка, голова не отвечает на щипки, не окликает и не плюётся. Включается в админке («Полароид»), в содержимом это site.polaroidOn.
 const polOn = () => !!(content.site && content.site.polaroidOn === true) && !content.preview;
-const POL = { state: 'idle', armed: true, ax: 0, ay: 0, since: 0, t: 0, ui: null, mod: null, finder: null };     // state: idle | count | edit
-const HOLD_MS = 1500, STILL_PX = 14, STRETCH_MIN = 0.16;     // сколько держать, насколько неподвижно и насколько растянуть
+const POL = { state: 'idle', armed: true, at: null, since: 0, t: 0, ui: null, mod: null, finder: null };     // state: idle | count | edit
+const STILL_PX = 14, STRETCH_MIN = 0.16;     // насколько неподвижно держать и насколько растянуть
+// сколько держать растянутой до отсчёта — из админки («Полароиды» → «Съёмка», site.polaroidHold, секунды); по умолчанию 1,5
+const holdMs = () => { const v = Number(content.site && content.site.polaroidHold); return (Number.isFinite(v) && v > 0 ? clamp(v, 0.3, 10) : 1.5) * 1000; };
 const polBusy = () => POL.state !== 'idle';
 if (debug) window.__pol = POL;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-// каждый кадр головы: держат ли её растянутой и неподвижной
+// Каждый кадр головы: держат ли её растянутой и неподвижной. Тянуть можно и несколькими пальцами сразу (на телефоне):
+// хватит, чтобы хоть один щипок растянул голову достаточно, а все пальцы замерли — каждый у своей точки
 function holdTick(now) {
   if (POL.state !== 'idle' || !head) return;
-  if (!head.drags.size) { POL.armed = true; POL.since = 0; return; }       // отпустили — можно снимать снова
-  if (!POL.armed || head.drags.size !== 1 || view !== 'hero' || !polOn() || head.intro.on || spit.state !== 'off' || dragging) { POL.since = 0; return; }
-  const d = head.drags.values().next().value, h = d && d.handle;
-  if (!h) { POL.since = 0; return; }                                         // держат очки — это не позирование
-  const s = Math.hypot(h.d.x + h.e.x, h.d.y + h.e.y, h.d.z + h.e.z);
-  if (s < STRETCH_MIN) { POL.since = 0; return; }
-  if (!POL.since || Math.hypot(d.px - POL.ax, d.py - POL.ay) > STILL_PX) { POL.ax = d.px; POL.ay = d.py; POL.since = now; return; }
-  if (now - POL.since >= HOLD_MS) { POL.armed = false; polCountdown(); }
+  if (!head.drags.size) { POL.armed = true; POL.since = 0; POL.at = null; return; }       // отпустили — можно снимать снова
+  if (!POL.armed || view !== 'hero' || !polOn() || head.intro.on || spit.state !== 'off' || dragging) { POL.since = 0; return; }
+  const list = [...head.drags.entries()];
+  let s = 0;
+  for (const [, d] of list) { const h = d.handle; if (h) s = Math.max(s, Math.hypot(h.d.x + h.e.x, h.d.y + h.e.y, h.d.z + h.e.z)); }
+  if (s < STRETCH_MIN) { POL.since = 0; return; }                             // держат только очки или почти не тянут — не позирование
+  const at = POL.at;
+  const moved = !POL.since || !at || at.size !== list.length || list.some(([id, d]) => { const a = at.get(id); return !a || Math.hypot(d.px - a.x, d.py - a.y) > STILL_PX; });
+  if (moved) { POL.at = new Map(list.map(([id, d]) => [id, { x: d.px, y: d.py }])); POL.since = now; return; }
+  if (now - POL.since >= holdMs()) { POL.armed = false; polCountdown(); }
 }
 // рамка видоискателя вокруг головы — квадрат, как будущий кадр
 function finder(on) {
