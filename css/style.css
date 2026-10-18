@@ -77,10 +77,12 @@ button{ font:inherit; color:inherit; }
 .bg-layer[data-tone="light"]::after{ background:radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(255,255,255,.3)); }
 
 /* полоски цвета страницы у верхнего и нижнего края (js/tint.js): по ним Safari 26 на iPhone красит полосы над страницей
-   и под ней. Их цвет — цвет фона под ними, глазу они не видны. Под затемнением полароида (z 64) — их закрывает оно */
-.tint{ position:fixed; left:0; right:0; z-index:63; height:4px; pointer-events:none; }
+   и под ней. 12 px — чтобы закрыть точку в 8 px от края, где Safari ищет цвет, и не считаться рамкой (≤ 10 px).
+   Видны только на iPhone и iPad: там их закрывают строка состояния и панель браузера. Под затемнением полароида (z 64) */
+.tint{ position:fixed; left:0; right:0; z-index:63; height:12px; pointer-events:none; display:none; }
 .tint--top{ top:0; }
 .tint--bottom{ bottom:0; }
+@supports (-webkit-touch-callout: none){ @media (orientation:portrait){ .tint{ display:block; } } }      /* в ландшафте на iPhone строки состояния нет — полоска была бы видна */
 
 /* ---------- шапка: логотип по центру, кнопки справа ---------- */
 .topbar{ position:fixed; inset:0 0 auto 0; z-index:40; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px; min-height:var(--hdr); padding:var(--pad-top) var(--pad-x) 0; pointer-events:none; color:var(--fg); }

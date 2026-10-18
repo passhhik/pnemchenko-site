@@ -128,7 +128,14 @@ export function setTheme(theme) {
   setTint(theme ? theme.color : (/^#[0-9a-f]{6}$/i.test(paper) ? paper : '#F4F6F6'), true);
   document.body.style.setProperty('--theme-c', theme ? theme.color : '#FFFFFF');     // цвет фона — для дымки под шапкой каталога
   if (!root) return;
-  if (!theme) { below.classList.remove('is-on'); above.classList.remove('is-on'); return; }
+  if (!theme) {
+    below.classList.remove('is-on'); above.classList.remove('is-on');
+    // слои фона, когда погасли, — цвета листа: прозрачные, они всё равно лежат во весь экран, и Safari мог взять
+    // их прежний цвет проекта для полос над страницей (в кейсе и архиве под часами оставался цвет каталога)
+    const sheet = /^#[0-9a-f]{6}$/i.test(paper) ? paper : '#F4F6F6';
+    setTimeout(() => { if (key === '') for (const l of [below, above]) l.style.setProperty('--c', sheet); }, 700);
+    return;
+  }
   // новый фон проявляется верхним слоем поверх прежнего — без провала в белый
   if (prev) {
     below.style.cssText = above.style.cssText; below.dataset.tone = above.dataset.tone || ''; below.dataset.img = above.dataset.img || '';
