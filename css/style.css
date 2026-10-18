@@ -712,9 +712,9 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
    на главной здесь по умолчанию нет (js/content.js, heroFolders); если их включить в админке, они встают лентой над панелью.
    То же условие — в js/content.js (STACK) и css/tokens.css. */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
-  /* Док: слева кружок, справа стеклянная панель кнопок — одной высоты (кнопка + поля по 10) и одним стеклом.
-     В кружке — две свежие карточки архива (главная, каталог) или голова (архив, кейс). Док — во всю ширину
-     с полями по 15 (на планшете — не шире 520), кнопки в панели делят её поровну */
+  /* Док: слева кружок, справа стеклянная панель кнопок — одним стеклом. В кружке — две свежие карточки архива
+     (главная, каталог; кружок крупнее панели — Figma: 114 при ширине 390) или голова (архив, кейс; кружок высотой
+     с панель). Поля по 15 (на планшете док не шире 520). Кнопки в панели — по своему тексту: CV узкая, как в макете */
   :root{ --bar-gap:max(var(--bar-bottom), calc(env(safe-area-inset-bottom) + 6px)); --dock-h:calc(var(--btn-h) + 20px); --dock-l:max(15px, calc(50vw - 260px));
     --bar:calc(var(--dock-h) + var(--bar-gap)); --corner:var(--dock-h); --corner-r:15px; }
   body[data-view="case"],body[data-view="work"]{ --corner:var(--dock-h); --corner-r:15px; }
@@ -724,11 +724,11 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
   .cv-pre{ display:none; }      /* в панели места мало: просто «CV» */
   /* стеклянная панель (стекло — --dock-bg: размытие только в кейсе и архиве, где под ней едет содержимое; на главной
      и в каталоге фон ровный, а размытие поверх движущегося визуала дорого на телефоне) */
-  .topnav,body[data-view="hero"] .topnav{ position:fixed; left:var(--dock-l); right:var(--dock-l); bottom:var(--bar-gap); z-index:41; justify-self:auto; gap:var(--sp-10); height:var(--dock-h); padding:var(--sp-10);
-    border-radius:calc(var(--dock-h) / 2); background:var(--dock-bg); -webkit-backdrop-filter:var(--dock-fx); backdrop-filter:var(--dock-fx); box-shadow:var(--dock-ring); transform:none; transition:none; }
-  .topnav .btn{ flex:1 1 0; min-width:0; padding:0 12px; }
-  /* место под кружок слева: карточки — пока полароид включён, голова — если 3D работает */
-  body[data-view="hero"]:not(.no-pol) .topnav,body[data-view="work"]:not(.no-pol) .topnav,body[data-view="archive"]:not(.no-webgl) .topnav,body[data-view="case"]:not(.no-webgl) .topnav{ left:calc(var(--dock-l) + var(--dock-h) + var(--sp-10)); }
+  .topnav,body[data-view="hero"] .topnav{ position:fixed; left:50%; right:auto; bottom:var(--bar-gap); z-index:41; justify-self:auto; gap:var(--sp-10); height:var(--dock-h); padding:var(--sp-10);
+    border-radius:calc(var(--dock-h) / 2); background:var(--dock-bg); -webkit-backdrop-filter:var(--dock-fx); backdrop-filter:var(--dock-fx); box-shadow:var(--dock-ring); transform:translateX(-50%); transition:none; }
+  .topnav .btn{ flex:none; }
+  /* слева кружок (карточки — пока полароид включён, голова — если 3D работает) — панель у правого края */
+  body[data-view="hero"]:not(.no-pol) .topnav,body[data-view="work"]:not(.no-pol) .topnav,body[data-view="archive"]:not(.no-webgl) .topnav,body[data-view="case"]:not(.no-webgl) .topnav{ left:auto; right:var(--dock-l); transform:none; }
   /* голова в архиве и кейсе — в кружке дока, на месте карточек */
   .stage.is-corner,.corner-probe{ top:calc(100% - var(--bar-gap) - var(--dock-h)); left:var(--dock-l); }
   /* её реплики — облачком над доком: растут от головы вверх, хвостик смотрит на неё; ни панель, ни кружок не закрывают */
@@ -770,12 +770,12 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
   .cat-play{ right:var(--cpad); bottom:calc(var(--dots-b) - 10px); width:40px; }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
   .site-footer{ padding-bottom:calc(var(--bar) + 24px); }
-  /* полароид: кружок «Архив» — в доке слева от кнопок, той же высоты и того же стекла; есть и в каталоге */
-  .arch-btn{ --ab:var(--dock-h); left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
+  /* полароид: кружок «Архив» — в доке слева от кнопок, того же стекла; есть и в каталоге (Figma: 114 при ширине 390);
+     голова и реплика на главной встают над ним (barH() в js/app.js) */
+  .arch-btn{ --ab:clamp(84px, calc(100vw - 268px), 114px); left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
   body[data-view="work"]:not(.no-pol) .arch-btn{ display:block; }
-  .arch-mini{ width:62%; }
-  .arch-mini--a{ left:0; top:-6%; }
-  .arch-mini--b{ left:42%; top:16%; }
+  .arch-mini--a{ left:1%; top:-2%; }
+  .arch-mini--b{ left:44%; top:20%; }
   .is-pol .arch-btn{ visibility:hidden; }
   .folders{ bottom:var(--bar-res, var(--bar)); }
   .no-folders .tip{ bottom:calc(var(--bar-res, var(--bar)) + 8px); }
