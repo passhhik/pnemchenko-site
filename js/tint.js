@@ -33,6 +33,9 @@ export function setTint(color) {
   document.body.style.backgroundColor = color;
 }
 
-// с первой секунды — цвет листа: до первой смены цвета край тоже должен быть нашим
-const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
-setTint(/^#[0-9a-f]{6}$/i.test(paper) ? paper : (meta && meta.content) || '#F4F6F6');
+// с первой секунды — цвет листа: до первой смены цвета край тоже должен быть нашим. Только на самом сайте
+// (у его body есть data-view): модуль подключает и админка, ради правила контраста, — ей полоски ни к чему
+if (document.body && document.body.hasAttribute('data-view')) {
+  const paper = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+  setTint(/^#[0-9a-f]{6}$/i.test(paper) ? paper : (meta && meta.content) || '#F4F6F6');
+}
