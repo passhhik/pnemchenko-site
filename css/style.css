@@ -235,6 +235,7 @@ body:not([data-view="hero"]) .loader{ display:none; }
 .subs-line{ margin:0; }
 /* на главной строка переносится между предложениями, а не посреди фразы (пока предложение помещается целиком) */
 body[data-view="hero"] .subs-line .s{ display:inline-block; max-width:100%; }
+body[data-view] .subs-line.is-loose .s{ display:inline; }      /* длинная реплика не влезла в свои строки целыми предложениями (js/subtitles.js, _fit) */
 /* реплика гаснет целиком: прозрачность меняется у всего блока субтитров (у него слой один и постоянный) */
 .subs{ will-change:opacity; }
 .subs.is-out{ opacity:0; transition:opacity .45s var(--ease); }
@@ -712,30 +713,31 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
    на главной здесь по умолчанию нет (js/content.js, heroFolders); если их включить в админке, они встают лентой над панелью.
    То же условие — в js/content.js (STACK) и css/tokens.css. */
 @media (max-width:760px), (max-width:1024px) and (max-aspect-ratio:17/20){
-  /* Док: слева кружок, справа стеклянная панель кнопок — одним стеклом. В кружке — две свежие карточки архива
-     (главная, каталог; кружок крупнее панели — Figma: 114 при ширине 390) или голова (архив, кейс; кружок высотой
-     с панель). Поля по 15 (на планшете док не шире 520). Кнопки в панели — по своему тексту: CV узкая, как в макете */
+  /* Док: слева кружок, справа стеклянная панель кнопок — одним стеклом. Размеры дока всегда одни и те же, меняется
+     только наполнение: в кружке — две свежие карточки архива (главная, каталог) или голова (архив, кейс), кружок
+     всегда одного размера (Figma: 114 при ширине 390); в панели слева всегда CV одного размера, справа — «Все работы»
+     или «К голове» на всё остальное место. Поля по 15 (на планшете док не шире 520) */
   :root{ --bar-gap:max(var(--bar-bottom), calc(env(safe-area-inset-bottom) + 6px)); --dock-h:calc(var(--btn-h) + 20px); --dock-l:max(15px, calc(50vw - 260px));
-    --bar:calc(var(--dock-h) + var(--bar-gap)); --corner:var(--dock-h); --corner-r:15px; }
-  body[data-view="case"],body[data-view="work"]{ --corner:var(--dock-h); --corner-r:15px; }
+    --dock-c:clamp(84px, calc(100vw - 268px), 114px);
+    --bar:calc(var(--dock-h) + var(--bar-gap)); --corner:var(--dock-c); --corner-r:15px; }
+  body[data-view="case"],body[data-view="work"]{ --corner:var(--dock-c); --corner-r:15px; }
   .topbar{ grid-template-columns:1fr; padding-top:max(var(--pad-top), env(safe-area-inset-top)); }
   .topbar-side{ position:absolute; top:max(4px, env(safe-area-inset-top)); right:8px; }
   .lang{ height:36px; font-size:15px; }
   .cv-pre{ display:none; }      /* в панели места мало: просто «CV» */
   /* стеклянная панель (стекло — --dock-bg: размытие только в кейсе и архиве, где под ней едет содержимое; на главной
      и в каталоге фон ровный, а размытие поверх движущегося визуала дорого на телефоне) */
-  .topnav,body[data-view="hero"] .topnav{ position:fixed; left:50%; right:auto; bottom:var(--bar-gap); z-index:41; justify-self:auto; gap:var(--sp-10); height:var(--dock-h); padding:var(--sp-10);
-    border-radius:calc(var(--dock-h) / 2); background:var(--dock-bg); -webkit-backdrop-filter:var(--dock-fx); backdrop-filter:var(--dock-fx); box-shadow:var(--dock-ring); transform:translateX(-50%); transition:none; }
-  .topnav .btn{ flex:none; }
-  /* слева кружок (карточки — пока полароид включён, голова — если 3D работает) — панель у правого края */
-  body[data-view="hero"]:not(.no-pol) .topnav,body[data-view="work"]:not(.no-pol) .topnav,body[data-view="archive"]:not(.no-webgl) .topnav,body[data-view="case"]:not(.no-webgl) .topnav{ left:auto; right:var(--dock-l); transform:none; }
-  /* голова в архиве и кейсе — в кружке дока, на месте карточек */
-  .stage.is-corner,.corner-probe{ top:calc(100% - var(--bar-gap) - var(--dock-h)); left:var(--dock-l); }
-  /* её реплики — облачком над доком: растут от головы вверх, хвостик смотрит на неё; ни панель, ни кружок не закрывают */
-  body[data-view="case"] .subs,body[data-view="archive"] .subs{ left:var(--dock-l); right:var(--dock-l); top:auto; bottom:calc(var(--bar) + 12px); width:auto; max-width:none; transform:none; text-align:left; font-size:16px; line-height:1.25; }
+  .topnav,body[data-view="hero"] .topnav{ position:fixed; left:auto; right:var(--dock-l); bottom:var(--bar-gap); z-index:41; justify-self:auto; width:calc(100vw - var(--dock-l) * 2 - var(--dock-c) - var(--sp-10)); gap:var(--sp-10); height:var(--dock-h); padding:var(--sp-10);
+    border-radius:calc(var(--dock-h) / 2); background:var(--dock-bg); -webkit-backdrop-filter:var(--dock-fx); backdrop-filter:var(--dock-fx); box-shadow:var(--dock-ring); transform:none; transition:none; }
+  .topnav .btn{ flex:1 1 0; min-width:0; }
+  .topnav [data-cv],.topnav [data-sound]{ flex:none; }       /* CV — первая в разметке, значит слева; ширина — по тексту, везде одна */
+  /* голова в архиве и кейсе — в кружке дока, на месте карточек и того же размера */
+  .stage.is-corner,.corner-probe{ top:calc(100% - var(--bar-gap) - var(--dock-c)); left:var(--dock-l); }
+  /* её реплики — облачком над кружком: растут от головы вверх, хвостик смотрит на неё; ни панель, ни кружок не закрывают */
+  body[data-view="case"] .subs,body[data-view="archive"] .subs{ left:var(--dock-l); right:var(--dock-l); top:auto; bottom:calc(var(--bar-gap) + var(--dock-c) + 12px); width:auto; max-width:none; transform:none; text-align:left; font-size:16px; line-height:1.25; }
   body[data-view="case"] .subs-line,body[data-view="archive"] .subs-line{ position:relative; max-width:100%; padding:.6em .85em .65em; border-radius:18px; background:color-mix(in srgb, var(--paper) 92%, transparent); -webkit-backdrop-filter:blur(20px) saturate(1.6); backdrop-filter:blur(20px) saturate(1.6);
-    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent), 0 8px 24px rgba(0,0,0,.1); transform-origin:calc(var(--dock-h) / 2) 100%; animation:say-in .38s cubic-bezier(.34,1.4,.5,1) both; }
-  body[data-view="case"] .subs-line::after,body[data-view="archive"] .subs-line::after{ content:''; position:absolute; left:calc(var(--dock-h) / 2 - 8px); top:100%; border:8px solid transparent; border-bottom-width:0; border-top-color:color-mix(in srgb, var(--paper) 92%, transparent); }
+    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent), 0 8px 24px rgba(0,0,0,.1); transform-origin:calc(var(--dock-c) / 2) 100%; animation:say-in .38s cubic-bezier(.34,1.4,.5,1) both; }
+  body[data-view="case"] .subs-line::after,body[data-view="archive"] .subs-line::after{ content:''; position:absolute; left:calc(var(--dock-c) / 2 - 8px); top:100%; border:8px solid transparent; border-bottom-width:0; border-top-color:color-mix(in srgb, var(--paper) 92%, transparent); }
   /* плашка наклона: на чистом экране — над панелью, место под неё оставляет раскладка (TIP_SLOT в js/app.js);
      с лентой папок места внизу нет — она встаёт наверху */
   .tip{ top:max(5px, env(safe-area-inset-top)); bottom:auto; }
@@ -750,7 +752,7 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
   .folders .gf.is-cur .gf-title{ color:var(--fg); }
   /* каталог (Figma: «Каталог — телефон»): проект по центру — визуал, логотип проекта, описание, «Смотреть» и лайк, точки;
      внизу панель «К голове» / CV. Ленты карточек здесь нет: проекты листаются свайпом (js/catalog.js) */
-  body[data-view="work"] .topnav [data-home]{ display:inline-flex; order:-1; }
+  body[data-view="work"] .topnav [data-home]{ display:inline-flex; }
   .cat{ --dots-b:calc(var(--bar) + 18px); }      /* текст проекта и точки — у самого дока: визуалу больше места */
   .cat-strip{ display:none; }
   .cat-dots{ display:flex; }
@@ -769,24 +771,20 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
   .cat-hero{ will-change:transform; }
   .cat-play{ right:var(--cpad); bottom:calc(var(--dots-b) - 10px); width:40px; }
   .case-end{ padding-bottom:calc(var(--bar) + 120px); }
-  .site-footer{ padding-bottom:calc(var(--bar) + 24px); }
-  /* полароид: кружок «Архив» — в доке слева от кнопок, того же стекла; есть и в каталоге (Figma: 114 при ширине 390);
+  .site-footer{ padding-bottom:calc(var(--bar-gap) + var(--dock-c) + 24px); }
+  /* полароид: кружок «Архив» — в доке слева от кнопок, того же стекла и размера, что кружок с головой; есть и в каталоге;
      голова и реплика на главной встают над ним (barH() в js/app.js) */
-  .arch-btn{ --ab:clamp(84px, calc(100vw - 268px), 114px); left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
+  .arch-btn{ --ab:var(--dock-c); left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
   body[data-view="work"]:not(.no-pol) .arch-btn{ display:block; }
   .arch-mini--a{ left:1%; top:-2%; }
   .arch-mini--b{ left:44%; top:20%; }
   .is-pol .arch-btn{ visibility:hidden; }
   .folders{ bottom:var(--bar-res, var(--bar)); }
   .no-folders .tip{ bottom:calc(var(--bar-res, var(--bar)) + 8px); }
-  /* архив: две колонки лесенкой (правая ниже), внизу «К голове» и «Все работы» */
-  .archive{ padding:calc(var(--hdr) + 24px) 12px calc(var(--bar) + 60px); }
+  /* архив: две колонки лесенкой (правая ниже), внизу — голова в кружке, CV и «Все работы» */
+  .archive{ padding:calc(var(--hdr) + 24px) 12px calc(var(--bar-gap) + var(--dock-c) + 40px); }
   .arc-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:30px 10px; padding-bottom:22%; }
   .arc-li:nth-child(even){ transform:translateY(calc(var(--dy, 0px) + 24%)); }
-  body[data-view="archive"] .topnav [data-home]{ display:inline-flex; order:-1; }
-  body[data-view="archive"] .topnav [data-cv]{ display:none; }
-  /* на светлом матовом доке светлая кнопка теряется — здесь «К голове» контурная, как CV на главной */
-  body[data-view="archive"] .topnav [data-home],body[data-view="case"] .topnav [data-home]{ background:transparent; color:var(--fg); box-shadow:inset 0 0 0 var(--button-stroke) currentColor; }
   /* редактор полароида: окно с репликой — внизу во всю ширину */
   .pol-dlg{ bottom:max(10px, env(safe-area-inset-bottom)); padding:18px; gap:14px; border-radius:32px; }
   .pol-acts{ width:100%; gap:10px; }

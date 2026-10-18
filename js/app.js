@@ -58,6 +58,7 @@ const CLEAN_HEAD = [0.72, 0.78];   // голова от уха до уха — �
 const CLEAN_HEAD_MAX = 540;       // …и не больше стольких точек (планшет в портрете)
 const CLEAN_DROP = 0.2;           // какая доля свободной высоты уходит над голову (остальное — под реплику): голова стоит повыше, у реплики — воздух
 const SUBS_LH = 1.15;             // межстрочный интервал субтитров — тот же, что у .subs в css/style.css
+const subsLines = () => (isStack() ? 3 : 2);     // голова пишет на телефоне в три строки, на компьютере — в две (на любом экране)
 let head = null, subs = null, catalog = null, caseView = null;
 let view = null, folderEls = [], logoAR = 393 / 95;
 // Время этапов загрузки, мс от открытия страницы (для справки ?diag): когда что появилось
@@ -301,7 +302,8 @@ function layout() {
   let width, top, subsY, subsW, subsSize, subsH, fw;
   if (!mobile) {
     // ритм макета: логотип — 3,6u — голова — 3,6u — субтитры (до верха букв), под ними поля побольше.
-    // Реплика (Figma: «Реплика»): узкий 32, ширина 654 — из css/tokens.css; место — под две строки, третья уходит в поле снизу
+    // Реплика (Figma: «Реплика»): узкий 32, ширина 654 — из css/tokens.css; место — под две строки: длиннее реплика
+    // не бывает, кегль уменьшается (_fit в js/subtitles.js)
     subsSize = tokPx('--fs-subs', 32);
     subsH = subsSize * SUBS_LH * 2;
     const gapTop = 3.6 * u, gapSubs = 2.9 * u, bottom = Math.max(4 * u, 26);
@@ -1150,7 +1152,7 @@ async function dockIn() {
   if (bubble && subs) {
     if (!dock.subs || dock.subs.el !== bubble) {
       const { Subtitles: S2 } = await import('./subtitles.js');
-      dock.subs = new S2({ el: bubble, srEl: $('[data-subs-sr]'), voice, lines: subs.lines, fmt: subs.fmt, reducedMotion: reduced });
+      dock.subs = new S2({ el: bubble, srEl: $('[data-subs-sr]'), voice, lines: subs.lines, fmt: subs.fmt, reducedMotion: reduced, maxLines: subsLines });
       dock.subs.onLine = () => card.classList.add('is-said');        // облачко появляется с первой буквой, подводка под ним прячется
     }
     if (dock.on) {
@@ -1466,7 +1468,7 @@ async function boot() {
   SPIT_AFTER = spitDelay(site);
   Object.assign(vars, { name: tx(site.name), nameGen: tx(site.nameGen) || tx(site.name), role: tx(site.role) });
   subs = new Subtitles({
-    el: els.subs, srEl: $('[data-subs-sr]'), voice, reducedMotion: reduced,
+    el: els.subs, srEl: $('[data-subs-sr]'), voice, reducedMotion: reduced, maxLines: subsLines,
     lines: linesFor(content.lang, site.lines),          // исходные реплики и поверх — свои, из админки
     fmt: (s) => String(s).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ''),
   });

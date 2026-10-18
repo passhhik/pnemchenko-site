@@ -48,8 +48,9 @@ export function buildLine(text) {
 }
 
 export class Subtitles {
-  constructor({ el, srEl, voice, lines, fmt, reducedMotion }) {
-    this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion;
+  // maxLines — сколько строк может занять реплика (число или функция); не задано — сколько получится
+  constructor({ el, srEl, voice, lines, fmt, reducedMotion, maxLines = null }) {
+    this.el = el; this.srEl = srEl; this.voice = voice; this.lines = lines; this.fmt = fmt; this.rm = reducedMotion; this.maxLines = maxLines;
     this.token = 0; this.last = 0; this.busyUntil = 0; this.readUntil = 0;
     this.onLine = null;       // (id) — началась реплика: страница может на неё отозваться (например, голова смотрит на кнопку, о которой говорит)
   }
@@ -95,16 +96,39 @@ export class Subtitles {
     p.style.width = `${Math.ceil(right - left) + 1 + (cs.boxSizing === 'border-box' ? padL + padR : 0)}px`;
   }
 
-  // На главной реплика — не больше трёх строк (Figma: «Реплика»): длиннее — кегль чуть уменьшается, но не меньше 80%
+  // Реплика — не больше maxLines строк: на телефоне три, на компьютере две, на любом экране сайта. Длиннее — сначала
+  // реплика шире, если рядом есть место (в углу на компьютере), потом кегль чуть меньше (до 75%), а если и так не
+  // влезает — предложения перестают держаться целиком и переносятся посреди строки (.is-loose)
   _fit(p) {
-    this.el.style.fontSize = '';
-    if (document.body.dataset.view !== 'hero') return;
-    const base = parseFloat(getComputedStyle(this.el).fontSize) || 0;
-    if (!base) return;
-    for (let k = 1; k > 0.8; k -= 0.05) {
-      if (k < 1) this.el.style.fontSize = `${(base * k).toFixed(2)}px`;
-      const lh = parseFloat(getComputedStyle(p).lineHeight) || base * k * 1.15;
-      if (p.offsetHeight <= lh * 3 + 2) return;
+    const el = this.el;
+    el.style.fontSize = ''; el.style.maxWidth = '';
+    p.classList.remove('is-loose');
+    const n = typeof this.maxLines === 'function' ? this.maxLines() : this.maxLines;
+    if (!n) return;
+    // строки — по словам: у слов одной строки один верх
+    const count = () => {
+      const tops = [];
+      for (const w of p.querySelectorAll('.w')) { const t = w.getBoundingClientRect().top; if (!tops.some((x) => Math.abs(x - t) < 3)) tops.push(t); }
+      return tops.length;
+    };
+    if (count() <= n) return;
+    const corner = getComputedStyle(el).maxWidth.endsWith('px');       // реплика в углу (кейс, архив на компьютере): ей можно стать шире
+    if (corner) {
+      const base = parseFloat(getComputedStyle(el).maxWidth), room = window.innerWidth - el.getBoundingClientRect().right;
+      const most = Math.max(base, el.getBoundingClientRect().right - Math.max(24, room));
+      for (const k of [1.25, 1.5]) {
+        el.style.maxWidth = `${Math.min(base * k, most).toFixed(0)}px`;
+        if (count() <= n) return;
+      }
+    }
+    const size = parseFloat(getComputedStyle(el).fontSize) || 0;
+    if (!size) return;
+    for (const loose of [false, true]) {
+      p.classList.toggle('is-loose', loose);
+      for (let k = 1; k >= 0.75 - 1e-6; k -= 0.05) {
+        el.style.fontSize = k < 1 ? `${(size * k).toFixed(2)}px` : '';
+        if (count() <= n) return;
+      }
     }
   }
 
@@ -115,8 +139,12 @@ export class Subtitles {
     this.el.innerHTML = '';
     this.el.appendChild(p);
     this.el.classList.remove('is-out');
+    // мерить — без анимации появления: облачко на телефоне вырастает из масштаба 0,92, и замер по сжатому облачку
+    // делал его уже, чем надо, — реплика потом расползалась на лишнюю строку
+    p.style.animation = 'none';
     this._fit(p);
     this._hug(p);
+    p.style.animation = '';
     let audio = null;
     if (this.voice.has(id)) audio = await this.voice.play(id);
     if (!alive()) return;
