@@ -5,18 +5,25 @@
 // страницы: цвет поменялся — полоски заменяются новыми (не чаще раза в 120 мс, пока цвет плывёт при листании каталога).
 // theme-color тоже ставим — его читают Chrome на Android и Safari прежних версий.
 const meta = document.querySelector('meta[name="theme-color"]');
-let shown = '', want = '', timer = 0;
+let shown = '', want = '', timer = 0, seq = 0;
 
+// Полоски убираются и возвращаются не сразу, а через пару кадров: если заменить их в одном шаге, на экране ничего не
+// меняется (те же места, те же размеры), и Safari не перечитывает цвет — на iPhone под часами оставался цвет первого
+// проекта каталога. Кадр без полосок Safari видит как «фиксированные элементы ушли», новые — как «пришли».
 function put(color) {
+  const my = ++seq;
   for (const old of document.querySelectorAll('.tint')) old.remove();
-  for (const side of ['top', 'bottom']) {
-    const el = document.createElement('div');
-    el.className = `tint tint--${side}`;
-    el.setAttribute('aria-hidden', 'true');
-    el.style.backgroundColor = color;
-    document.body.appendChild(el);
-  }
   shown = color;
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+    if (my !== seq) return;
+    for (const side of ['top', 'bottom']) {
+      const el = document.createElement('div');
+      el.className = `tint tint--${side}`;
+      el.setAttribute('aria-hidden', 'true');
+      el.style.backgroundColor = want || color;
+      document.body.appendChild(el);
+    }
+  }, 50)));
 }
 
 // color — CSS-цвет (#RRGGBB или rgb(…)); now — заменить полоски сразу, без ожидания
