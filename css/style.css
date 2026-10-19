@@ -64,6 +64,27 @@ button{ font:inherit; color:inherit; }
 .skip-link{ position:fixed; left:16px; top:-64px; z-index:100; padding:10px 18px; border-radius:999px; background:#000; color:#fff; text-decoration:none; transition:top .2s; }
 .skip-link:focus{ top:16px; }
 .noscript{ position:fixed; inset:auto 16px 16px; z-index:70; padding:16px; background:#000; color:#fff; border-radius:16px; }
+/* Текст страницы для поисковиков и посетителей без JavaScript (js/seo.js). Со скриптами его нет: сайт убирает блок сразу,
+   а до того он скрыт (браузер, который не знает про (scripting), прячет его как текст для экранного диктора) */
+.seo-static{ position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media (scripting: enabled){ .seo-static{ display:none; } }
+@media (scripting: none){
+  body[data-view]{ overflow:visible; height:auto; }
+  .hero{ position:static; }
+  .stage,.loader,.burst,.brainph,.veil,.subs,.arch-btn,.topbar,.logo,.pol-a11y,.skip-link{ display:none !important; }
+  .noscript{ position:static; max-width:720px; margin:0 auto 48px; }
+  .seo-static{ position:static; width:auto; height:auto; overflow:visible; clip-path:none; white-space:normal; box-sizing:border-box; max-width:760px; margin:0 auto; padding:40px 20px 48px; }
+  .seo-static h1{ font-family:var(--font); font-weight:400; font-size:clamp(36px, 7vw, 64px); line-height:1.02; margin:28px 0 16px; text-wrap:balance; }
+  .seo-static h2{ font-family:var(--font); font-weight:400; font-size:clamp(26px, 4vw, 36px); line-height:1.08; margin:44px 0 12px; }
+  .seo-static h3{ font:inherit; font-weight:500; margin:24px 0 4px; }
+  .seo-static p,.seo-static li{ max-width:68ch; }
+  .seo-static nav{ color:var(--mute); }
+  .seo-static figure{ margin:24px 0; }
+  .seo-static img{ display:block; height:auto; border-radius:16px; }
+  .seo-static dl{ display:grid; grid-template-columns:max-content 1fr; gap:6px 20px; }
+  .seo-static dt{ color:var(--mute); }
+  .seo-static dd{ margin:0; }
+}
 
 /* ---------- фон «в стиле проекта» ---------- */
 .bg{ position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
@@ -127,7 +148,7 @@ body:not([data-view="hero"]) .logo{ z-index:42; }
 /* «Звук» — только если включён в админке; «К голове» — только в каталоге на телефоне; в каталоге «Все работы» не нужна */
 .no-sound [data-sound]{ display:none !important; }
 .topnav [data-home]{ display:none; }
-body[data-view="work"] .topnav [href="#/work"]{ display:none; }
+body[data-view="work"] .topnav [data-t="allWork"]{ display:none; }
 /* «Звук»: когда включён, рядом с надписью три столбика; они пляшут, пока голова говорит */
 .btn--toggle .eq{ display:none; align-items:flex-end; gap:2px; height:.7em; }
 .btn--toggle[aria-pressed="true"] .eq{ display:inline-flex; }

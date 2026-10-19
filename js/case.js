@@ -6,6 +6,7 @@ import { content, tx, t, esc, srcOf, peekItems } from './content.js';
 import { folderHTML } from './folders.js';
 import { setTheme, themeOf, toneOf, softTextOk, inkOf } from './theme.js';
 import { heroOf } from './catalog.js';
+import { paths } from './seo.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : '');
@@ -237,7 +238,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
           </div>
         </div>
         ${next ? `<div class="case-next">${folderHTML({
-    href: `#/work/${encodeURIComponent(next.slug)}`, title: tx(next.title), pill: t('next'),
+    href: paths.case(next.slug), title: tx(next.title), pill: t('next'),
     items: peekItems(next), stickers: [next.sticker], tint: next.folder, cls: 'gf--project gf--auto' })}</div>` : ''}
       </section>
     </div>`;

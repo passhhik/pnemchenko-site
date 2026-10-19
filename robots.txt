@@ -3,3 +3,11 @@ Allow: /
 Disallow: /admin/
 Disallow: /tools/
 Disallow: /server/
+Disallow: /*?*preview=
+Disallow: /*.md$
+Disallow: /start.command
+# Яндекс: метки ссылок (?from= — «откуда пришли», ?me= — «не считать мои заходы»), язык, раздел каталога
+# и служебные параметры не меняют страницу — это один и тот же адрес
+Clean-param: from&me&lang&cat&model&look&diag&spit /
+
+Sitemap: https://pnemchenko.ru/sitemap.xml

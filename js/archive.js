@@ -1,4 +1,4 @@
-// Архив полароидов (#/archive; Figma: «Архив»). Карточки гостей сеткой — четыре в ряд на компьютере, две на телефоне,
+// Архив полароидов (/archive/; Figma: «Архив»). Карточки гостей сеткой — четыре в ряд на компьютере, две на телефоне,
 // каждая чуть повёрнута. Их только смотрят: крупно не открываются, даты нет. Своя карточка (и та, что ещё не ушла
 // в общий архив) лежит ровно и чуть выше соседних — без цвета и надписей; незрячему это говорит подпись карточки.
 import { content, tx, t, esc } from './content.js';
@@ -26,7 +26,7 @@ export function cardInner(it, set) {
 export function createArchive(root, { onLoad = () => {}, onScroll = () => {} } = {}) {
   root.innerHTML = `<h1 id="archive-title" class="visually-hidden" tabindex="-1">${esc(t('archive'))}</h1>
     <ul class="arc-grid" data-grid></ul>
-    <div class="arc-empty" data-empty hidden><p>${esc(t('arcEmpty'))}</p><a class="btn" href="#/">${esc(t('toHead'))}</a></div>
+    <div class="arc-empty" data-empty hidden><p>${esc(t('arcEmpty'))}</p><a class="btn" href="/">${esc(t('toHead'))}</a></div>
     <p class="arc-note" data-note aria-live="polite"></p>
     <div class="arc-more" data-more aria-hidden="true"></div>`;
   const grid = root.querySelector('[data-grid]'), empty = root.querySelector('[data-empty]'), note = root.querySelector('[data-note]'), sentinel = root.querySelector('[data-more]');

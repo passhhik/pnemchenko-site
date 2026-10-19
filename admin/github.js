@@ -132,27 +132,36 @@ export const gh = {
 
   // Один коммит с файлами [{ path, bytes }]. Отправляются только те, что отличаются от лежащих на сайте.
   // check(snapshot) — последняя проверка перед записью: вернёт false — публикация отменяется.
-  // Возвращает { sha, changed: [пути] }; changed пуст — на сайте уже всё то же самое, коммита не было.
-  async commit(files, { message, onProgress = () => {}, check = null } = {}) {
-    for (const f of files) if (f.bytes.length > MAX_FILE) throw new GhError(`Файл «${f.path.split('/').pop()}» весит ${(f.bytes.length / 1e6).toFixed(0)} МБ — для сайта это слишком много. Сожмите его до 15–20 МБ и добавьте заново.`, 0, 'size');
+  // derive(snapshot) — файлы, которые собираются из того, что лежит в репозитории прямо сейчас (страницы для
+  // поисковиков собираются из index.html репозитория): [{ path, bytes }] и [{ path, delete: true }] — убрать файл.
+  // Если ветка за это время ушла вперёд, они собираются заново — поверх свежей версии.
+  // Возвращает { sha, changed: [пути], files }; changed пуст — на сайте уже всё то же самое, коммита не было.
+  async commit(files, { message, onProgress = () => {}, check = null, derive = null } = {}) {
+    const big = (list) => { for (const f of list) if (f.bytes && f.bytes.length > MAX_FILE) throw new GhError(`Файл «${f.path.split('/').pop()}» весит ${(f.bytes.length / 1e6).toFixed(0)} МБ — для сайта это слишком много. Сожмите его до 15–20 МБ и добавьте заново.`, 0, 'size'); };
+    big(files);
     let snap = await this.snapshot();
-    if (check && !(await check(snap))) return { sha: snap.sha, changed: [], cancelled: true };
-    const todo = [];
-    for (const f of files) { f.sha = f.sha || await gitSha(f.bytes); if (snap.files.get(f.path) !== f.sha) todo.push(f); }
-    if (!todo.length) return { sha: snap.sha, changed: [] };
-    let n = 0;
-    onProgress(n, todo.length);
-    for (const f of todo) {
-      const made = await this.req('POST', '/git/blobs', { content: await toBase64(f.bytes), encoding: 'base64' });
-      f.sha = made.sha;
-      onProgress(++n, todo.length);
-    }
+    if (check && !(await check(snap))) return { sha: snap.sha, changed: [], files: [], cancelled: true };
+    for (const f of files) f.sha = f.sha || await gitSha(f.bytes);
+    const sent = new Set();                       // отпечатки файлов, уже отправленных на GitHub
     for (let attempt = 0; ; attempt++) {
-      const tree = await this.req('POST', '/git/trees', { base_tree: snap.treeSha, tree: todo.map((f) => ({ path: f.path, mode: '100644', type: 'blob', sha: f.sha })) });
+      const extra = derive ? await derive(snap) : [];
+      big(extra);
+      for (const f of extra) if (!f.delete) f.sha = f.sha || await gitSha(f.bytes);
+      const todo = [...files, ...extra].filter((f) => (f.delete ? snap.files.has(f.path) : snap.files.get(f.path) !== f.sha));
+      if (!todo.length) return { sha: snap.sha, changed: [], files: [] };
+      const upload = todo.filter((f) => !f.delete && !sent.has(f.sha));
+      let n = 0;
+      onProgress(n, upload.length);
+      for (const f of upload) {
+        const made = await this.req('POST', '/git/blobs', { content: await toBase64(f.bytes), encoding: 'base64' });
+        f.sha = made.sha; sent.add(made.sha);
+        onProgress(++n, upload.length);
+      }
+      const tree = await this.req('POST', '/git/trees', { base_tree: snap.treeSha, tree: todo.map((f) => ({ path: f.path, mode: '100644', type: 'blob', sha: f.delete ? null : f.sha })) });
       const commit = await this.req('POST', '/git/commits', { message, tree: tree.sha, parents: [snap.sha] });
       try {
         await this.req('PATCH', `/git/refs/heads/${encodeURIComponent(this.cfg.branch)}`, { sha: commit.sha, force: false });
-        return { sha: commit.sha, changed: todo.map((f) => f.path) };
+        return { sha: commit.sha, changed: todo.map((f) => f.path), files: todo };
       } catch (e) {
         // пока мы отправляли файлы, в ветке появился чужой коммит (например, правки кода) — строим свой поверх него
         if (e.code !== 'conflict' || attempt >= 2) throw e.code === 'conflict' ? new GhError('Не получилось: на сайте в эту минуту появились другие изменения. Нажмите «Опубликовать» ещё раз.', e.status, 'conflict') : e;
@@ -160,6 +169,7 @@ export const gh = {
       }
     }
   },
+  async readText(sha) { return (await this.req('GET', `/git/blobs/${sha}`, null, { raw: true })).text(); },
 
   // Ждёт, пока GitHub Pages выложит коммит. 'done' — правки на сайте, 'failed' — сборка упала,
   // 'unknown' — узнать не удалось (тогда сайт, скорее всего, обновится сам через пару минут).

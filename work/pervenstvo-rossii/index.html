@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <!-- Защита страницы: скрипты, стили, картинки и запросы — только со своего адреса. Чужой или вставленный в страницу
+       скрипт браузер не выполнит. 'unsafe-eval' нужен только затем, чтобы старые Safari разрешили распаковщик 3D-модели (WebAssembly). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <!-- все пути в странице — от корня сайта: одна и та же страница открывается и по адресу /work/svoi-dengi/ -->
+  <base href="/">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- заголовок, описание, canonical, карточка ссылки и разметка для поисковиков — у каждой страницы свои: их пишет
+       js/seo.js (админка при публикации, с компьютера — node tools/prerender.mjs). Вручную между метками не правьте -->
+  <!--seo:head-->
+  <title>Первенства России: визуальная система для 300+ видов спорта — Павел Немченко</title>
+  <meta name="description" content="Единая визуальная система первенств России: 300+ видов спорта в смысловых группах, один логотип и заполняемые макеты — федерации оформляют баннеры сами.">
+  <link rel="canonical" href="https://pnemchenko.ru/work/pervenstvo-rossii/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Павел Немченко">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:url" content="https://pnemchenko.ru/work/pervenstvo-rossii/">
+  <meta property="og:title" content="Первенства России: визуальная система для 300+ видов спорта — Павел Немченко">
+  <meta property="og:description" content="Единая визуальная система первенств России: 300+ видов спорта в смысловых группах, один логотип и заполняемые макеты — федерации оформляют баннеры сами.">
+  <meta property="og:image" content="https://pnemchenko.ru/assets/cases/pervenstvo-rossii/cover.webp">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://pnemchenko.ru/#website","url":"https://pnemchenko.ru/","name":"Павел Немченко","alternateName":["Паша Немченко","pnemchenko.ru"],"inLanguage":"ru","publisher":{"@id":"https://pnemchenko.ru/#person"}},{"@type":"Person","@id":"https://pnemchenko.ru/#person","name":"Павел Немченко","alternateName":["Паша Немченко","Pavel Nemchenko"],"url":"https://pnemchenko.ru/","jobTitle":"Продуктовый дизайнер","email":"mailto:pavel.nemchenko@outlook.com","sameAs":["https://t.me/passhhik"],"knowsAbout":["Цифровые продукты","Маркетинг и коммуникация","Айдентика и брендинг"]},{"@type":"CreativeWork","@id":"https://pnemchenko.ru/work/pervenstvo-rossii/#work","url":"https://pnemchenko.ru/work/pervenstvo-rossii/","name":"Первенства России","headline":"Первенства России","description":"Единая визуальная система первенств России: 300+ видов спорта в смысловых группах, один логотип и заполняемые макеты — федерации оформляют баннеры сами.","inLanguage":"ru","creator":{"@id":"https://pnemchenko.ru/#person"},"author":{"@id":"https://pnemchenko.ru/#person"},"isPartOf":{"@id":"https://pnemchenko.ru/#website"},"mainEntityOfPage":"https://pnemchenko.ru/work/pervenstvo-rossii/","image":"https://pnemchenko.ru/assets/cases/pervenstvo-rossii/cover.webp","dateCreated":"2025","keywords":"Дизайн-система, Айдентика, Госсектор, Спорт","sourceOrganization":{"@type":"Organization","name":"ФЦПСР"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Павел Немченко","item":"https://pnemchenko.ru/"},{"@type":"ListItem","position":2,"name":"Работы","item":"https://pnemchenko.ru/work/"},{"@type":"ListItem","position":3,"name":"Первенства России","item":"https://pnemchenko.ru/work/pervenstvo-rossii/"}]}]}</script>
+  <!--/seo:head-->
+  <meta name="theme-color" content="#F4F6F6">
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" href="assets/favicon.png" type="image/png" sizes="96x96">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/narrow-cyrillic-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/roboto-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="content/site.json" as="fetch" crossorigin>
+  <link rel="preload" href="content/projects.json" as="fetch" crossorigin>
+  <!-- архив полароидов и статистика — облачная функция: соединение с ней открываем, пока качается страница, — кружок
+       «Архив» получает свежие карточки на пару сотен миллисекунд раньше (на мобильной сети заметно). Две строки —
+       для запросов данных и для картинок: браузер держит для них разные соединения. Сменится адрес функции — поправьте -->
+  <link rel="preconnect" href="https://functions.yandexcloud.net" crossorigin>
+  <link rel="preconnect" href="https://functions.yandexcloud.net">
+  <link rel="stylesheet" href="css/tokens.css">      <!-- дизайн-токены: шрифты, отступы, кнопки, цвета — править здесь -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- части интерфейса: качаются сразу и одновременно, а не по цепочке «скрипт → его зависимости» -->
+  <link rel="modulepreload" href="js/app.js">
+  <link rel="modulepreload" href="js/content.js">
+  <link rel="modulepreload" href="js/i18n.js">
+  <link rel="modulepreload" href="js/nav.js">
+  <link rel="modulepreload" href="js/seo.js">
+  <link rel="modulepreload" href="js/lines.js">
+  <link rel="modulepreload" href="js/folders.js">
+  <link rel="modulepreload" href="js/theme.js">
+  <link rel="modulepreload" href="js/tint.js">
+  <link rel="modulepreload" href="js/catalog.js">
+  <link rel="modulepreload" href="js/likes.js">
+  <link rel="modulepreload" href="js/style.js">
+  <link rel="modulepreload" href="js/case.js">
+  <link rel="modulepreload" href="js/burst.js">
+  <link rel="modulepreload" href="js/subtitles.js">
+  <link rel="modulepreload" href="js/voice.js">
+  <link rel="modulepreload" href="js/model.js">
+  <link rel="modulepreload" href="js/polaroids.js">
+  <link rel="modulepreload" href="js/stickers.js">
+  <!-- 3D-голова подгружается после интерфейса; движок начинаем качать заранее. Саму модель и её загрузчики здесь
+       не трогаем: их запускает js/app.js, когда движок уже скачан, — иначе они делят с ним канал, и на мобильной
+       сети первым на экране появляется не мозг, а долгое ожидание -->
+  <link rel="modulepreload" href="vendor/three/three.module.js">
+  <link rel="modulepreload" href="js/head.js">
+  <link rel="modulepreload" href="js/brain.js">
+</head>
+<body data-view="hero" data-tone="light" class="no-sound no-likes no-pol">
+  <a class="skip-link" href="/work/" data-t="skip">Сразу к работам</a>
+
+  <!-- фон «в стиле проекта»: два слоя для плавной смены -->
+  <div class="bg" data-bg aria-hidden="true"><div class="bg-layer"></div><div class="bg-layer"></div></div>
+
+  <!-- логотип — отдельным слоем: на главной он лежит под головой (голова может его перекрывать), внутри сайта — в шапке -->
+  <a class="logo" href="/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
+
+  <header class="topbar" data-topbar>
+    <div class="topbar-side" data-lang></div>
+    <nav class="topnav" aria-label="Основное меню">
+      <a class="btn btn--line" data-cv href="assets/cv.pdf" download><span class="cv-pre" data-t="download">Скачать</span> CV</a>
+      <a class="btn" href="/work/" data-t="allWork">Все работы</a>
+      <button class="btn btn--line btn--toggle" type="button" data-sound aria-pressed="false"><span data-t="sound">Звук</span></button>
+      <a class="btn btn--light" href="/" data-home data-t="toHead">К голове</a>
+    </nav>
+  </header>
+
+  <!-- работы из папок летят под головой: огибают её сзади, а не закрывают лицо -->
+  <div class="burst" data-burst aria-hidden="true"></div>
+  <div class="brainph" data-ph aria-hidden="true" hidden><i></i></div>
+  <!-- пустышка для прежней версии скрипта: браузер вернувшегося посетителя может минуту держать её в памяти -->
+  <div data-eyes aria-hidden="true" hidden></div>
+  <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
+
+  <!-- архив полароидов (Figma: кружок справа внизу, на телефоне — слева от кнопок): две свежие карточки, ведёт в архив -->
+  <a class="arch-btn" href="/archive/" data-arch-btn aria-label="Архив полароидов">
+    <span class="arch-disc" aria-hidden="true"></span>
+    <span class="arch-mini arch-mini--a" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
+    <span class="arch-mini arch-mini--b" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
+  </a>
+
+  <!-- загрузка без процентов: пока 3D-голова качается, на месте мозга — розовое пятно, потом сам мозг (место им задаёт js/app.js),
+       а когда модель готова, голова собирается по частям -->
+  <div class="loader" data-loader role="status"><span class="visually-hidden" data-t="loader">Собираю лицо</span></div>
+
+  <main id="main">
+    <!-- текст страницы для поисковиков и посетителей без JavaScript (js/seo.js); сайт его убирает и рисует страницу сам -->
+    <!--seo:body-->
+    <div class="seo-static" data-seo-static>
+    <nav aria-label="Вы здесь"><a href="/">Павел Немченко</a> / <a href="/work/">Работы</a> / Первенства России</nav>
+    <article>
+    <h1>Первенства России</h1>
+    <p>Единая визуальная система для 300+ видов спорта: логотип, правила и макеты, которые федерации заполняют сами.</p>
+    <figure><img src="/assets/cases/pervenstvo-rossii/cover.webp" alt="Первенства России" loading="lazy" decoding="async"></figure>
+    <dl><dt>Роль</dt><dd>Дизайнер системы</dd><dt>Заказчик</dt><dd>ФЦПСР</dd><dt>Год проекта</dt><dd>2025</dd></dl>
+    <section><h2>Одна система вместо сотни стилей</h2><p>Шестьсот–семьсот первенств в год оформляли четыре дизайнера, каждое по-своему. Система собрала 300+ видов спорта в смысловые группы: один логотип, общий визуальный язык и заполняемые макеты — федерация оформляет баннер сама, без обращения к дизайнерам.</p></section>
+    <section><h2>Правила</h2><p>Трёхуровневая иерархия логотипов организаторов, обязательные блоки с данными мероприятия из Единого календарного плана, правила для спонсоров и подбор фотографий с учётом возраста участников.</p></section>
+    <section><h2>Статус</h2><p>Система разработана в конце 2025 года. Чтобы она стала обязательной, нужен приказ министерства: внедрение готовят к 2027 году, отдельные мероприятия уже оформлены по ней.</p></section>
+    <p>Теги: Дизайн-система, Айдентика, Госсектор, Спорт</p>
+    </article>
+    <h2>Другие работы</h2><ul><li><a href="/work/svoi-dengi/">Флоу детского банкинга для ВТБ</a> — Не просто контроль трат, а модель финансового взросления</li><li><a href="/work/spartakiada-2027/">Спартакиада инвалидов 2027</a> — Визуальный стиль и брендбук всероссийской летней Спартакиады — от афиш до медалей со шрифтом Брайля.</li><li><a href="/work/unaffected/">Стритвир-бренд Unaffected</a> — Единственный дизайнер бренда: от карточек товаров и баннеров до логики личного кабинета и программы лояльности.</li><li><a href="/work/moya-privivka/">Моя прививка</a> — Сервис, который помогает родителям детей до двух лет не потеряться в графике прививок.</li><li><a href="/work/pobeda/">Фестиваль «Победа»</a> — Всероссийский фестиваль инновационных видов спорта: фиджитал, гонки дронов, спортивное программирование.</li></ul>
+    <h2>Контакты</h2><ul><li>Почта: <a href="mailto:pavel.nemchenko@outlook.com">pavel.nemchenko@outlook.com</a></li><li>Telegram: <a href="https://t.me/passhhik" rel="me">@passhhik</a></li><li><a href="/assets/cv.pdf">Резюме (PDF)</a></li></ul>
+    </div>
+    <!--/seo:body-->
+    <section class="hero" data-screen="hero" aria-labelledby="hero-title" hidden>
+      <h1 id="hero-title" class="visually-hidden" tabindex="-1"><span data-fullname>Павел Немченко</span> — <span data-role>продуктовый дизайнер</span></h1>
+      <p class="visually-hidden" data-about></p>
+      <nav class="folders" data-folders aria-label="Разделы портфолио"></nav>
+      <!-- полароид без мыши: кнопка видна, только когда на неё перешли клавишей Tab -->
+      <button class="pol-a11y" type="button" data-pol-shot data-t="polShot">Сфотографироваться с головой</button>
+    </section>
+
+    <section class="catalog" data-screen="work" hidden aria-labelledby="work-title"></section>
+    <article class="case" data-screen="case" hidden></article>
+    <section class="archive" data-screen="archive" hidden aria-labelledby="archive-title"></section>
+  </main>
+
+  <footer class="site-footer">
+    <span>© <span data-year>2026</span> <span data-name>Павел Немченко</span></span>
+    <a data-email href="#" hidden></a>
+    <a data-cv href="assets/cv.pdf" download data-t="downloadCv">Скачать резюме</a>
+  </footer>
+
+  <div class="veil" data-veil aria-hidden="true" hidden></div>
+
+  <div class="subs" data-subs aria-hidden="true"></div>
+  <p class="visually-hidden" data-subs-sr aria-live="polite"></p>
+
+  <noscript><p class="noscript">Это текстовая версия. Включите JavaScript, чтобы увидеть портфолио целиком и поговорить с головой.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

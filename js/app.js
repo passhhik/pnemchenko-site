@@ -15,6 +15,14 @@ import { fetchModel, fetched, warmLoaders } from './model.js';
 import { latestPhotos, warmRecent, flush as flushPolaroids } from './polaroids.js';
 import { stickerSet, stickerSrc, stickerById } from './stickers.js';
 import { stat } from './stats.js';
+import { go, where, onRoute, tidyUrl, interceptLinks, paths } from './nav.js';
+import { pageMeta, aboutText, who, ORIGIN } from './seo.js';
+
+// www.pnemchenko.ru → pnemchenko.ru: у сайта один адрес, и поисковики не делят его на два одинаковых сайта
+if (/^www\./i.test(location.hostname)) location.replace(location.href.replace('//www.', '//'));
+// Текст страницы для поисковиков и посетителей без JavaScript (js/seo.js) сайту не нужен: он рисует страницу сам
+document.querySelectorAll('[data-seo-static]').forEach((el) => el.remove());
+tidyUrl();                // старые ссылки #/work/… → /work/…
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -42,7 +50,7 @@ export function track(event, props = {}) {
 
 const els = {
   topbar: $('[data-topbar]'), logo: $('[data-logo]'), mark: $('[data-logo-mark]'), nav: $('.topnav'), lang: $('[data-lang]'),
-  sound: $('[data-sound]'), allWork: $('.topnav [href="#/work"]'),
+  sound: $('[data-sound]'), allWork: $('.topnav [data-t="allWork"]'),
   stage: $('#stage'), loader: $('[data-loader]'), ph: $('[data-ph]') || document.createElement('div'),      // заглушки нет в прежней версии страницы (кэш) — тогда работаем без неё
   folders: $('[data-folders]'), burst: $('[data-burst]'), subs: $('[data-subs]'), veil: $('[data-veil]'),
   archBtn: $('[data-arch-btn]'), polShot: $('[data-pol-shot]'),
@@ -99,14 +107,14 @@ function applyContent() {
   applyStyle(site.style);                    // дизайн-токены из админки поверх значений по умолчанию (css/style.css)
   $$('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
   $$('[data-name]').forEach((el) => { el.textContent = name; });
+  $$('[data-fullname]').forEach((el) => { el.textContent = who(site, content.lang).full || name; });     // полное имя — в заголовке главной (для поиска)
   $$('[data-role]').forEach((el) => { el.textContent = role; });
+  $$('[data-about]').forEach((el) => { el.textContent = aboutText(site, content.lang); });            // «о себе» — для экранного диктора и поисковиков
   $$('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   els.logo.setAttribute('aria-label', `${name} — ${t('home')}`);
   els.stage.setAttribute('aria-label', t('stage'));
   els.folders.setAttribute('aria-label', t('sections'));
   els.nav.setAttribute('aria-label', t('menu'));
-  const desc = tx(site.description);
-  if (desc) { const m = $('meta[name="description"]'); if (m) m.content = desc; }
 
   // резюме: нет файла — кнопки скрываем, чтобы посетитель не получил битую ссылку
   const cv = tx(site.cv);
@@ -216,7 +224,7 @@ function buildFolders() {
   els.folders.innerHTML = (content.site.sections || []).map((s) => {
     const ps = sectionProjects(s.id);
     return folderHTML({
-      href: `#/work?cat=${encodeURIComponent(s.id)}`, title: tx(s.label),
+      href: paths.cat(s.id), title: tx(s.label),
       items: peekOf(s.id), stickers: ps.map((p) => p.sticker).filter(Boolean), tint: s.folder,
       cls: 'gf--section', attrs: `data-section="${esc(s.id)}"`, lazy: false,
     });
@@ -562,7 +570,7 @@ function bindFolder(el) {
     // наведения нет: касание показывает работы и через мгновение открывает раздел
     e.preventDefault();
     openFolder(el);
-    setTimeout(() => { location.hash = el.getAttribute('href'); }, 750);
+    setTimeout(() => { go(el.getAttribute('href')); }, 750);
   });
 }
 
@@ -615,16 +623,36 @@ const vibrate = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } 
 if (debug) window.__strip = () => ({ armed: stripArmed, openId, mobile: geo.mobile, view });
 
 // ---------- роутинг ----------
+// Адреса экранов — пути (/work/svoi-dengi/), переходы — без перезагрузки: js/nav.js
 let switchT = 0, sleepT = 0, greeted = false, booted = false;
 function route() {
-  const raw = location.hash.replace(/^#\/?/, '');
-  const [path, qs] = raw.split('?');
-  const parts = path.split('/').filter(Boolean);
-  const params = new URLSearchParams(qs || '');
-  if (parts[0] === 'work' && parts[1]) return show('case', { slug: decodeURIComponent(parts[1]) });
-  if (parts[0] === 'work') return show('work', { cat: params.get('cat') || 'all' });
-  if (parts[0] === 'archive' && content.site && content.site.polaroidOn === true) return show('archive');      // архив выключен в админке — на главную
+  const { parts, params } = where();
+  if (parts[0] === 'work' && parts.length === 2) return show('case', { slug: parts[1] });
+  if (parts[0] === 'work' && parts.length === 1) return show('work', { cat: params.get('cat') || 'all' });
+  if (parts[0] === 'archive' && parts.length === 1 && content.site && content.site.polaroidOn === true) return show('archive');
+  // такого экрана нет (или архив выключен в админке) — на главную
+  if (parts.length && !content.preview) { go(paths.home, { replace: true }); return undefined; }
   return show('hero');
+}
+// Заголовок вкладки, описание, canonical и карточка ссылки — те же, что в файле страницы для поисковиков (js/seo.js)
+const SITE_URL = (() => { try { const l = $('link[rel="canonical"]'); return l ? new URL(l.href).origin : ORIGIN; } catch (_) { return ORIGIN; } })();
+function applyMeta(page) {
+  const m = pageMeta(content.site, content.projects, page, { origin: SITE_URL, lang: content.lang });
+  document.title = m.title;
+  const tag = (sel, make, attr, value) => {
+    let el = document.head.querySelector(sel);
+    if (!value) { if (el) el.remove(); return; }
+    if (!el) { el = make(); document.head.appendChild(el); }
+    el.setAttribute(attr, value);
+  };
+  const meta = (key, name, value) => tag(`meta[${key}="${name}"]`, () => { const e = document.createElement('meta'); e.setAttribute(key, name); return e; }, 'content', value);
+  meta('name', 'description', m.description);
+  meta('name', 'robots', m.robots);
+  tag('link[rel="canonical"]', () => { const e = document.createElement('link'); e.rel = 'canonical'; return e; }, 'href', m.url);
+  meta('property', 'og:url', m.url);
+  meta('property', 'og:title', m.title);
+  meta('property', 'og:description', m.description);
+  if (m.image) meta('property', 'og:image', m.image);
 }
 function show(next, opts = {}) {
   const prev = view;
@@ -654,16 +682,15 @@ function show(next, opts = {}) {
   else if (head) head.sleep(false);
   if (next !== 'case') setTheme(null);
   layout();
-  const name = tx(content.site.name);
   if (next === 'work') {
     catalog.setCategory(opts.cat, true);
     catalog.activate(true, { restore: prev === 'case' || prev === 'work', fresh: prev !== 'work' });      // из кейса и при обновлении предпросмотра — на том же проекте
-    document.title = `${t('work')} — ${name}`;
+    applyMeta({ kind: 'work' });
     if (prev && prev !== 'work') $('#work-title').focus({ preventScroll: true });
     track('view_catalog', { cat: opts.cat });
   } else if (next === 'case') {
     const p = content.projects.find((x) => x.slug === opts.slug);
-    if (!p) { location.replace('#/work'); return; }
+    if (!p) { setTimeout(() => go(paths.work, { replace: true })); return; }      // такого кейса нет (сняли с сайта) — в каталог
     const keep = content.preview && prev === 'case' ? window.scrollY : 0;      // в предпросмотре админки страница не прыгает наверх
     sayQ.list.length = 0; clearTimeout(sayQ.t);
     caseView = renderCase(els.views.case, p, { reduced, say: caseSay });
@@ -674,18 +701,18 @@ function show(next, opts = {}) {
     }
     window.scrollTo(0, keep);
     requestAnimationFrame(() => { if (view === 'case') window.scrollTo(0, keep); });      // на случай, если каталог ещё доезжал плавной прокруткой
-    document.title = `${caseView.title} — ${name}`;
+    applyMeta({ kind: 'case', project: p });
     if (!content.preview) $('h1', els.views.case).focus({ preventScroll: true });
     say('open_project', { force: true });
     track('open_project', { slug: p.slug });
   } else if (next === 'archive') {
     window.scrollTo(0, 0);
-    document.title = `${t('archive')} — ${name}`;
+    applyMeta({ kind: 'archive' });
     openArchive(prev);
     track('view_archive');
   } else {
     window.scrollTo(0, 0);
-    document.title = `${name} — ${tx(content.site.role)}`;
+    applyMeta({ kind: 'home' });
     track('view_home');
     if (prev) {
       if (subs) subs.clear();
@@ -695,11 +722,12 @@ function show(next, opts = {}) {
     }
   }
 }
-window.addEventListener('hashchange', route);
+onRoute(route);
+interceptLinks();
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (POL.state === 'count') polStop();                  // передумали фотографироваться
-  else if (view === 'case') location.hash = '#/work';
+  else if (view === 'case') go(paths.work);
 });
 document.addEventListener('click', (e) => {
   const a = e.target.closest && e.target.closest('a');
@@ -1333,7 +1361,7 @@ async function archMinis(fresh = false, cached = false) {
 }
 window.addEventListener('ph:polaroids', () => archMinis());
 
-// ---------- архив полароидов (#/archive, js/archive.js) ----------
+// ---------- архив полароидов (/archive/, js/archive.js) ----------
 let archiveView = null;
 async function openArchive(prev) {
   try {

@@ -10,6 +10,7 @@ import { setTheme, toneOf, softTextOk, inkOf, buttonLight } from './theme.js';
 import { setTint } from './tint.js';
 import { liked, toggleLike } from './likes.js';
 import { styleValue } from './style.js';
+import { go, paths } from './nav.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Сердечко по умолчанию (своё пришлёт Павел — заменить здесь и в админке ничего не нужно)
@@ -351,7 +352,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
       <h2 class="cat-title">${esc(tx(p.title))}</h2>
       ${tx(p.summary) ? `<p class="cat-sum">${esc(tx(p.summary))}</p>` : ''}
       <div class="cat-acts">
-        <a class="btn cat-open" href="#/work/${encodeURIComponent(p.slug)}" draggable="false">${esc(t('openProject'))}</a>
+        <a class="btn cat-open" href="${esc(paths.case(p.slug))}" draggable="false">${esc(t('openProject'))}</a>
         <button class="btn btn--icon cat-likeb" type="button" data-like aria-pressed="${on}" aria-label="${esc(t('like'))}" title="${esc(t('like'))}">${HEART}</button>
       </div>
     </div>`;
@@ -480,7 +481,7 @@ export function createCatalog(root, { onHover, onLike, onEmpty, reduced = false 
     const card = e.target.closest('.cat-card');
     if (!card || S.dragged) return;
     const i = Number(card.dataset.i);
-    if (i === S.idx && S.p === S.target) location.hash = `#/work/${encodeURIComponent(S.list[i].slug)}`;
+    if (i === S.idx && S.p === S.target) go(paths.case(S.list[i].slug));
     else goTo(i);
   });
   const onLikeClick = (e) => {

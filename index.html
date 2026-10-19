@@ -4,20 +4,31 @@
   <meta charset="utf-8">
   <!-- Защита страницы: скрипты, стили, картинки и запросы — только со своего адреса. Чужой или вставленный в страницу
        скрипт браузер не выполнит. 'unsafe-eval' нужен только затем, чтобы старые Safari разрешили распаковщик 3D-модели (WebAssembly). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data: https://functions.yandexcloud.net https://*.apigw.yandexcloud.net; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <!-- все пути в странице — от корня сайта: одна и та же страница открывается и по адресу /work/svoi-dengi/ -->
+  <base href="/">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Павел Немченко — продуктовый дизайнер</title>
-  <meta name="description" content="Портфолио Павла Немченко: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.">
-  <meta name="theme-color" content="#F4F6F6">
-  <!-- карточка ссылки в мессенджерах и соцсетях; адрес картинки должен быть полным — поменяйте домен, если он другой -->
+  <!-- заголовок, описание, canonical, карточка ссылки и разметка для поисковиков — у каждой страницы свои: их пишет
+       js/seo.js (админка при публикации, с компьютера — node tools/prerender.mjs). Вручную между метками не правьте -->
+  <!--seo:head-->
+  <title>Павел Немченко — продуктовый дизайнер, портфолио</title>
+  <meta name="description" content="Павел (Паша) Немченко — продуктовый дизайнер: мобильные приложения и сервисы, айдентика и брендбуки спортивных мероприятий, лендинги. Кейсы для ВТБ, ФЦПСР и Unaffected.">
+  <link rel="canonical" href="https://pnemchenko.ru/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Павел Немченко — продуктовый дизайнер">
-  <meta property="og:description" content="Портфолио: цифровые продукты, маркетинг и коммуникация, айдентика и брендинг.">
+  <meta property="og:site_name" content="Павел Немченко">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:url" content="https://pnemchenko.ru/">
+  <meta property="og:title" content="Павел Немченко — продуктовый дизайнер, портфолио">
+  <meta property="og:description" content="Павел (Паша) Немченко — продуктовый дизайнер: мобильные приложения и сервисы, айдентика и брендбуки спортивных мероприятий, лендинги. Кейсы для ВТБ, ФЦПСР и Unaffected.">
   <meta property="og:image" content="https://pnemchenko.ru/assets/og.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://pnemchenko.ru/#website","url":"https://pnemchenko.ru/","name":"Павел Немченко","alternateName":["Паша Немченко","pnemchenko.ru"],"inLanguage":"ru","publisher":{"@id":"https://pnemchenko.ru/#person"}},{"@type":"Person","@id":"https://pnemchenko.ru/#person","name":"Павел Немченко","alternateName":["Паша Немченко","Pavel Nemchenko"],"url":"https://pnemchenko.ru/","jobTitle":"Продуктовый дизайнер","email":"mailto:pavel.nemchenko@outlook.com","sameAs":["https://t.me/passhhik"],"knowsAbout":["Цифровые продукты","Маркетинг и коммуникация","Айдентика и брендинг"]},{"@type":"ProfilePage","@id":"https://pnemchenko.ru/#profile","url":"https://pnemchenko.ru/","name":"Павел Немченко — продуктовый дизайнер, портфолио","description":"Павел (Паша) Немченко — продуктовый дизайнер: мобильные приложения и сервисы, айдентика и брендбуки спортивных мероприятий, лендинги. Кейсы для ВТБ, ФЦПСР и Unaffected.","inLanguage":"ru","isPartOf":{"@id":"https://pnemchenko.ru/#website"},"mainEntity":{"@id":"https://pnemchenko.ru/#person"}}]}</script>
+  <!--/seo:head-->
+  <meta name="theme-color" content="#F4F6F6">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" href="assets/favicon.png" type="image/png" sizes="96x96">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -36,6 +47,8 @@
   <link rel="modulepreload" href="js/app.js">
   <link rel="modulepreload" href="js/content.js">
   <link rel="modulepreload" href="js/i18n.js">
+  <link rel="modulepreload" href="js/nav.js">
+  <link rel="modulepreload" href="js/seo.js">
   <link rel="modulepreload" href="js/lines.js">
   <link rel="modulepreload" href="js/folders.js">
   <link rel="modulepreload" href="js/theme.js">
@@ -58,21 +71,21 @@
   <link rel="modulepreload" href="js/brain.js">
 </head>
 <body data-view="hero" data-tone="light" class="no-sound no-likes no-pol">
-  <a class="skip-link" href="#/work" data-t="skip">Сразу к работам</a>
+  <a class="skip-link" href="/work/" data-t="skip">Сразу к работам</a>
 
   <!-- фон «в стиле проекта»: два слоя для плавной смены -->
   <div class="bg" data-bg aria-hidden="true"><div class="bg-layer"></div><div class="bg-layer"></div></div>
 
   <!-- логотип — отдельным слоем: на главной он лежит под головой (голова может его перекрывать), внутри сайта — в шапке -->
-  <a class="logo" href="#/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
+  <a class="logo" href="/" data-logo aria-label="На главную"><span class="logo-mark" data-logo-mark></span></a>
 
   <header class="topbar" data-topbar>
     <div class="topbar-side" data-lang></div>
     <nav class="topnav" aria-label="Основное меню">
       <a class="btn btn--line" data-cv href="assets/cv.pdf" download><span class="cv-pre" data-t="download">Скачать</span> CV</a>
-      <a class="btn" href="#/work" data-t="allWork">Все работы</a>
+      <a class="btn" href="/work/" data-t="allWork">Все работы</a>
       <button class="btn btn--line btn--toggle" type="button" data-sound aria-pressed="false"><span data-t="sound">Звук</span></button>
-      <a class="btn btn--light" href="#/" data-home data-t="toHead">К голове</a>
+      <a class="btn btn--light" href="/" data-home data-t="toHead">К голове</a>
     </nav>
   </header>
 
@@ -84,7 +97,7 @@
   <div class="stage" id="stage" role="img" aria-label="Интерактивная 3D-голова. Её можно потянуть мышью или пальцем — она резиновая. Очки снимаются."></div>
 
   <!-- архив полароидов (Figma: кружок справа внизу, на телефоне — слева от кнопок): две свежие карточки, ведёт в архив -->
-  <a class="arch-btn" href="#/archive" data-arch-btn aria-label="Архив полароидов">
+  <a class="arch-btn" href="/archive/" data-arch-btn aria-label="Архив полароидов">
     <span class="arch-disc" aria-hidden="true"></span>
     <span class="arch-mini arch-mini--a" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
     <span class="arch-mini arch-mini--b" aria-hidden="true"><span class="arch-ph"><img alt="" hidden></span></span>
@@ -95,8 +108,20 @@
   <div class="loader" data-loader role="status"><span class="visually-hidden" data-t="loader">Собираю лицо</span></div>
 
   <main id="main">
+    <!-- текст страницы для поисковиков и посетителей без JavaScript (js/seo.js); сайт его убирает и рисует страницу сам -->
+    <!--seo:body-->
+    <div class="seo-static" data-seo-static>
+    <p>Павел (Паша) Немченко — продуктовый дизайнер. Проектирую мобильные приложения и сервисы: от поиска проблемы и сценариев до интерфейса и дизайн-системы. Делаю айдентику, брендбуки и визуальные системы для всероссийских спортивных мероприятий, лендинги и материалы для брендов. Учусь в магистратуре ИТМО «Продуктовый дизайн».</p>
+    <h2>Цифровые продукты</h2><ul><li><a href="/work/svoi-dengi/">Флоу детского банкинга для ВТБ</a> — Не просто контроль трат, а модель финансового взросления</li><li><a href="/work/unaffected/">Стритвир-бренд Unaffected</a> — Единственный дизайнер бренда: от карточек товаров и баннеров до логики личного кабинета и программы лояльности.</li><li><a href="/work/moya-privivka/">Моя прививка</a> — Сервис, который помогает родителям детей до двух лет не потеряться в графике прививок.</li></ul>
+    <h2>Маркетинг и коммуникация</h2><ul><li><a href="/work/pobeda/">Фестиваль «Победа»</a> — Всероссийский фестиваль инновационных видов спорта: фиджитал, гонки дронов, спортивное программирование.</li></ul>
+    <h2>Айдентика и брендинг</h2><ul><li><a href="/work/spartakiada-2027/">Спартакиада инвалидов 2027</a> — Визуальный стиль и брендбук всероссийской летней Спартакиады — от афиш до медалей со шрифтом Брайля.</li><li><a href="/work/pervenstvo-rossii/">Первенства России</a> — Единая визуальная система для 300+ видов спорта: логотип, правила и макеты, которые федерации заполняют сами.</li></ul>
+    <p><a href="/work/">Все работы</a></p>
+    <h2>Контакты</h2><ul><li>Почта: <a href="mailto:pavel.nemchenko@outlook.com">pavel.nemchenko@outlook.com</a></li><li>Telegram: <a href="https://t.me/passhhik" rel="me">@passhhik</a></li><li><a href="/assets/cv.pdf">Резюме (PDF)</a></li></ul>
+    </div>
+    <!--/seo:body-->
     <section class="hero" data-screen="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title" class="visually-hidden" tabindex="-1"><span data-name>Павел Немченко</span> — <span data-role>продуктовый дизайнер</span></h1>
+      <h1 id="hero-title" class="visually-hidden" tabindex="-1"><span data-fullname>Павел Немченко</span> — <span data-role>продуктовый дизайнер</span></h1>
+      <p class="visually-hidden" data-about></p>
       <nav class="folders" data-folders aria-label="Разделы портфолио"></nav>
       <!-- полароид без мыши: кнопка видна, только когда на неё перешли клавишей Tab -->
       <button class="pol-a11y" type="button" data-pol-shot data-t="polShot">Сфотографироваться с головой</button>
@@ -118,7 +143,7 @@
   <div class="subs" data-subs aria-hidden="true"></div>
   <p class="visually-hidden" data-subs-sr aria-live="polite"></p>
 
-  <noscript><p class="noscript">Включите JavaScript, чтобы увидеть портфолио и поговорить с головой.</p></noscript>
+  <noscript><p class="noscript">Это текстовая версия. Включите JavaScript, чтобы увидеть портфолио целиком и поговорить с головой.</p></noscript>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

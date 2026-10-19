@@ -11,6 +11,7 @@ import { DEFAULT_STICKERS, dieCut } from '../js/stickers.js';
 import { polaroidsApi, fetchList, setHidden, removePolaroid, modImage } from '../js/polaroids.js';
 import { markOwner } from '../js/stats.js';
 import { STYLE_GROUPS, STYLE_TOKENS, styleValue } from '../js/style.js';
+import { buildPages, sitemapFor, readSitemap, originOf, isPageFile, pageMeta, caseWords, profilesOf } from '../js/seo.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -508,6 +509,9 @@ function checks(p) {
   add(['task', 'did', 'result'].every((x) => txAny((p.tldr || {})[x]).trim()), 'Задача, решение и результат', 'results');
   const noAlt = allImages(p).filter((x) => !txAny(x.alt).trim()).length;
   add(!noAlt, noAlt ? `Описания картинок: не хватает ${noAlt}` : 'Описания у всех картинок', 'blocks');
+  // поисковикам нужен текст: у кейсов, которые находят, — 400–800 слов
+  const words = caseWords(p, st.lang);
+  add(words >= 300, words >= 300 ? `Текст кейса: ${words} слов` : `Текст кейса: ${words} слов — для поиска нужно от 300`, 'blocks');
   return out;
 }
 function checksHTML(p) {
@@ -594,7 +598,11 @@ const PANES = {
     <div class="grid2">${F('Команда', 'team', { l: 1, ph: '2 дизайнера, 6 разработчиков' })}${F('Срок', 'duration', { l: 1, ph: '4 месяца' })}</div>
     ${IMG('Логотип клиента', 'clientLogo', { small: 1, max: 600, hint: 'Необязательно. В карточке фактов вместо названия клиента — PNG или SVG на прозрачном фоне, светлый на тёмном цвете проекта.' })}
     ${F('Теги', 'tags', { kind: 'list', l: 1, hint: 'Через запятую.' })}
-    ${F('Адрес страницы', 'slug', { kind: 'slug', attrs: 'spellcheck="false"', hint: 'Латиницей. Кейс открывается по адресу …/#/work/адрес. Если поменять его после публикации, старые ссылки перестанут работать.' })}`,
+    ${F('Адрес страницы', 'slug', { kind: 'slug', attrs: 'spellcheck="false"', hint: 'Латиницей. Кейс открывается по адресу …/work/адрес/. Если поменять его после публикации, старые ссылки перестанут работать.' })}
+    ${SEC('В поиске', `
+      ${F('Заголовок в поиске', 'seoTitle', { l: 1, ph: pageMeta(st.site, [], { kind: 'case', project: { ...p, seoTitle: '' } }, { lang: st.lang }).title, hint: 'Синяя строка в выдаче Яндекса и Google. Пусто — «Название — имя». Что ищут: «айдентика спартакиады», «UX-кейс детского банкинга». До 60–70 знаков.' })}
+      ${F('Описание в поиске', 'seoDescription', { l: 1, type: 'area', rows: 3, ph: pageMeta(st.site, [], { kind: 'case', project: { ...p, seoDescription: '' } }, { lang: st.lang }).description, hint: 'Две строки под заголовком: о чём кейс и что вы сделали. 120–170 знаков. Пусто — «Коротко о проекте» и факты.' })}
+      <div data-snippet>${snippetHTML()}</div>`, 'Так кейс выглядит в выдаче. Страница для поисковиков собирается сама при публикации.')}`,
   look: (p) => {
     const c = contrastHTML(p);
     const kind = (p.bg && p.bg.kind) || 'color';
@@ -664,6 +672,18 @@ const PANES = {
       ${st.menu ? `<ul class="add-menu">${Object.entries(BLOCKS).map(([k, d]) => `<li><button type="button" data-act="blk-add" data-type="${k}">${esc(d.name)}<span>${esc(d.hint)}</span></button></li>`).join('')}</ul>` : ''}
     </div>`,
 };
+// Адрес сайта для поиска: свой домен (файл CNAME), иначе pnemchenko.ru
+const siteOrigin = () => originOf(gh.cfg && gh.cfg.host);
+// Как страница выглядит в выдаче поисковика — то же, что соберёт js/seo.js при публикации
+function snippetHTML() {
+  const page = st.idx >= 0 && st.page === 'cases' ? { kind: 'case', project: cur() } : { kind: 'home' };
+  const m = pageMeta(st.site, st.projects, page, { origin: siteOrigin(), lang: st.lang });
+  const long = (n, max) => (n > max ? ` class="is-bad"` : '');
+  const signs = (n) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'знак' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'знака' : 'знаков'}`;
+  return `<div class="snip" aria-label="Так страница выглядит в поиске"><p class="snip-url">${esc(m.url.replace(/^https:\/\//, '').replace(/\/$/, ''))}</p>
+    <p class="snip-t">${esc(m.title)}</p><p class="snip-d">${esc(m.description)}</p></div>
+    <p class="hint">Заголовок — <span${long(m.title.length, 75)}>${signs(m.title.length)}</span>, описание — <span${long(m.description.length, 180)}>${signs(m.description.length)}</span>.${page.kind === 'case' && page.project.published === false ? ' Кейс снят с сайта — в поиск он не попадёт.' : ''}</p>`;
+}
 // Секция страницы: заголовок, пояснение одной-двумя строками и поля
 const SEC = (title, body, hint = '') => `<section class="sec"><h2 class="sec-h">${esc(title)}</h2>${hint ? `<p class="hint sec-hint">${hint}</p>` : ''}${body}</section>`;
 function profilePane() {
@@ -671,8 +691,15 @@ function profilePane() {
   return SEC('Кто вы', `
       <div class="grid2">${F('Имя', 'name', { l: 1 })}${F('Имя в родительном падеже', 'nameGen', { l: 1, hint: 'Для реплики «Привет! Я голова …».' })}</div>
       ${F('Роль', 'role', { l: 1, ph: 'продуктовый дизайнер' })}
-      ${F('Описание для поисковиков', 'description', { l: 1, type: 'area', rows: 2 })}
       ${IMG('Логотип', 'logo', { kind: 'logo', hint: 'SVG или PNG с прозрачным фоном.' })}`)
+    + SEC('Поиск', `
+      ${F('Полное имя', 'fullName', { l: 1, ph: 'Павел Немченко', hint: 'Как вас ищут: в заголовке главной, в заголовках кейсов и в разметке для поисковиков. На самом сайте подпись — «Имя» выше.' })}
+      ${F('Заголовок главной в поиске', 'seoTitle', { l: 1, ph: pageMeta({ ...st.site, seoTitle: '' }, [], { kind: 'home' }, { lang: st.lang }).title, hint: 'Пусто — «полное имя — роль, портфолио». До 60–70 знаков.' })}
+      ${F('Описание для поисковиков', 'description', { l: 1, type: 'area', rows: 3, hint: 'Две строки под заголовком в выдаче: кто вы и что делаете. 120–170 знаков.' })}
+      ${F('О себе', 'about', { l: 1, type: 'area', rows: 4, hint: 'Абзац о вас: его читают поисковики и экранный диктор, на экране его не видно. Пусто — имя, роль и описание.' })}
+      ${F('Профили на других сайтах', 'profiles', { kind: 'list', type: 'area', rows: 2, attrs: 'spellcheck="false"', hint: 'Ссылки через запятую: hh.ru, Behance, LinkedIn, vc.ru, Хабр Карьера… Так поисковики понимают, что профили и сайт — один человек, и сайт выше по запросу с вашим именем. В профилях тоже поставьте ссылку на сайт.' })}
+      <div class="grid2">${F('Код Яндекс Вебмастера', 'verify.yandex', { attrs: 'spellcheck="false"', hint: 'Вебмастер → «Добавить сайт» → «Мета-тег»: только значение content.' })}${F('Код Google Search Console', 'verify.google', { attrs: 'spellcheck="false"', hint: 'Search Console → «Префикс URL» → «Тег HTML»: только значение content.' })}</div>
+      <div data-snippet>${snippetHTML()}</div>`, 'Как сайт выглядит в выдаче. Страницы для поисковиков — главная, каталог, каждый кейс и карта сайта — собираются сами при публикации.')
     + SEC('Контакты и резюме', `
       <div class="grid2">${F('Почта для связи', 'email', { ph: 'hello@example.com', attrs: 'spellcheck="false"' })}${F('Telegram', 'telegram', { ph: '@username', attrs: 'spellcheck="false"' })}</div>
       ${IMG('Резюме, PDF', 'cv', { kind: 'file', l: 1, fixed: st.lang === defLang() ? 'assets/cv.pdf' : `assets/cv-${st.lang}.pdf`, hint: 'Пока файла нет, кнопка CV на сайте скрыта.' })}
@@ -1259,6 +1286,8 @@ function changed(path = '') {
     if (sum) { const el = $(`.blk[data-i="${sum[1]}"] .blk-sum`); if (el) el.textContent = summaryOf(p.blocks[Number(sum[1])]); }
   }
   if (/^(title|section|year|published|sticker|sections)/.test(path)) renderSide();
+  const sn = $('[data-snippet]');
+  if (sn) sn.innerHTML = snippetHTML();          // «Так страница выглядит в поиске» — сразу с правкой
   schedulePreview();
 }
 
@@ -1396,6 +1425,26 @@ async function save() {
 // (отличающиеся от лежащих на сайте). Без папки — содержимое и файлы, добавленные в этом сеансе.
 const clock = () => { const t = new Date(); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
 function pubNote(text) { st.pubNote = text; updateStatus(); }
+// Страницы для поисковиков (js/seo.js): главная, каталог, кейсы, архив, 404 и карта сайта. Собираются из index.html,
+// который лежит в репозитории прямо сейчас (а не на сайте и не в папке: там он может быть старее), и публикуемого
+// содержимого. Кейс удалили или сняли с сайта — его страница уходит из репозитория.
+const textCache = new Map();
+const blobText = async (sha) => { if (!textCache.has(sha)) textCache.set(sha, await gh.readText(sha)); return textCache.get(sha); };
+async function seoFiles(snap) {
+  const tpl = snap.files.get('index.html');
+  if (!tpl) return [];
+  let pages;
+  try { pages = buildPages({ template: await blobText(tpl), site: st.site, projects: st.projects, origin: siteOrigin() }); } catch (e) { console.warn('Страницы для поиска не собраны', e); return []; }
+  const enc = new TextEncoder(), out = [];
+  for (const p of pages) { const bytes = enc.encode(p.text); out.push({ path: p.path, bytes, sha: await gitSha(bytes) }); }
+  const was = snap.files.get('sitemap.xml');
+  const prev = readSitemap(was ? await blobText(was) : '');
+  const changedPage = (path) => { const f = out.find((x) => x.path === path); return !f || snap.files.get(path) !== f.sha; };
+  out.push({ path: 'sitemap.xml', bytes: enc.encode(sitemapFor(pages, prev, changedPage)) });
+  const keep = new Set(out.map((f) => f.path));
+  for (const path of snap.files.keys()) if (isPageFile(path) && !keep.has(path)) out.push({ path, delete: true });
+  return out;
+}
 async function publish() {
   if (st.busy || !gh.on || !st.site) return;
   st.busy = true;
@@ -1421,6 +1470,7 @@ async function publish() {
     const snapWas = snapshot();
     const res = await gh.commit(files, {
       message: 'Админка: правки содержимого',
+      derive: seoFiles,
       onProgress: (n, all) => pubNote(`Отправляю на сайт: ${n} из ${all}`),
       // на сайте не та версия, от которой мы шли (правили с другого компьютера?) — без спроса не затираем
       check: (snap) => {
@@ -1443,10 +1493,10 @@ async function publish() {
     pubNote('Отправлено. Сайт обновляется…');
     toast('Отправлено. Правки появятся на сайте через минуту-две');
     // по каким файлам потом узнаем, что правки дошли до сайта: содержимое, а если менялись только картинки — самая лёгкая из них
-    const sent = files.filter((f) => res.changed.includes(f.path) && f.sha);
+    const sent = (res.files || []).filter((f) => !f.delete && f.sha && f.bytes);
     const json = sent.filter((f) => f.path === SITE_JSON || f.path === PROJ_JSON);
     const probes = (json.length ? json : sent.sort((a, b) => a.bytes.length - b.bytes.length).slice(0, 1)).map((f) => ({ path: f.path, sha: f.sha }));
-    watchDeploy(res.sha, probes);
+    watchDeploy(res.sha, probes, (res.files || []).map((f) => pageUrl(f.path)).filter(Boolean));
   } catch (e) {
     console.error(e);
     pubNote('');
@@ -1456,6 +1506,23 @@ async function publish() {
     st.busy = false;
     renderSide();
     updateStatus();
+  }
+}
+// IndexNow: сообщить Яндексу (и через него Bing), какие страницы изменились, — робот придёт за ними в ближайшие часы,
+// а не когда сам дойдёт. Поисковик проверяет, что сообщение от владельца сайта, по файлу <ключ>.txt в корне сайта.
+// Ключ не секретный: он и так лежит на сайте. Сменить — новый файл с новым ключом и строчка ниже.
+const INDEXNOW_KEY = '54a5175d81a155876331af96026963f7';
+// файл страницы → её адрес (404.html и архив в поиск не идут)
+function pageUrl(path) {
+  const o = siteOrigin();
+  if (path === 'index.html') return `${o}/`;
+  if (path === 'work/index.html') return `${o}/work/`;
+  const m = /^work\/([^/]+)\/index\.html$/.exec(path);
+  return m ? `${o}/work/${m[1]}/` : '';
+}
+function pingSearch(urls) {
+  for (const u of urls.slice(0, 30)) {
+    fetch(`https://yandex.com/indexnow?url=${encodeURIComponent(u)}&key=${INDEXNOW_KEY}`, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }).catch(() => { /* не дошло — робот придёт по карте сайта */ });
   }
 }
 // Дошли ли правки до сайта. Админка открыта на самом сайте — спрашиваем его: там должен лежать ровно тот файл, который мы отправили.
@@ -1479,11 +1546,12 @@ async function liveHas(probes, alive, { timeout = 300000, every = 6000 } = {}) {
   return false;
 }
 // ждём, пока правки появятся на сайте; работать в админке это не мешает
-async function watchDeploy(sha, probes = []) {
+async function watchDeploy(sha, probes = [], pages = []) {
   const live = !isLocal() && probes.length > 0;
   const state = live
     ? ((await liveHas(probes, () => st.pubSha === sha)) ? 'done' : 'late')
     : await gh.deployed(sha).catch(() => 'unknown');
+  if (state === 'done' && live) pingSearch(pages);          // правки уже на сайте — зовём робота Яндекса
   if (st.pubSha !== sha) return;                 // за это время опубликовали что-то новее — отчитается та публикация
   if (state === 'done') { st.pubAt = `Опубликовано в ${clock()}`; pubNote(''); toast('Опубликовано: правки уже на сайте'); }
   else if (state === 'failed') { st.pubAt = ''; pubNote('GitHub не собрал сайт'); toast('GitHub не смог собрать сайт. Причина видна в репозитории на вкладке Actions'); }
