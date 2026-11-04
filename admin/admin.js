@@ -43,6 +43,28 @@ const BLOCKS = {
   video: { name: 'Видео', hint: 'Запись интерфейса или ролик', make: () => ({ type: 'video', src: '', poster: '', loop: true, caption: '' }) },
   palette: { name: 'Палитра', hint: 'Цвета проекта', make: () => ({ type: 'palette', title: '', colors: [{ hex: '#000000', name: '' }] }) },
   say: { name: 'Реплика головы', hint: 'Точка между блоками: докрутили до неё — голова говорит', make: () => ({ type: 'say', say: '' }) },
+  // главы из «Кейс — главы» (Figma; js/chapters.js) — первым ими собран кейс «Свои деньги».
+  // Тексты правятся здесь; экраны, слои и анимация телефонов — данные из Figma (их переносит Claude)
+  chapter: { name: 'Глава', hint: 'Заголовок 56 и вводный абзац', make: () => ({ type: 'chapter', title: '', lead: '' }) },
+  showreel: { name: 'Шоурил', hint: 'Видео 16:9 со своим плеером', make: () => ({ type: 'showreel', src: '', poster: '', duration: '' }) },
+  ribbon: { name: 'Лента главного', hint: 'Карточки с экранами листаются вбок', make: () => ({ type: 'ribbon', items: [] }) },
+  tldr: { name: 'Суть', hint: 'Задача, что сделал, итог — три колонки', make: () => ({ type: 'tldr', items: [{ title: 'Задача', text: '' }, { title: 'Что сделал', text: '' }, { title: 'Итог', text: '' }] }) },
+  duo: { name: 'Карточки-доводы', hint: 'Значок, заголовок, текст; можно карточку поверх ряда', make: () => ({ type: 'duo', items: [{ title: '', text: '' }, { title: '', text: '' }] }) },
+  voices: { name: 'Голоса', hint: 'Аватар и «хочу» каждого участника', make: () => ({ type: 'voices', items: [] }) },
+  ladder: { name: 'Лесенка', hint: 'Ступени растут слева направо', make: () => ({ type: 'ladder', items: [] }) },
+  flows: { name: 'Схема', hint: 'Колонки с шагами через «↓»', make: () => ({ type: 'flows', items: [] }) },
+  phoneSteps: { name: 'Шаги в телефоне', hint: 'Телефон прилипает, шаги листаются', make: () => ({ type: 'phoneSteps', items: [] }) },
+  stage: { name: 'Телефон на сцене', hint: 'Телефон и предметы вокруг', make: () => ({ type: 'stage', objects: [] }) },
+  marquee: { name: 'Стена карт', hint: 'Два ряда картинок едут навстречу', make: () => ({ type: 'marquee', rows: [[], []] }) },
+  grid: { name: 'Сетка плиток', hint: 'Картинки в заданной пропорции', make: () => ({ type: 'grid', columns: 2, ratio: '593 / 334', items: [] }) },
+  callouts: { name: 'Экран с выносками', hint: 'Телефон и подписи слева и справа', make: () => ({ type: 'callouts', left: [], right: [] }) },
+  scenario: { name: 'Сценарий', hint: 'Ряд экранов с подписями или развилка «или»', make: () => ({ type: 'scenario', items: [] }) },
+  feature: { name: 'Текст, пилюли и телефон', hint: 'Пилюли подсвечивают места на экране', make: () => ({ type: 'feature', title: '', lead: '', pills: [] }) },
+  plate: { name: 'Картинка на карточке', hint: 'Белая подложка, картинка по центру', make: () => ({ type: 'plate', src: '', alt: '' }) },
+  stickers: { name: 'Наклейки', hint: 'Квадраты с подписью, всплывают волной', make: () => ({ type: 'stickers', items: [] }) },
+  bento: { name: 'Бенто', hint: 'Плитки в два ряда: иконка, палитра, шрифты', make: () => ({ type: 'bento', rows: [[], []] }) },
+  words: { name: 'Метрики словом', hint: 'Пилюля, крупное слово, подпись', make: () => ({ type: 'words', items: [{ k: '', v: '', l: '' }], note: '' }) },
+  finale: { name: 'Финал на цвете', hint: 'Надпись, подзаголовок, кнопки', make: () => ({ type: 'finale', titleAlt: '', lead: '', buttons: [] }) },
 };
 // Банк идей (админка → «Настройки» → «Заметки для себя»): концепции, которые ещё не собраны. key — выключатель, когда идея готова
 const IDEAS = [];      // полароид собран — у него свой раздел настроек («Полароид»)
@@ -440,6 +462,17 @@ function PAIRS(path, kind) {
     <div class="f">${full ? '<span class="hint">В ряд помещается четыре цифры.</span>' : `<button class="btn btn--line btn--sm" type="button" data-act="item-add" data-path="${path}" data-make="${kind}">${word[1]}</button>`}</div>`;
 }
 const SAY = (P) => F('Реплика головы', `${P}.say`, { l: 1, hint: 'Необязательно. Голова скажет её, когда блок доедет до середины экрана.' });
+// главы: отступ сверху из макета и тексты у пунктов списка (картинки и экраны — из Figma)
+const GAP = (P) => F('Отступ сверху', `${P}.gap`, { type: 'select', kind: 'opt', options: [['', 'Как обычно — 120'], ['0', '0'], ['20', '20'], ['40', '40'], ['60', '60'], ['80', '80'], ['100', '100'], ['120', '120'], ['160', '160']], hint: 'Как в макете. На телефоне сайт сам делает отступы меньше.' });
+const NOTE_FIG = '<p class="hint">Экраны, картинки и анимация телефонов приходят из Figma — их переносит Claude. Здесь — тексты.</p>';
+function TXTS(path, fields, what = 'пункт') {
+  const items = val(path) || [];
+  if (!items.length) return '<p class="hint">Пунктов пока нет.</p>';
+  return `<ol class="pairs">${items.map((it, i) => `<li><span class="cells col">${fields.map(([k, ph, area]) => (area
+    ? `<textarea class="inp" rows="2" data-path="${path}.${i}.${k}" data-l="1" placeholder="${esc(ph)}" aria-label="${esc(ph)} ${i + 1}">${esc(getL(it[k]))}</textarea>`
+    : `<input type="text" class="inp" data-path="${path}.${i}.${k}" data-l="1" value="${esc(getL(it[k]))}" placeholder="${esc(ph)}" aria-label="${esc(ph)} ${i + 1}">`)).join('')}</span>${tools(path, i, items.length, what)}</li>`).join('')}</ol>`;
+}
+const LEAD = (P) => F('Вводный абзац', `${P}.lead`, { l: 1, type: 'area', rows: 4, hint: 'Перенос строки — как в макете: на компьютере держится, на телефоне текст переносится сам.' });
 const WIDTH = (P) => F('Ширина', `${P}.width`, { type: 'select', options: [['text', 'В колонку текста'], ['wide', 'Широкая'], ['full', 'Во всю ширину экрана']] });
 
 const BF = {
@@ -465,6 +498,32 @@ const BF = {
   video: (b, P) => IMG('Видео', `${P}.src`, { kind: 'video', hint: 'MP4 или WebM. Короткая запись — до 15 МБ.' }) + IMG('Заставка до запуска', `${P}.poster`)
     + CHECK('Короткая запись: крутить по кругу без звука', `${P}.loop`) + F('Что в ролике', `${P}.alt`, { l: 1 }) + F('Подпись', `${P}.caption`, { l: 1 }) + WIDTH(P) + SAY(P),
   palette: (b, P) => F('Заголовок', `${P}.title`, { l: 1 }) + PAIRS(`${P}.colors`, 'color') + SAY(P),
+  chapter: (b, P) => F('Заголовок', `${P}.title`, { l: 1, type: 'area', rows: 2 }) + LEAD(P)
+    + F('Выравнивание', `${P}.align`, { type: 'select', kind: 'opt', options: [['', 'По центру'], ['left', 'Слева']] }) + GAP(P) + SAY(P),
+  showreel: (b, P) => IMG('Видео', `${P}.src`, { kind: 'video', hint: 'MP4 (H.264). Шоурил до 15 МБ.' }) + IMG('Заставка до запуска', `${P}.poster`)
+    + F('Длительность', `${P}.duration`, { ph: '1:04', hint: 'Видна справа от полосы перемотки до запуска.' }) + F('Что в ролике', `${P}.alt`, { l: 1 })
+    + F('Кнопки', `${P}.tone`, { type: 'select', kind: 'opt', options: [['light', 'Тёмные — на светлой заставке'], ['dark', 'Светлые — на тёмной заставке']] }) + GAP(P) + SAY(P),
+  ribbon: (b, P) => NOTE_FIG + TXTS(`${P}.items`, [['caption', 'Подпись карточки', 1], ['alt', 'Что на экране']], 'карточку') + GAP(P) + SAY(P),
+  tldr: (b, P) => TXTS(`${P}.items`, [['title', 'Заголовок'], ['text', 'Текст', 1]], 'колонку') + GAP(P) + SAY(P),
+  duo: (b, P) => TXTS(`${P}.items`, [['title', 'Заголовок'], ['text', 'Текст', 1]], 'карточку')
+    + (b.accent ? `<p class="hint">Карточка поверх ряда</p>${F('Заголовок', `${P}.accent.title`, { l: 1 })}${F('Текст', `${P}.accent.text`, { l: 1, type: 'area', rows: 3 })}${COLOR('Цвет карточки', `${P}.accent.bg`)}` : '') + GAP(P) + SAY(P),
+  voices: (b, P) => TXTS(`${P}.items`, [['quote', 'Цитата', 1], ['who', 'Кто это (для незрячих)']], 'голос') + GAP(P) + SAY(P),
+  ladder: (b, P) => NOTE_FIG + TXTS(`${P}.items`, [['title', 'Название ступени'], ['text', 'Текст', 1]], 'ступень') + GAP(P) + SAY(P),
+  flows: (b, P) => TXTS(`${P}.items`, [['title', 'Название колонки']], 'колонку') + '<p class="hint">Шаги колонки — в содержимом (steps). Скажите Claude, если нужно поправить.</p>' + GAP(P) + SAY(P),
+  phoneSteps: (b, P) => NOTE_FIG + TXTS(`${P}.items`, [['title', 'Шаг'], ['text', 'Что происходит на шаге', 1]], 'шаг') + GAP(P) + SAY(P),
+  stage: (b, P) => NOTE_FIG + F('Что на экране', `${P}.alt`, { l: 1 }) + GAP(P) + SAY(P),
+  marquee: (b, P) => NOTE_FIG + F('Что это за картинки (для незрячих)', `${P}.label`, { l: 1 }) + GAP(P) + SAY(P),
+  grid: (b, P) => IMGLIST(`${P}.items`, { dims: 1 }) + F('Подпись под сеткой', `${P}.caption`, { l: 1 }) + GAP(P) + SAY(P),
+  callouts: (b, P) => NOTE_FIG + '<p class="hint">Слева</p>' + TXTS(`${P}.left`, [['title', 'Заголовок'], ['text', 'Текст', 1]], 'выноску')
+    + '<p class="hint">Справа</p>' + TXTS(`${P}.right`, [['title', 'Заголовок'], ['text', 'Текст', 1]], 'выноску') + GAP(P) + SAY(P),
+  scenario: (b, P) => NOTE_FIG + TXTS(`${P}.items`, [['caption', 'Подпись-пилюля'], ['alt', 'Что на экране']], 'экран') + (b.or !== undefined ? F('Между исходами', `${P}.or`, { l: 1 }) : '') + GAP(P) + SAY(P),
+  feature: (b, P) => F('Заголовок', `${P}.title`, { l: 1, type: 'area', rows: 2 }) + LEAD(P) + TXTS(`${P}.pills`, [['label', 'Пилюля']], 'пилюлю') + GAP(P) + SAY(P),
+  plate: (b, P) => IMG('Картинка', `${P}.src`, { dims: 1 }) + F('Что на картинке', `${P}.alt`, { l: 1 }) + COLOR('Цвет подложки', `${P}.bg`, { optional: 1 }) + GAP(P) + SAY(P),
+  stickers: (b, P) => TXTS(`${P}.items`, [['caption', 'Подпись'], ['alt', 'Что на картинке']], 'наклейку') + GAP(P) + SAY(P),
+  bento: (b, P) => NOTE_FIG + (b.rows || []).map((r, ri) => TXTS(`${P}.rows.${ri}`, [['title', 'Заголовок плитки', 1]], 'плитку')).join('') + GAP(P) + SAY(P),
+  words: (b, P) => TXTS(`${P}.items`, [['k', 'Пилюля'], ['v', 'Слово или цифра'], ['l', 'Подпись', 1]], 'метрику') + F('Подпись под метриками', `${P}.note`, { l: 1 }) + GAP(P) + SAY(P),
+  finale: (b, P) => F('Надпись (для незрячих и поиска)', `${P}.titleAlt`, { l: 1 }) + F('Подзаголовок', `${P}.lead`, { l: 1 })
+    + (b.buttons || []).map((x, i) => `<div class="grid2">${F(`Кнопка ${i + 1}`, `${P}.buttons.${i}.label`, { l: 1 })}${F('Ссылка', `${P}.buttons.${i}.url`, { ph: 'https://…' })}</div>`).join('') + COLOR('Цвет карточки', `${P}.bg`) + GAP(P) + SAY(P),
 };
 function summaryOf(b) {
   const cut = (s) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > 46 ? `${s.slice(0, 46)}…` : s; };
@@ -481,6 +540,13 @@ function summaryOf(b) {
     case 'compare': return cut(txAny(b.title) || txAny(b.caption));
     case 'video': return cut(txAny(b.caption) || fileName(b.src) || 'файл не выбран');
     case 'palette': return cut(txAny(b.title)) || n(b.colors, 'цвет', 'цвета', 'цветов');
+    case 'chapter': case 'feature': return cut(txAny(b.title) || txAny(b.lead));
+    case 'showreel': return cut(fileName(b.src) || 'файл не выбран');
+    case 'ribbon': case 'scenario': case 'phoneSteps': case 'stickers': case 'voices': case 'ladder': case 'flows': case 'duo': case 'tldr': case 'words':
+      return cut((b.items || []).map((x) => txAny(x.caption || x.title || x.quote || x.v || '')).filter(Boolean).join(' · ')) || n(b.items, 'пункт', 'пункта', 'пунктов');
+    case 'callouts': return cut([...(b.left || []), ...(b.right || [])].map((x) => txAny(x.title)).join(' · '));
+    case 'finale': return cut(txAny(b.titleAlt) || txAny(b.lead));
+    case 'plate': case 'grid': case 'marquee': case 'stage': case 'bento': return cut(txAny(b.alt || b.label || b.caption) || BLOCKS[b.type].hint);
     default: return '';
   }
 }

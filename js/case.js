@@ -7,6 +7,8 @@ import { folderHTML } from './folders.js';
 import { setTheme, themeOf, toneOf, softTextOk, inkOf } from './theme.js';
 import { heroOf } from './catalog.js';
 import { paths } from './seo.js';
+import { CHAPTERS, initChapters, setColorSpace, p3 } from './chapters.js';
+import { initPhones, initCycles, phoneApi } from './phone.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : '');
@@ -150,16 +152,37 @@ const BLOCKS = {
     }).join('')}</ul></section>`;
   },
 };
-export const BLOCK_TYPES = Object.keys(BLOCKS);
+// главы из «Кейс — главы» (js/chapters.js) — те же блоки, что и выше, только новее
+const ALL = { ...BLOCKS, ...CHAPTERS };
+export const BLOCK_TYPES = Object.keys(ALL);
+// отступ перед блоком из макета: 0…160 с шагом 20 (по умолчанию — 120 между главами, на телефоне меньше)
+const GAPS = [0, 20, 40, 60, 80, 100, 120, 160];
+const gapOf = (b) => { const g = Math.round(Number(b.gap)); return Number.isFinite(g) && b.gap !== '' && b.gap != null ? GAPS.reduce((a, c) => (Math.abs(c - g) < Math.abs(a - g) ? c : a), 120) : null; };
 
 function blockHTML(b, ctx, i) {
-  const fn = b && BLOCKS[b.type];
+  const fn = b && ALL[b.type];
   if (!fn) return '';
   const html = fn(b, ctx);
   if (!html) return '';
-  const say = tx(b.say);
-  // на первом теге блока — его номер (для предпросмотра в админке), реплика головы и метка «всплыть при прокрутке»
-  return html.replace(/^<(\w+) class="/, `<$1 data-b="${i}" ${say ? `data-say="${esc(say)}" ` : ''}class="rv `);
+  const say = tx(b.say), gap = gapOf(b);
+  // на первом теге блока — его номер (для предпросмотра в админке), реплика головы, отступ и метка «всплыть при прокрутке»
+  return html.replace(/^<(\w+) class="/, `<$1 data-b="${i}" ${say ? `data-say="${esc(say)}" ` : ''}${gap !== null ? `data-gap="${gap}" ` : ''}class="rv `);
+}
+// Полоса на цвете (глава «Своя карта»): соседние блоки с одним цветом band — на общем фоне во всю ширину экрана
+function blocksHTML(list, ctx) {
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    const band = color(b && b.band);
+    if (!band) { out.push(blockHTML(b, ctx, i)); continue; }
+    const inner = [];
+    let j = i;
+    for (; j < list.length && color(list[j] && list[j].band) === band; j++) inner.push(blockHTML(list[j], ctx, j));
+    const gap = gapOf(b);
+    out.push(`<div class="blk band" data-tone="${toneOf(band) === 'dark' ? 'dark' : 'light'}"${gap !== null ? ` data-gap="${gap}"` : ''} style="--band:${p3(band)}"><div class="band-in">${inner.filter(Boolean).join('')}</div></div>`);
+    i = j - 1;
+  }
+  return out.filter(Boolean).join('');
 }
 
 const telegramUrl = (v) => {
@@ -181,6 +204,7 @@ function coverVisual(p) {
 
 // say(text) — голова произносит реплику к блоку, когда он доехал до середины экрана
 export function renderCase(root, p, { reduced = false, say = null } = {}) {
+  setColorSpace(p.colorSpace);
   const list = content.projects;
   const next = list.length > 1 ? list[(list.indexOf(p) + 1) % list.length] : null;
   const title = tx(p.title);
@@ -193,22 +217,24 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
     .filter(([, v, img]) => v || img).slice(0, 4);
   const results = (p.metrics || []).filter((m) => m && (tx(m.v) || tx(m.l))).slice(0, 4);
   const tl = p.tldr || {};
-  const tldr = [['task', tx(tl.task)], ['did', tx(tl.did)], ['result', tx(tl.result)]].filter(([, v]) => v);
+  // «Суть» стоит блоком в нужном месте (как в кейсе «Свои деньги») — тогда наверху её не повторяем
+  const tldr = (p.blocks || []).some((b) => b && b.type === 'tldr') ? [] : [['task', tx(tl.task)], ['did', tx(tl.did)], ['result', tx(tl.result)]].filter(([, v]) => v);
   const tags = (p.tags || []).map(tx).filter(Boolean);
-  const blocks = (p.blocks || []).map((b, i) => blockHTML(b, { reduced }, i)).filter(Boolean).join('');
+  const blocks = blocksHTML(p.blocks || [], { reduced });
   const mail = String(site.email || '').trim(), tg = telegramUrl(site.telegram), cv = tx(site.cv);
   const logo = srcOf(p.logo), vis = coverVisual(p);
   const lead = tx(p.tagline) || tx(p.summary);
   // подписи фактов — на 70%, но не бледнее 4,5:1 на цвете проекта (иначе целиком)
-  const cardVars = cc ? `--cc:${esc(cc)};--cf:${ctone === 'dark' ? 'var(--ink-dark)' : 'var(--ink)'}${softTextOk(inkOf(ctone), cc) ? '' : ';--cfo:1'}` : '';
+  const cardVars = cc ? `--cc:${esc(p3(cc))};--cf:${ctone === 'dark' ? 'var(--ink-dark)' : 'var(--ink)'}${softTextOk(inkOf(ctone), cc) ? '' : ';--cfo:1'}` : '';
   const cardStyle = cardVars ? ` style="${cardVars}"` : '';
 
+  const peek = p.coverStyle === 'peek';
   root.innerHTML = `
-    <header class="case-top">
-      <div class="cover-card rv"${cardStyle}>
+    <header class="case-top${peek ? ' is-peek' : ''}">
+      <div class="cover-card rv${peek ? ' cover--peek' : ''}"${cardStyle}>
         <div class="cover-text">
           <h1 class="cover-title" tabindex="-1">${logo ? `<img class="cover-logo" src="${esc(logo)}" alt="${esc(title)}" decoding="async" fetchpriority="high">` : esc(title)}</h1>
-          ${lead ? `<p class="cover-lead">${esc(lead)}</p>` : ''}
+          ${lead && !peek ? `<p class="cover-lead">${esc(lead)}</p>` : ''}
         </div>
         ${vis ? `<div class="cover-visual">${vis.video
     ? `<video src="${esc(vis.src)}" muted playsinline autoplay${vis.poster ? ` poster="${esc(vis.poster)}"` : ''} aria-hidden="true"></video>`
@@ -245,6 +271,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
 
   // фон страницы — светлый лист; цвет проекта — только у обложки и фактов. Полоса браузера — тоже светлая
   setTheme(null);
+  root.classList.toggle('is-p3', p.colorSpace === 'p3');
 
   const bar = document.querySelector('[data-topbar]');
   let raf = 0;
@@ -258,6 +285,15 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll);
   sync();
+
+  // --u — один пиксель макета 1440 при текущей ширине кейса (главы из js/chapters.js растут и сжимаются пропорционально)
+  const caseIn = root.querySelector('.case-in');
+  const setU = () => { if (caseIn) root.style.setProperty('--u', `${(caseIn.clientWidth / 1206).toFixed(4)}px`); };
+  setU();
+  window.addEventListener('resize', setU);
+  const offPhones = initPhones(root, { reduced });
+  const offCycles = initCycles(root, { reduced });
+  const offChapters = initChapters(root, { reduced, phoneApi });
 
   // «до/после»
   root.querySelectorAll('.cmp').forEach((c) => {
@@ -298,6 +334,8 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
     destroy() {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
+      window.removeEventListener('resize', setU);
+      offPhones(); offCycles(); offChapters();
       cancelAnimationFrame(raf);
       ios.forEach((o) => o.disconnect());
       root.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch (_) { /* noop */ } });

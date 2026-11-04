@@ -15,7 +15,7 @@
    "cover": "assets/cases/svoi-dengi/cover.webp",
    "thumb": "assets/cases/svoi-dengi/thumb.webp",
    "sticker": "assets/cases/svoi-dengi/sticker.webp",
-   "logo": "assets/cases/svoi-dengi/logo.webp",
+   "logo": "assets/cases/svoi-dengi/v2/logo-cover.svg",
    "card": {
     "image": "assets/cases/svoi-dengi/card.webp",
     "over": "assets/cases/svoi-dengi/card-over.webp"
@@ -24,8 +24,8 @@
     "color": "#5C7EFF"
    },
    "published": true,
-   "clientLogo": "assets/cases/svoi-dengi/client-vtb.webp",
-   "caseVisual": "assets/cases/svoi-dengi/pig.webp",
+   "clientLogo": "assets/cases/svoi-dengi/v2/vtb.svg",
+   "caseVisual": "assets/cases/svoi-dengi/v2/cover-pig.webp",
    "glow": "#F4F6F6",
    "hero": {
     "image": "assets/cases/svoi-dengi/hero.webp",
@@ -53,137 +53,1906 @@
    ],
    "blocks": [
     {
-     "type": "text",
-     "title": "Проблема: «Родитель выбирает из двух плохих вариантов»",
-     "text": "Контролировать каждую трату или учить деньгам «понарошку», в играх. В обоих случаях к 14 годам ребёнок не умеет обращаться с настоящими деньгами."
+     "type": "showreel",
+     "gap": 60,
+     "src": "assets/cases/svoi-dengi/v2/showreel.mp4",
+     "poster": "assets/cases/svoi-dengi/v2/showreel-poster.webp",
+     "alt": "Шоурил «Своих денег»: маскот, экраны и карты приложения",
+     "tone": "light",
+     "duration": "1:04"
     },
     {
-     "type": "gallery",
-     "shape": "square",
+     "type": "chapter",
+     "gap": 80,
+     "title": "Главное за 30 секунд",
+     "lead": ""
+    },
+    {
+     "type": "ribbon",
+     "gap": 60,
+     "label": "Главное за 30 секунд",
+     "items": [
+      {
+       "caption": "Деньги настоящие, а границы задаёт родитель",
+       "alt": "Онбординг родителя: сколько доверить с первого дня",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r3-level.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/scr-r3-level.webp",
+         "dur": 5.85,
+         "focus": [
+          {
+           "x": 20,
+           "y": 275,
+           "w": 355,
+           "h": 103,
+           "r": 16,
+           "at": 0.49,
+           "d": 1.95
+          },
+          {
+           "x": 20,
+           "y": 747,
+           "w": 353,
+           "h": 53,
+           "r": 16,
+           "at": 2.93,
+           "d": 0.98
+          }
+         ],
+         "tap": [
+          {
+           "x": 196,
+           "y": 773,
+           "at": 3.42
+          }
+         ]
+        }
+       }
+      },
+      {
+       "caption": "Мама отказала — не тупик, просто повод начать копить",
+       "alt": "Экран «Не сейчас»: мама отказала и предлагает копить",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-refuse.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-refuse-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "pause",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pause.webp",
+           "x": 160,
+           "y": 124,
+           "w": 72,
+           "h": 72,
+           "in": "burst",
+           "at": 0.49,
+           "idle": "pulse"
+          },
+          {
+           "name": "mom",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-mom.webp",
+           "x": 20,
+           "y": 281,
+           "w": 353,
+           "h": 141,
+           "in": "up",
+           "at": 0.98
+          },
+          {
+           "name": "save",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-save.webp",
+           "x": 20,
+           "y": 466,
+           "w": 353,
+           "h": 174,
+           "in": "pop",
+           "at": 1.46
+          },
+          {
+           "name": "pig",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pig.webp",
+           "x": 159,
+           "y": 444,
+           "w": 234,
+           "h": 196,
+           "in": "burst",
+           "at": 1.95,
+           "idle": "bob"
+          }
+         ],
+         "tap": [
+          {
+           "x": 196,
+           "y": 694,
+           "at": 3.9
+          }
+         ]
+        }
+       }
+      },
+      {
+       "caption": "Урок — прямо в момент \nпервой покупки",
+       "alt": "Урок про кэшбэк открывается после первой покупки",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u1-hook.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-hook-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "t1",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t1.webp",
+           "x": 32.2,
+           "y": 147.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -12.0,
+            -12.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t2",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t2.webp",
+           "x": 28.2,
+           "y": 143.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -8.0,
+            -8.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t3",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t3.webp",
+           "x": 24.2,
+           "y": 139.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -4.0,
+            -4.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t4",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t4.webp",
+           "x": 20.2,
+           "y": 135.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "pop",
+           "at": 0.49,
+           "d": 0.55
+          },
+          {
+           "name": "choco",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-choco.webp",
+           "x": 0,
+           "y": 432.0,
+           "w": 153.8,
+           "h": 197.6,
+           "in": "left",
+           "at": 0.98,
+           "idle": "float"
+          },
+          {
+           "name": "arrows",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-arrows.webp",
+           "x": 172,
+           "y": 462,
+           "w": 48,
+           "h": 104,
+           "in": "fade",
+           "at": 1.46,
+           "idle": "pulse"
+          },
+          {
+           "name": "c1",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c1.webp",
+           "x": 265,
+           "y": 427,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 1.95,
+           "idle": "bob"
+          },
+          {
+           "name": "c2",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c2.webp",
+           "x": 325,
+           "y": 455,
+           "w": 68,
+           "h": 75,
+           "in": "drop",
+           "at": 2.072,
+           "idle": "bob"
+          },
+          {
+           "name": "c3",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c3.webp",
+           "x": 240,
+           "y": 488,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.194,
+           "idle": "bob"
+          },
+          {
+           "name": "c4",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c4.webp",
+           "x": 313,
+           "y": 517,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.316,
+           "idle": "bob"
+          },
+          {
+           "name": "c5",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c5.webp",
+           "x": 260,
+           "y": 547,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.438,
+           "idle": "bob"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "caption": "Маскот тут ассистент, \nа не главный герой",
+       "alt": "Свин-банкир — маскот приложения",
+       "cycle": [
+        "assets/cases/svoi-dengi/v2/pig-support.webp",
+        "assets/cases/svoi-dengi/v2/pig-joy.webp",
+        "assets/cases/svoi-dengi/v2/pig-touched.webp",
+        "assets/cases/svoi-dengi/v2/pig-cool.webp",
+        "assets/cases/svoi-dengi/v2/pig-rich.webp",
+        "assets/cases/svoi-dengi/v2/pig-calc.webp",
+        "assets/cases/svoi-dengi/v2/pig-puzzled.webp",
+        "assets/cases/svoi-dengi/v2/pig-lost.webp",
+        "assets/cases/svoi-dengi/v2/pig-hurt.webp"
+       ],
+       "every": 1500
+      },
+      {
+       "caption": "Карту ребёнок выбирает сам",
+       "alt": "Ребёнок выбирает дизайн своей карты",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-choose-card.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-choose-base.webp",
+         "dur": 7.8,
+         "layers": [
+          {
+           "name": "strip",
+           "src": "assets/cases/svoi-dengi/v2/sc-choose-strip.webp",
+           "x": -312,
+           "y": 167,
+           "w": 1015.7,
+           "h": 202
+          },
+          {
+           "name": "dots",
+           "src": "assets/cases/svoi-dengi/v2/sc-choose-dots.webp",
+           "x": 166,
+           "y": 401,
+           "w": 60,
+           "h": 8
+          }
+         ],
+         "strip": {
+          "layer": "strip",
+          "steps": [
+           {
+            "to": -345.3,
+            "at": 0.98,
+            "d": 0.7
+           },
+           {
+            "to": 0,
+            "at": 2.44,
+            "d": 0.7
+           },
+           {
+            "to": 345.3,
+            "at": 3.9,
+            "d": 0.7
+           },
+           {
+            "to": 0,
+            "at": 5.37,
+            "d": 0.7
+           }
+          ]
+         },
+         "tap": [
+          {
+           "x": 196,
+           "y": 770,
+           "at": 6.83
+          }
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "tldr",
+     "gap": 60,
+     "items": [
+      {
+       "title": "Задача",
+       "text": "ВТБ хочет растить клиентов с детства. А рынок даёт родителю два так себе варианта: контролировать каждую трату или учить деньгам понарошку"
+      },
+      {
+       "title": "Что сделал",
+       "text": "Придумал модель взросления: ребёнок тратит настоящие деньги в рамках уровня доверия. Уровень растёт от поведения, а в 14 — свой счёт"
+      },
+      {
+       "title": "Итог",
+       "text": "Концепт за 2 недели: пять сценариев, около 30 экранов, маскот, карты и метрики. Дальше — тест с семьями"
+      }
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 120,
+     "title": "Две модели — и обе мимо",
+     "lead": "Разобрал шесть продуктов — от Greenlight и GoHenry \nдо Сбера и Т-Банка. Одни дают родителю контроль, \nдругие учат ребёнка понарошку. А к 14 годам ребёнок \nвсё равно не умеет обращаться с настоящими деньгами"
+    },
+    {
+     "type": "duo",
+     "gap": 40,
+     "items": [
+      {
+       "icon": "assets/cases/svoi-dengi/v2/logos-control.webp",
+       "iconAlt": "ВТБ, Т-Банк, Альфа-Банк",
+       "title": "Контроль",
+       "text": "Ребёнку дают карту, привязанную к родителю. Родитель режет траты лимитами и видит каждую операцию"
+      },
+      {
+       "icon": "assets/cases/svoi-dengi/v2/logos-sim.webp",
+       "iconAlt": "СберКидс, Greenlight",
+       "title": "Симуляция",
+       "text": "Ребёнок учится понарошку: викторины, игры, виртуальные монетки. Обучение вроде есть, но с настоящими тратами никак не связано"
+      }
+     ],
+     "accent": {
+      "icon": "assets/cases/svoi-dengi/v2/logo-small.svg",
+      "iconAlt": "Свои деньги",
+      "bg": "#daff6d",
+      "title": "Взросление",
+      "text": "Ребёнок сам распоряжается своими деньгами в рамках уровня доверия, а родитель повышает уровень, когда ребёнок учится."
+     }
+    },
+    {
+     "type": "text",
+     "gap": 60,
+     "align": "center",
+     "title": "У каждого за столом своё «хочу»",
+     "text": "И решение должно устроить сразу троих"
+    },
+    {
+     "type": "voices",
+     "gap": 30,
+     "items": [
+      {
+       "avatar": "assets/cases/svoi-dengi/v2/avatar-mom.webp",
+       "who": "Родитель",
+       "quote": "Хочу, чтобы ребёнок учился сам, но в безопасных границах"
+      },
+      {
+       "avatar": "assets/cases/svoi-dengi/v2/avatar-kid.webp",
+       "who": "Ребёнок",
+       "quote": "Хочу, чтобы это были мои деньги и мои решения"
+      },
+      {
+       "avatar": "assets/cases/svoi-dengi/v2/avatar-vtb.webp",
+       "who": "Банк ВТБ",
+       "quote": "Хочу больше клиентов с нулевой стоимостью привлечения"
+      }
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 100,
+     "title": "Родитель управляет доверием, а не запретами",
+     "lead": "Ребёнок тратит настоящие деньги в рамках своего уровня. \nУровень не выдают по возрасту — его зарабатывают поведением: четыре недели подряд траты не больше поступлений. \nА в 14 лет — выпускной и свой счёт в ВТБ"
+    },
+    {
+     "type": "ladder",
+     "gap": 60,
+     "items": [
+      {
+       "title": "Учусь тратить",
+       "text": "Сам покупает до 500 ₽ и копит на цели. Родитель видит все операции",
+       "image": "assets/cases/svoi-dengi/v2/pig-joy.webp",
+       "alt": "",
+       "bg": "#daff6d",
+       "h": 400,
+       "dark": false,
+       "solid": false
+      },
+      {
+       "title": "Планирую сам",
+       "text": "Покупки до 3 000 ₽. Родитель видит итоги недели",
+       "image": "assets/cases/svoi-dengi/v2/pig-calc.webp",
+       "alt": "",
+       "bg": "#5c7eff",
+       "h": 480,
+       "dark": true,
+       "solid": false
+      },
+      {
+       "title": "Почти взрослый",
+       "text": "Почти всё сам. Родитель видит только тревожные сигналы",
+       "image": "assets/cases/svoi-dengi/v2/pig-cool.webp",
+       "alt": "",
+       "bg": "#002987",
+       "h": 560,
+       "dark": true,
+       "solid": false
+      },
+      {
+       "title": "Выпускной",
+       "text": "В 14 лет свой счёт в ВТБ: копилки и история переезжают с ним",
+       "image": "assets/cases/svoi-dengi/v2/pig-rich.webp",
+       "alt": "",
+       "bg": "#1d1d1f",
+       "h": 640,
+       "dark": true,
+       "solid": true
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "gap": 120,
+     "align": "center",
+     "title": "Уровень можно заработать и потерять — но не навсегда",
+     "text": "Повышения ребёнок просит сам, а родитель решает по чек-листу. Накосячил серьёзно — уровень снижается, но план возврата появляется сразу"
+    },
+    {
+     "type": "flows",
+     "gap": 40,
+     "items": [
+      {
+       "title": "Вверх",
+       "color": "#2dbe60",
+       "steps": [
+        "Четыре недели подряд траты не больше поступлений — викторинами не наработать",
+        "Заявка: приложение само собирает резюме достижений",
+        "Родитель решает по чек-листу: права до и после",
+        "Ритуал нового уровня и новые права"
+       ]
+      },
+      {
+       "title": "Вниз",
+       "color": "#ff3b30",
+       "steps": [
+        "Красный инцидент: перевод чужому после предупреждения, обход лимита",
+        "Понижение на один уровень — причина обязательна, ребёнок её видит",
+        "План возврата сразу: те же условия, 14 дней вместо 30",
+        "Заявка — и уровень возвращается"
+       ]
+      },
+      {
+       "title": "Не наказываем",
+       "color": "#ffc400",
+       "steps": [
+        "Жёлтый инцидент: потратил копилку, вышел за план — тема для разговора",
+        "Пожалел о покупке — не инцидент, а повод для урока",
+        "Право на ошибку — основа модели"
+       ]
+      }
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 120,
+     "title": "Пять шагов — и карта уже работает",
+     "lead": "Всё начинается в приложении ВТБ у родителя, в разделе «Дети». Возраст сам настраивает права и интерфейс, карманные приходят сами, а цифровая карта выпускается сразу"
+    },
+    {
+     "type": "phoneSteps",
+     "gap": 60,
+     "items": [
+      {
+       "title": "Расскажите о ребёнке",
+       "text": "Имя и дата рождения — по возрасту настроятся права и интерфейс",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r2-child.webp"
+       }
+      },
+      {
+       "title": "Сколько доверить с первого дня",
+       "text": "Три уровня. По умолчанию — «Учусь тратить»: до 500 ₽, родитель видит все операции",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r3-level.webp"
+       }
+      },
+      {
+       "title": "Карманные — без напоминаний",
+       "text": "Сумма и день перевода, а сдача с покупок округляется в копилку",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r4-pocket.webp"
+       }
+      },
+      {
+       "title": "Карта уже работает",
+       "text": "Цифровая карта выпускается сразу, пластик — по желанию. Дизайн ребёнок выберет сам",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r5-card.webp"
+       }
+      },
+      {
+       "title": "Приглашение ребёнку",
+       "text": "Ребёнок получает своё приложение и знает, какие операции видите вы",
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-r6-invite.webp"
+       }
+      }
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 120,
+     "title": "Первое, что делает ребёнок — выбирает свою карту",
+     "lead": "Приложение ребёнка — его территория: права написаны открытым текстом, а первое, что он делает, — выбирает дизайн карты. Коллекции — про то, чем дети реально живут: снэки, животные, игровые валюты, Hello Kitty, стритвир",
+     "tone": "dark",
+     "band": "#002987"
+    },
+    {
+     "type": "stage",
+     "gap": 60,
+     "band": "#002987",
+     "phone": {
+      "src": "assets/cases/svoi-dengi/v2/scr-choose-card.webp",
+      "scene": {
+       "base": "assets/cases/svoi-dengi/v2/sc-choose-base.webp",
+       "dur": 7.8,
+       "layers": [
+        {
+         "name": "strip",
+         "src": "assets/cases/svoi-dengi/v2/sc-choose-strip.webp",
+         "x": -312,
+         "y": 167,
+         "w": 1015.7,
+         "h": 202
+        },
+        {
+         "name": "dots",
+         "src": "assets/cases/svoi-dengi/v2/sc-choose-dots.webp",
+         "x": 166,
+         "y": 401,
+         "w": 60,
+         "h": 8
+        }
+       ],
+       "strip": {
+        "layer": "strip",
+        "steps": [
+         {
+          "to": -345.3,
+          "at": 0.98,
+          "d": 0.7
+         },
+         {
+          "to": 0,
+          "at": 2.44,
+          "d": 0.7
+         },
+         {
+          "to": 345.3,
+          "at": 3.9,
+          "d": 0.7
+         },
+         {
+          "to": 0,
+          "at": 5.37,
+          "d": 0.7
+         }
+        ]
+       },
+       "tap": [
+        {
+         "x": 196,
+         "y": 770,
+         "at": 6.83
+        }
+       ]
+      }
+     },
+     "alt": "Выбор карты в приложении ребёнка",
+     "objects": [
+      {
+       "src": "assets/cases/svoi-dengi/v2/float-pack.webp",
+       "x": -545,
+       "y": -168,
+       "w": 471.3,
+       "depth": 1.4,
+       "front": false,
+       "m": {
+        "x": -120,
+        "y": -95,
+        "w": 190
+       }
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/float-gem.webp",
+       "x": -480,
+       "y": 537,
+       "w": 240.5,
+       "depth": 0.8,
+       "front": false,
+       "m": {
+        "x": -120,
+        "y": 520,
+        "w": 130
+       }
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/float-coin.webp",
+       "x": 567,
+       "y": -69,
+       "w": 260.9,
+       "depth": 1.1,
+       "front": false,
+       "m": {
+        "x": 300,
+        "y": -70,
+        "w": 140
+       }
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/float-pig.webp",
+       "x": 362,
+       "y": 206,
+       "w": 647,
+       "depth": 1.8,
+       "front": true,
+       "m": {
+        "x": 230,
+        "y": 600,
+        "w": 240
+       }
+      }
+     ]
+    },
+    {
+     "type": "marquee",
+     "gap": 60,
+     "band": "#002987",
+     "speed": 70,
+     "label": "Коллекции дизайнов детских карт",
+     "rows": [
+      [
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a01.webp",
+        "alt": "Карта «Анимал»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a02.webp",
+        "alt": "Карта «Халоу китти»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a03.webp",
+        "alt": "Карта «Лав снэк»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a04.webp",
+        "alt": "Карта «Джуниор стайл»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a05.webp",
+        "alt": "Карта «Оммаж на Charli XCX»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a06.webp",
+        "alt": "Карта «Фуглеры»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a07.webp",
+        "alt": "Карта «Гейм валюта»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a08.webp",
+        "alt": "Карта «Анималс»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a09.webp",
+        "alt": "Карта «Халоу китти»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a10.webp",
+        "alt": "Карта «Лав снэк»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-a11.webp",
+        "alt": "Карта «Джуниор стайл»"
+       }
+      ],
+      [
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b12.webp",
+        "alt": "Карта «Оммаж на Charli XCX»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b13.webp",
+        "alt": "Карта «Фуглеры»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b14.webp",
+        "alt": "Карта «Гейм валюта»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b15.webp",
+        "alt": "Карта «Анималс»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b16.webp",
+        "alt": "Карта «Халоу китти»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b17.webp",
+        "alt": "Карта «Лав снэк»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b18.webp",
+        "alt": "Карта «Джуниор стайл»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b19.webp",
+        "alt": "Карта «Оммаж на Charli XCX»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b20.webp",
+        "alt": "Карта «Фуглеры»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b21.webp",
+        "alt": "Карта «Гейм валюта»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b22.webp",
+        "alt": "Карта «image 43»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b23.webp",
+        "alt": "Карта «image 44»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b24.webp",
+        "alt": "Карта «image 49»"
+       },
+       {
+        "src": "assets/cases/svoi-dengi/v2/card-b25.webp",
+        "alt": "Карта «image 50»"
+       }
+      ]
+     ]
+    },
+    {
+     "type": "say",
+     "band": "#002987",
+     "say": "Карту с дошиком я бы и сам завёл"
+    },
+    {
+     "type": "grid",
+     "gap": 60,
+     "band": "#002987",
      "columns": 2,
+     "ratio": "593 / 334",
      "items": [
       {
-       "ph": "1 модель рынка с логотипами"
+       "src": "assets/cases/svoi-dengi/v2/collab-1.webp",
+       "alt": "Карты-монстры в костюмах банкиров"
       },
       {
-       "ph": "2 модель рынка с логотипами"
+       "src": "assets/cases/svoi-dengi/v2/collab-2.webp",
+       "alt": "Карта с Hello Kitty в кондитерской"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/collab-3.webp",
+       "alt": "Скейтер с картой «Свэг»"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/collab-4.webp",
+       "alt": "Карты со снэками в пакете"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/collab-5.webp",
+       "alt": "Карта «Кэш» в рюкзаке"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/collab-6.webp",
+       "alt": "Три карты на диско-шаре"
       }
      ]
     },
     {
-     "type": "idea",
-     "title": "Идея: «Родитель управляет доверием, а не запретами»",
-     "text": "Ребёнок сам тратит реальные деньги в рамках уровня доверия. Уровень зарабатывается поведением, а не выдаётся по возрасту. В 14 лет он переходит на собственный счёт.",
-     "items": []
+     "type": "chapter",
+     "gap": 120,
+     "title": "Сделано для 6–9. Растёт до 14",
+     "lead": "Одна главная на годы: с возрастом маскот уходит на второй план, данных становится больше, а яркая палитра плавно переходит в спокойный синий ВТБ"
     },
     {
-     "type": "split",
-     "title": "Решение: «Отказ — это маршрут, а не тупик»",
-     "text": "Если мама отклонила покупку, ребёнок видит «Не сейчас», её причину и предложение начать копить.",
-     "src": "",
-     "alt": "",
-     "side": "left",
-     "shape": "phone"
+     "type": "callouts",
+     "gap": 60,
+     "phone": {
+      "src": "assets/cases/svoi-dengi/v2/scr-home.webp",
+      "scene": {
+       "base": "assets/cases/svoi-dengi/v2/sc-home-base.webp",
+       "h": 1287,
+       "layers": [
+        {
+         "name": "pig",
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pig.webp",
+         "x": 164.2,
+         "y": 154,
+         "w": 228.8,
+         "h": 222,
+         "idle": "bob"
+        },
+        {
+         "name": "coin1",
+         "src": "assets/cases/svoi-dengi/v2/sc-home-coin1.webp",
+         "x": 260,
+         "y": 909,
+         "w": 106.2,
+         "h": 128.2,
+         "idle": "float"
+        },
+        {
+         "name": "coin2",
+         "src": "assets/cases/svoi-dengi/v2/sc-home-coin2.webp",
+         "x": 163,
+         "y": 931,
+         "w": 128.2,
+         "h": 143.2,
+         "idle": "bob"
+        }
+       ],
+       "fixed": [
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-status.webp",
+         "at": "top",
+         "h": 48
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-nav.webp",
+         "at": "bottom",
+         "h": 263.5
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-grabber.webp",
+         "at": "bottom",
+         "h": 30
+        }
+       ],
+       "scroll": [
+        {
+         "to": 435,
+         "at": 1.95,
+         "d": 2.0
+        },
+        {
+         "to": 0,
+         "at": 6.35,
+         "d": 1.8
+        }
+       ],
+       "dur": 9.76
+      }
+     },
+     "alt": "Главная ребёнка 6–9 лет",
+     "left": [
+      {
+       "title": "Маскот — ассистент, а не герой",
+       "text": "Свинья подсказывает и радуется, но главное на экране всё-таки деньги ребёнка"
+      },
+      {
+       "title": "Одно действие — несколько входов",
+       "text": "Попросить, скинуть, цели, история — с главной в одно касание"
+      }
+     ],
+     "right": [
+      {
+       "title": "Монетки вместо графиков",
+       "text": "В 6–9 лет число понятнее прогноза, поэтому копилка просто растёт монетками"
+      },
+      {
+       "title": "Яркий сейчас, \nсиний ВТБ потом",
+       "text": "С возрастом палитра спокойнее — такой мостик к взрослому банку"
+      }
+     ]
     },
     {
-     "type": "split",
-     "title": "Решение: «Родитель решает на данных, а не вслепую»",
-     "text": "С запросом приходит контекст: баланс, прогресс цели, траты в категории. Действий два: разрешить или отклонить с причиной.",
-     "src": "",
-     "alt": "",
-     "side": "right",
-     "shape": "phone"
+     "type": "chapter",
+     "gap": 120,
+     "title": "Тимур хочет наушники за 1 490 ₽",
+     "lead": "Покупка больше лимита не блокируется молча: ребёнок пишет, зачем ему это, и запрос улетает маме"
+    },
+    {
+     "type": "scenario",
+     "gap": 60,
+     "items": [
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-d3-over.webp",
+        "pos": "top"
+       },
+       "caption": "Больше лимита",
+       "alt": "Оплата больше лимита: приложение предлагает спросить маму"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-d3-over.webp",
+        "pos": "bottom",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-d3-base.webp",
+         "h": 1203,
+         "dur": 7.8,
+         "fixed": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-d3-top.webp",
+           "at": "top",
+           "h": 103
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-d3-buttons.webp",
+           "at": "bottom",
+           "h": 204
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-d3-grabber.webp",
+           "at": "bottom",
+           "h": 30
+          }
+         ],
+         "scroll": [
+          {
+           "to": 351,
+           "at": 0.98,
+           "d": 1.9
+          },
+          {
+           "to": 0,
+           "at": 6.35,
+           "d": 1.4
+          }
+         ],
+         "focus": [
+          {
+           "x": 40,
+           "y": 703,
+           "w": 313,
+           "h": 256,
+           "r": 16,
+           "at": 3.42,
+           "d": 1.95
+          }
+         ]
+        }
+       },
+       "caption": "Зачем это тебе",
+       "alt": "Ребёнок пишет, зачем ему покупка"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-send.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-send-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "lines",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-lines.webp",
+           "x": 0,
+           "y": 174,
+           "w": 393,
+           "h": 325.5,
+           "in": "fade",
+           "at": 0.05,
+           "idle": "drift"
+          },
+          {
+           "name": "t1",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-t1.webp",
+           "x": 27.9,
+           "y": 205.8,
+           "w": 340.4,
+           "h": 230.4,
+           "in": "spread",
+           "from": [
+            -7.9,
+            -7.8
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t2",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-t2.webp",
+           "x": 25.2,
+           "y": 203.2,
+           "w": 340.4,
+           "h": 230.4,
+           "in": "spread",
+           "from": [
+            -5.2,
+            -5.2
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t3",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-t3.webp",
+           "x": 22.6,
+           "y": 200.6,
+           "w": 340.4,
+           "h": 230.4,
+           "in": "spread",
+           "from": [
+            -2.6,
+            -2.6
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t4",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-t4.webp",
+           "x": 20,
+           "y": 198,
+           "w": 340.4,
+           "h": 230.4,
+           "in": "pop",
+           "at": 0.49,
+           "d": 0.55
+          },
+          {
+           "name": "pig",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-pig.webp",
+           "x": 0,
+           "y": 299.5,
+           "w": 256.1,
+           "h": 229.9,
+           "in": "burst",
+           "at": 0.98,
+           "idle": "run"
+          },
+          {
+           "name": "buy",
+           "src": "assets/cases/svoi-dengi/v2/sc-send-buy.webp",
+           "x": 22,
+           "y": 600,
+           "w": 353,
+           "h": 78,
+           "in": "up",
+           "at": 1.46
+          }
+         ]
+        }
+       },
+       "caption": "Запрос ушёл маме",
+       "alt": "Экран «Отправляем маме»"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-wait.webp"
+       },
+       "caption": "Ждём ответ",
+       "alt": "Экран ожидания ответа мамы"
+      }
+     ]
+    },
+    {
+     "type": "feature",
+     "gap": 60,
+     "title": "Родитель решает на данных, а не вслепую",
+     "lead": "Вместе с запросом приходит контекст: зачем ребёнку покупка, сколько у него денег, как идёт копилка и сколько он уже тратил на такое. Действий всего два: разрешить или отклонить с причиной",
+     "pills": [
+      {
+       "label": "Обоснование от ребёнка"
+      },
+      {
+       "label": "Текущий баланс"
+      },
+      {
+       "label": "Статус накоплений"
+      },
+      {
+       "label": "Траты в категории"
+      }
+     ],
+     "phone": {
+      "src": "assets/cases/svoi-dengi/v2/scr-parent.webp",
+      "scene": {
+       "base": "assets/cases/svoi-dengi/v2/sc-parent-base.webp",
+       "h": 1030,
+       "dur": 9.76,
+       "fixed": [
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-parent-top.webp",
+         "at": "top",
+         "h": 103
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-parent-buttons.webp",
+         "at": "bottom",
+         "h": 190
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-parent-grabber.webp",
+         "at": "bottom",
+         "h": 30
+        }
+       ],
+       "scroll": [
+        {
+         "to": 178,
+         "at": 0.49,
+         "d": 1.4
+        },
+        {
+         "to": 0,
+         "at": 9.27,
+         "d": 0.45
+        }
+       ],
+       "focus": [
+        {
+         "x": 16,
+         "y": 390,
+         "w": 361,
+         "h": 120,
+         "r": 16,
+         "at": 1.95,
+         "d": 1.46
+        },
+        {
+         "x": 20,
+         "y": 613,
+         "w": 353,
+         "h": 46,
+         "r": 12,
+         "at": 3.9,
+         "d": 1.46
+        },
+        {
+         "x": 20,
+         "y": 683,
+         "w": 353,
+         "h": 46,
+         "r": 12,
+         "at": 5.85,
+         "d": 1.46
+        },
+        {
+         "x": 20,
+         "y": 753,
+         "w": 353,
+         "h": 46,
+         "r": 12,
+         "at": 7.8,
+         "d": 1.0
+        }
+       ]
+      }
+     },
+     "alt": "Запрос Тимура в приложении родителя"
     },
     {
      "type": "text",
-     "title": "Решение: «Урок приходит в момент настоящей траты»",
-     "text": "Первая версия объясняла кэшбэк арифметикой и требовала трёх мыслительных шагов. Переделал на шоколадку: одна мысль на экран.",
-     "align": "center"
+     "gap": 120,
+     "align": "center",
+     "title": "Отказ — это маршрут, а не тупик",
+     "text": "Если мама отказала, ребёнок видит причину и сразу получает предложение начать копить на ту же вещь"
     },
     {
-     "type": "gallery",
-     "shape": "phone",
-     "columns": 2,
+     "type": "scenario",
+     "gap": 40,
+     "or": "или",
      "items": [
       {
-       "ph": ""
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-allowed.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-allowed-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "check",
+           "src": "assets/cases/svoi-dengi/v2/sc-allowed-check.webp",
+           "x": 160.5,
+           "y": 127,
+           "w": 72,
+           "h": 72,
+           "in": "burst",
+           "at": 0.49
+          },
+          {
+           "name": "buy",
+           "src": "assets/cases/svoi-dengi/v2/sc-allowed-buy.webp",
+           "x": 20,
+           "y": 284,
+           "w": 353,
+           "h": 110,
+           "in": "up",
+           "at": 0.98
+          },
+          {
+           "name": "lesson",
+           "src": "assets/cases/svoi-dengi/v2/sc-allowed-lesson.webp",
+           "x": 18.6,
+           "y": 428,
+           "w": 374.4,
+           "h": 288,
+           "in": "pop",
+           "at": 1.46
+          },
+          {
+           "name": "pig",
+           "src": "assets/cases/svoi-dengi/v2/sc-allowed-pig.webp",
+           "x": 146.3,
+           "y": 428,
+           "w": 246.7,
+           "h": 210,
+           "in": "burst",
+           "at": 1.95,
+           "idle": "bob"
+          }
+         ],
+         "tap": [
+          {
+           "x": 196,
+           "y": 770,
+           "at": 3.9
+          }
+         ]
+        }
+       },
+       "caption": "Одобрение покупки",
+       "alt": "Мама разрешила — и сразу урок про кэшбэк"
       },
       {
-       "ph": ""
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-refuse.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-refuse-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "pause",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pause.webp",
+           "x": 160,
+           "y": 124,
+           "w": 72,
+           "h": 72,
+           "in": "burst",
+           "at": 0.49,
+           "idle": "pulse"
+          },
+          {
+           "name": "mom",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-mom.webp",
+           "x": 20,
+           "y": 281,
+           "w": 353,
+           "h": 141,
+           "in": "up",
+           "at": 0.98
+          },
+          {
+           "name": "save",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-save.webp",
+           "x": 20,
+           "y": 466,
+           "w": 353,
+           "h": 174,
+           "in": "pop",
+           "at": 1.46
+          },
+          {
+           "name": "pig",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pig.webp",
+           "x": 159,
+           "y": 444,
+           "w": 234,
+           "h": 196,
+           "in": "burst",
+           "at": 1.95,
+           "idle": "bob"
+          }
+         ],
+         "tap": [
+          {
+           "x": 196,
+           "y": 694,
+           "at": 3.9
+          }
+         ]
+        }
+       },
+       "caption": "Отклонение покупки",
+       "alt": "Не сейчас — и предложение копить"
+      }
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 120,
+     "title": "Урок приходит вместе с настоящей покупкой",
+     "lead": "Это не симулятор: урок открывается, когда ребёнок сам заплатил картой. Угадать, сколько вернётся, — не экзамен, ошибиться не страшно. А куда деть кэшбэк, он решает сам, без мамы"
+    },
+    {
+     "type": "scenario",
+     "gap": 60,
+     "items": [
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u1-hook.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/sc-hook-base.webp",
+         "dur": 5.85,
+         "layers": [
+          {
+           "name": "t1",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t1.webp",
+           "x": 32.2,
+           "y": 147.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -12.0,
+            -12.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t2",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t2.webp",
+           "x": 28.2,
+           "y": 143.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -8.0,
+            -8.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t3",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t3.webp",
+           "x": 24.2,
+           "y": 139.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "spread",
+           "from": [
+            -4.0,
+            -4.0
+           ],
+           "at": 0.74,
+           "d": 0.2
+          },
+          {
+           "name": "t4",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-t4.webp",
+           "x": 20.2,
+           "y": 135.8,
+           "w": 347.1,
+           "h": 166.0,
+           "in": "pop",
+           "at": 0.49,
+           "d": 0.55
+          },
+          {
+           "name": "choco",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-choco.webp",
+           "x": 0,
+           "y": 432.0,
+           "w": 153.8,
+           "h": 197.6,
+           "in": "left",
+           "at": 0.98,
+           "idle": "float"
+          },
+          {
+           "name": "arrows",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-arrows.webp",
+           "x": 172,
+           "y": 462,
+           "w": 48,
+           "h": 104,
+           "in": "fade",
+           "at": 1.46,
+           "idle": "pulse"
+          },
+          {
+           "name": "c1",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c1.webp",
+           "x": 265,
+           "y": 427,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 1.95,
+           "idle": "bob"
+          },
+          {
+           "name": "c2",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c2.webp",
+           "x": 325,
+           "y": 455,
+           "w": 68,
+           "h": 75,
+           "in": "drop",
+           "at": 2.072,
+           "idle": "bob"
+          },
+          {
+           "name": "c3",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c3.webp",
+           "x": 240,
+           "y": 488,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.194,
+           "idle": "bob"
+          },
+          {
+           "name": "c4",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c4.webp",
+           "x": 313,
+           "y": 517,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.316,
+           "idle": "bob"
+          },
+          {
+           "name": "c5",
+           "src": "assets/cases/svoi-dengi/v2/sc-hook-c5.webp",
+           "x": 260,
+           "y": 547,
+           "w": 73,
+           "h": 75,
+           "in": "drop",
+           "at": 2.438,
+           "idle": "bob"
+          }
+         ]
+        }
+       },
+       "caption": "Старт урока",
+       "alt": "Урок 1: случилось хорошее — кэшбэк"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u2-buy.webp"
+       },
+       "caption": "История трат",
+       "alt": "Экран «Вот твоя покупка»"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u3-guess.webp",
+        "scene": {
+         "base": "assets/cases/svoi-dengi/v2/scr-u3-guess.webp",
+         "dur": 3.9,
+         "focus": [
+          {
+           "x": 22,
+           "y": 319,
+           "w": 346,
+           "h": 60,
+           "r": 16,
+           "at": 0.49,
+           "d": 0.6
+          },
+          {
+           "x": 22,
+           "y": 391,
+           "w": 346,
+           "h": 60,
+           "r": 16,
+           "at": 1.46,
+           "d": 0.6
+          },
+          {
+           "x": 22,
+           "y": 463,
+           "w": 346,
+           "h": 60,
+           "r": 16,
+           "at": 2.44,
+           "d": 0.6
+          }
+         ],
+         "hot": [
+          {
+           "x": 22,
+           "y": 319,
+           "w": 346,
+           "h": 60,
+           "go": "assets/cases/svoi-dengi/v2/scr-u3-miss.webp",
+           "label": "Ответить: 40 ₽"
+          },
+          {
+           "x": 22,
+           "y": 391,
+           "w": 346,
+           "h": 60,
+           "go": "assets/cases/svoi-dengi/v2/scr-u3-ok.webp",
+           "label": "Ответить: 117 ₽"
+          },
+          {
+           "x": 22,
+           "y": 463,
+           "w": 346,
+           "h": 60,
+           "go": "assets/cases/svoi-dengi/v2/scr-u3-miss.webp",
+           "label": "Ответить: 300 ₽"
+          }
+         ]
+        }
+       },
+       "caption": "Предположение о выгоде",
+       "alt": "Угадай, сколько вернётся: можно нажать на ответ"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u3-miss.webp"
+       },
+       "caption": "Неверное предположение",
+       "alt": "Неверный ответ: ошибиться не страшно"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u4-choco.webp"
+       },
+       "caption": "Наглядная демонстрация",
+       "alt": "Кэшбэк на примере шоколадки"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u5-where.webp"
+       },
+       "caption": "Назначение кэшбэка",
+       "alt": "Куда направить кэшбэк — решает ребёнок"
+      },
+      {
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u6-done.webp"
+       },
+       "caption": "Выгода",
+       "alt": "117 ₽ в копилке"
       }
      ]
     },
     {
      "type": "text",
-     "title": "От чего отказался",
-     "text": "",
-     "align": "center"
+     "gap": 120,
+     "align": "center",
+     "title": "Одна мысль на экран",
+     "text": "Первая версия объясняла кэшбэк арифметикой — \nтри мыслительных шага на одном экране. \nВо второй просто шоколадка вместо процентов"
     },
     {
-     "type": "gallery",
-     "shape": "card",
-     "columns": 3,
+     "type": "scenario",
+     "gap": 40,
      "items": [
       {
-       "ph": "",
-       "caption": "Голос и видео в обосновании покупки: это биометрия ребёнка (152-ФЗ) и риск давления на жалость."
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u3-old.webp"
+       },
+       "caption": "Было",
+       "alt": "Первая версия урока: арифметика на одном экране"
       },
       {
-       "ph": "",
-       "caption": "Четыре кнопки у родителя: оставил две, остальное вынес в следующую версию."
-      },
-      {
-       "ph": "",
-       "caption": "Встраивание в приложение родителя: ребёнку нужна своя территория."
+       "phone": {
+        "src": "assets/cases/svoi-dengi/v2/scr-u4-choco.webp"
+       },
+       "caption": "Стало",
+       "alt": "Вторая версия: шоколадка вместо процентов"
       }
      ]
     },
     {
-     "type": "image",
-     "src": "",
-     "ph": "",
-     "alt": "",
-     "width": "wide"
+     "type": "plate",
+     "gap": 120,
+     "src": "assets/cases/svoi-dengi/v2/turnaround.webp",
+     "alt": "Свин-банкир с шести сторон",
+     "imgW": 53,
+     "ratio": "1206 / 626"
     },
     {
-     "type": "metrics",
-     "title": "Метрики: «Как понять, что это работает»",
+     "type": "stickers",
+     "gap": 60,
      "items": [
       {
-       "v": "",
-       "l": "Дети с самостоятельным действием за неделю."
+       "src": "assets/cases/svoi-dengi/v2/pig-joy.webp",
+       "caption": "Радостный",
+       "alt": "Свин-банкир: радостный"
       },
       {
-       "v": "",
-       "l": "Доля семей, повысивших уровень за 90 дней."
+       "src": "assets/cases/svoi-dengi/v2/pig-support.webp",
+       "caption": "Поддерживающий",
+       "alt": "Свин-банкир: поддерживающий"
       },
       {
-       "v": "",
-       "l": "Время в приложении не должно расти."
+       "src": "assets/cases/svoi-dengi/v2/pig-touched.webp",
+       "caption": "Умиляется",
+       "alt": "Свин-банкир: умиляется"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-cool.webp",
+       "caption": "Крутой",
+       "alt": "Свин-банкир: крутой"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-rich.webp",
+       "caption": "Богатый",
+       "alt": "Свин-банкир: богатый"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-calc.webp",
+       "caption": "Расчётливый",
+       "alt": "Свин-банкир: расчётливый"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-puzzled.webp",
+       "caption": "В недоумении",
+       "alt": "Свин-банкир: в недоумении"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-lost.webp",
+       "caption": "Растерянный",
+       "alt": "Свин-банкир: растерянный"
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/pig-hurt.webp",
+       "caption": "Обиделся",
+       "alt": "Свин-банкир: обиделся"
       }
      ]
     },
     {
-     "type": "links",
-     "title": "Границы и следующий шаг",
-     "text": "Концепт не проверялся на пользователях. Профиль 10–13 показан направлением. Следующий шаг: тест прототипа с детьми и родителями.",
+     "type": "bento",
+     "gap": 80,
+     "rows": [
+      [
+       {
+        "span": 1,
+        "bg": "#002987",
+        "dark": true,
+        "title": "Своя иконка у приложения ребёнка",
+        "image": "assets/cases/svoi-dengi/v2/bento-home.webp",
+        "alt": "Иконка «Свои деньги» на экране телефона",
+        "fit": "place",
+        "place": {
+         "x": 75.9,
+         "y": 97.1,
+         "w": 313.1
+        }
+       },
+       {
+        "span": 2,
+        "bg": "#ffffff",
+        "title": "Синий ВТБ остаётся главным, \nлайм и розовый — детская громкость",
+        "palette": [
+         {
+          "name": "Синий ВТБ",
+          "hex": "#5C7EFF",
+          "dark": true
+         },
+         {
+          "name": "Лайм",
+          "hex": "#DAFF6D"
+         },
+         {
+          "name": "Розовый",
+          "hex": "#F64CDF",
+          "dark": true
+         },
+         {
+          "name": "Графит",
+          "hex": "#23252A",
+          "dark": true
+         },
+         {
+          "name": "Белый",
+          "hex": "#FFFFFF",
+          "ring": true
+         }
+        ]
+       }
+      ],
+      [
+       {
+        "span": 1,
+        "bg": "#ffffff",
+        "title": "HeadingNow — для наклеек, Inter — для интерфейса",
+        "image": "assets/cases/svoi-dengi/v2/bento-fonts.webp",
+        "alt": "Надпись шрифтом HeadingNow и строка Inter"
+       },
+       {
+        "span": 1,
+        "bg": "#daff6d",
+        "title": "Монеты вместо графиков и процентов",
+        "objects": [
+         {
+          "src": "assets/cases/svoi-dengi/v2/coin-1.webp",
+          "x": 44,
+          "y": 134,
+          "w": 139.9
+         },
+         {
+          "src": "assets/cases/svoi-dengi/v2/coin-2.webp",
+          "x": -9,
+          "y": 234,
+          "w": 187.5
+         },
+         {
+          "src": "assets/cases/svoi-dengi/v2/coin-3.webp",
+          "x": 143,
+          "y": 257,
+          "w": 256.1
+         },
+         {
+          "src": "assets/cases/svoi-dengi/v2/coin-4.webp",
+          "x": 191,
+          "y": 105,
+          "w": 200
+         }
+        ]
+       },
+       {
+        "span": 1,
+        "bg": "#5c7eff",
+        "dark": true,
+        "title": "Кнопки, чипы, карточки статуса",
+        "image": "assets/cases/svoi-dengi/v2/bento-ui.webp",
+        "alt": "Кнопки, чипы и карточка статуса из UI-кита"
+       }
+      ]
+     ]
+    },
+    {
+     "type": "chapter",
+     "gap": 120,
+     "title": "Время в приложении \nне должно расти",
+     "lead": "Цифр пока нет — концепт не запускали. Поэтому заранее решили, что мерить и какой рост считать вредным"
+    },
+    {
+     "type": "words",
+     "gap": 60,
      "items": [
       {
+       "k": "North Star",
+       "v": "WAU",
+       "l": "Дети, которые сами \nчто-то сделали за неделю"
+      },
+      {
+       "k": "Сигнатурная",
+       "v": "+1 уровень",
+       "l": "Индекс доверия: доля семей, повысивших уровень за 90 дней"
+      },
+      {
+       "k": "Ограничитель",
+       "v": "↓ время",
+       "l": "Время ребёнка в приложении не должно расти: продукт про деньги, а не про экран"
+      }
+     ],
+     "note": "А в 14 лет — переход в клиенты банка без затрат на привлечение: это метрика «выпускного»"
+    },
+    {
+     "type": "say",
+     "say": "Редкий продукт, который хочет, чтобы в нём сидели меньше"
+    },
+    {
+     "type": "chapter",
+     "gap": 100,
+     "title": "Что не вошло — и почему",
+     "lead": ""
+    },
+    {
+     "type": "duo",
+     "gap": 60,
+     "items": [
+      {
+       "mark": "✕",
+       "title": "Голос и видео в обосновании покупки",
+       "text": "Это биометрия ребёнка по 152-ФЗ, плюс риск давить на жалость и манипулировать родителем. Текста «зачем» вполне хватает"
+      },
+      {
+       "mark": "✕",
+       "title": "Встроить ребёнка в приложение родителя",
+       "text": "Ребёнку нужна своя территория: своё приложение, где он знает, что видит мама"
+      },
+      {
+       "mark": "✕",
+       "title": "Четыре кнопки у родителя",
+       "text": "Разрешить, отклонить, обсудить вечером, спросить второго родителя. Оставил две, остальное — в следующую версию"
+      },
+      {
+       "mark": "✕",
+       "title": "Урок с арифметикой",
+       "text": "Три мыслительных шага на экран — многовато. Заменил на шоколадку: одна мысль — один экран"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "gap": 120,
+     "align": "center",
+     "title": "Границы и следующий шаг",
+     "text": "Концепт на пользователях пока не проверяли, а профиль 10–13 показан только направлением. Следующий шаг — тест прототипа с детьми и родителями"
+    },
+    {
+     "type": "finale",
+     "gap": 60,
+     "bg": "#5c7eff",
+     "title": "assets/cases/svoi-dengi/v2/final-title.svg",
+     "titleAlt": "Не ещё один детский банк",
+     "lead": "а модель взросления, которая выращивает клиента",
+     "buttons": [
+      {
+       "img": "assets/cases/svoi-dengi/v2/btn-figma.webp",
        "label": "Figma",
        "url": ""
       },
       {
-       "label": "Прототип",
+       "img": "assets/cases/svoi-dengi/v2/btn-docs.webp",
+       "label": "Доки",
        "url": ""
       }
-     ]
+     ],
+     "visual": "assets/cases/svoi-dengi/v2/final-pig.webp"
     }
    ],
    "tags": [
     "Мобильное приложение",
     "Финтех",
     "Концепт"
-   ]
+   ],
+   "coverStyle": "peek",
+   "tldr": {
+    "task": "ВТБ хочет растить клиентов с детства. А рынок даёт родителю два так себе варианта: контролировать каждую трату или учить деньгам понарошку",
+    "did": "Придумал модель взросления: ребёнок тратит настоящие деньги в рамках уровня доверия. Уровень растёт от поведения, а в 14 — свой счёт",
+    "result": "Концепт за 2 недели: пять сценариев, около 30 экранов, маскот, карты и метрики. Дальше — тест с семьями"
+   },
+   "colorSpace": "p3"
   },
   {
    "slug": "spartakiada-2027",
