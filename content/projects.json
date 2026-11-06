@@ -1973,7 +1973,7 @@
    "theme": {
     "color": "#EF8733"
    },
-   "published": false,
+   "published": true,
    "glow": "#F4F6F6",
    "hero": {
     "image": "assets/cases/spartakiada-2027/hero.webp",
