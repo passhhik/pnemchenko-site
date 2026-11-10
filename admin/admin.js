@@ -746,7 +746,7 @@ function snippetHTML() {
   const m = pageMeta(st.site, st.projects, page, { origin: siteOrigin(), lang: st.lang });
   const long = (n, max) => (n > max ? ` class="is-bad"` : '');
   const signs = (n) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'знак' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'знака' : 'знаков'}`;
-  return `<div class="snip" aria-label="Так страница выглядит в поиске"><p class="snip-url">${esc(m.url.replace(/^https:\/\//, '').replace(/\/$/, ''))}</p>
+  return `<div class="snip" aria-label="Так страница выглядит в поиске"><p class="snip-site">${esc(m.siteName)}</p><p class="snip-url">${esc(m.url.replace(/^https:\/\//, '').replace(/\/$/, ''))}</p>
     <p class="snip-t">${esc(m.title)}</p><p class="snip-d">${esc(m.description)}</p></div>
     <p class="hint">Заголовок — <span${long(m.title.length, 75)}>${signs(m.title.length)}</span>, описание — <span${long(m.description.length, 180)}>${signs(m.description.length)}</span>.${page.kind === 'case' && page.project.published === false ? ' Кейс снят с сайта — в поиск он не попадёт.' : ''}</p>`;
 }
@@ -760,6 +760,7 @@ function profilePane() {
       ${IMG('Логотип', 'logo', { kind: 'logo', hint: 'SVG или PNG с прозрачным фоном.' })}`)
     + SEC('Поиск', `
       ${F('Полное имя', 'fullName', { l: 1, ph: 'Павел Немченко', hint: 'Как вас ищут: в заголовке главной, в заголовках кейсов и в разметке для поисковиков. На самом сайте подпись — «Имя» выше.' })}
+      ${F('Название сайта в выдаче', 'siteName', { l: 1, ph: pageMeta({ ...st.site, siteName: '' }, [], { kind: 'home' }, { lang: st.lang }).siteName, hint: 'Строка над адресом в Google и жирная строка в превью ссылки в Telegram. Google берёт его как подсказку и может оставить домен. Пусто — полное имя.' })}
       ${F('Заголовок главной в поиске', 'seoTitle', { l: 1, ph: pageMeta({ ...st.site, seoTitle: '' }, [], { kind: 'home' }, { lang: st.lang }).title, hint: 'Пусто — «полное имя — роль, портфолио». До 60–70 знаков.' })}
       ${F('Описание для поисковиков', 'description', { l: 1, type: 'area', rows: 3, hint: 'Две строки под заголовком в выдаче: кто вы и что делаете. 120–170 знаков.' })}
       ${F('О себе', 'about', { l: 1, type: 'area', rows: 4, hint: 'Абзац о вас: его читают поисковики и экранный диктор, на экране его не видно. Пусто — имя, роль и описание.' })}

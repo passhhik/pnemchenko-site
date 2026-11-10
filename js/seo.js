@@ -158,7 +158,7 @@ export function pageMeta(site, projects, page, { origin = ORIGIN, lang = 'ru' } 
   }
   m.url = m.path ? origin + m.path : '';
   m.robots = m.index ? 'index, follow, max-image-preview:large' : 'noindex, follow';
-  m.siteName = full;
+  m.siteName = one(pick(site.siteName, lang)) || full;                       // название сайта: строка над адресом в выдаче и в превью ссылки
   m.alt = short;
   m.locale = lang === 'en' ? 'en_US' : 'ru_RU';
   return m;
@@ -183,7 +183,8 @@ export function ldGraph(site, projects, page, m, { origin = ORIGIN, lang = 'ru' 
   if (same.length) person.sameAs = same;
   const topics = (site.sections || []).map((s) => one(pick(s.label, lang))).filter(Boolean);
   if (topics.length) person.knowsAbout = topics;
-  const website = { '@type': 'WebSite', '@id': ids.site, url: home, name: full, alternateName: uniq([short, home.replace(/^https:\/\/|\/$/g, '')]).filter((x) => x !== full), inLanguage: lang, publisher: { '@id': ids.person } };
+  const siteName = one(pick(site.siteName, lang)) || full;
+  const website = { '@type': 'WebSite', '@id': ids.site, url: home, name: siteName, alternateName: uniq([full, short, home.replace(/^https:\/\/|\/$/g, '')]).filter((x) => x !== siteName), inLanguage: lang, publisher: { '@id': ids.person } };
   const crumbs = (items) => ({ '@type': 'BreadcrumbList', itemListElement: items.map(([name, url], i) => ({ '@type': 'ListItem', position: i + 1, name, item: url })) });
   const graph = [website, person];
   if (page.kind === 'home') {
