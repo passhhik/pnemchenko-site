@@ -1952,7 +1952,10 @@
     "did": "Придумал модель взросления: ребёнок тратит настоящие деньги в рамках уровня доверия. Уровень растёт от поведения, а в 14 — свой счёт",
     "result": "Концепт за 2 недели: пять сценариев, около 30 экранов, маскот, карты и метрики. Дальше — тест с семьями"
    },
-   "colorSpace": "p3"
+   "colorSpace": "p3",
+   "ogImage": "assets/cases/svoi-dengi/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   },
   {
    "slug": "spartakiada-2027",
@@ -2034,7 +2037,10 @@
     "Брендбук",
     "Спорт",
     "Инклюзивный дизайн"
-   ]
+   ],
+   "ogImage": "assets/cases/spartakiada-2027/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   },
   {
    "slug": "unaffected",
@@ -2103,7 +2109,10 @@
     "Личный кабинет",
     "Лояльность",
     "Мерч"
-   ]
+   ],
+   "ogImage": "assets/cases/unaffected/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   },
   {
    "slug": "moya-privivka",
@@ -2172,7 +2181,10 @@
     "Мобильное приложение",
     "Здоровье",
     "Учебный проект ИТМО"
-   ]
+   ],
+   "ogImage": "assets/cases/moya-privivka/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   },
   {
    "slug": "pobeda",
@@ -2228,7 +2240,10 @@
     "Событийный дизайн",
     "Лендинг",
     "Спорт"
-   ]
+   ],
+   "ogImage": "assets/cases/pobeda/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   },
   {
    "slug": "pervenstvo-rossii",
@@ -2291,7 +2306,10 @@
     "Айдентика",
     "Госсектор",
     "Спорт"
-   ]
+   ],
+   "ogImage": "assets/cases/pervenstvo-rossii/og.jpg",
+   "ogImageW": 1200,
+   "ogImageH": 630
   }
  ]
 }

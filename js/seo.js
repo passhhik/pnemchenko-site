@@ -136,7 +136,7 @@ export function pageMeta(site, projects, page, { origin = ORIGIN, lang = 'ru' } 
       title: one(pick(p.seoTitle, lang)) || `${title} — ${full}`,
       description: one(pick(p.seoDescription, lang)) || clip([dot(lead), dot(facts)].filter(Boolean).join(' '), 170),
       path: paths.case(p.slug), type: 'article', index: p.published !== false,
-      ...(img ? { image: img, imageW: 0, imageH: 0 } : og),
+      ...(img ? { image: img, imageW: (p.ogImage && +p.ogImageW) || 0, imageH: (p.ogImage && +p.ogImageH) || 0 } : og),   // размеры картинки превью — чтобы мессенджеры показали её сразу крупно
     };
   } else if (page.kind === 'work') {
     const names = list.map((p) => one(pick(p.title, lang))).filter(Boolean);
