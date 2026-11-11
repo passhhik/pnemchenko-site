@@ -25,7 +25,6 @@ const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? p3(Stri
 const img = (src, alt = '', extra = '') => (srcOf(src) ? `<img src="${esc(srcOf(src))}" alt="${esc(tx(alt) || '')}" loading="lazy" decoding="async"${extra}>` : '');
 const pct = (v, of) => `${Math.round((v / of) * 10000) / 100}%`;
 const CHEV = (dir) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="${dir === 'l' ? 'M14 6 8 12l6 6' : 'M10 6l6 6-6 6'}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const fmt = (s) => { s = Math.max(0, Math.round(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export const CHAPTERS = {
   // Глава (Figma: «Кейс / Глава»): заголовок 56 и вводный абзац; по центру или слева
@@ -34,15 +33,13 @@ export const CHAPTERS = {
     return `<section class="blk ch${b.align === 'left' ? ' ch--l' : ''}${b.tone === 'dark' ? ' is-dark' : ''}">${tx(b.title) ? `<h2 class="ch-t">${ML(b.title)}</h2>` : ''}${tx(b.lead) ? `<p class="ch-lead">${ML(b.lead)}</p>` : ''}</section>`;
   },
 
-  // Шоурил в карточке 16:9 со своим плеером (Figma: «Slide 16:9», кнопки «Frame 12242–12245»)
+  // Шоурил в карточке 16:9: стандартный плеер браузера (Figma: «Slide 16:9»). Видео грузится только по нажатию
   showreel(b, { reduced }) {
     const src = srcOf(b.src), poster = srcOf(b.poster);
     if (!src && !poster) return '';
     return `<figure class="blk reel${b.tone === 'dark' ? ' is-dark' : ''}" data-reel>
       <div class="reel-box">
-        ${src ? `<video class="reel-v" src="${esc(src)}"${poster ? ` poster="${esc(poster)}"` : ''} preload="none" playsinline${b.loop && !reduced ? ' loop' : ''}${tx(b.alt) ? ` aria-label="${T(b.alt)}"` : ''}></video>` : `<img class="reel-v" src="${esc(poster)}" alt="${T(b.alt)}" loading="lazy">`}
-        ${src ? `<button type="button" class="reel-play" data-reel-play aria-label="Смотреть шоурил"><img class="i-play" src="assets/ui/play.svg" alt=""><img class="i-pause" src="assets/ui/pause.svg" alt=""></button>
-        <div class="reel-bar"><span class="reel-t" data-reel-cur>0:00</span><label class="reel-track"><span class="sr">Перемотка</span><input type="range" min="0" max="1000" value="0" step="1" data-reel-seek><i class="reel-fill"></i><i class="reel-knob"></i></label><span class="reel-t" data-reel-dur>${esc(b.duration || '')}</span></div>` : ''}
+        ${src ? `<video class="reel-v" src="${esc(src)}"${poster ? ` poster="${esc(poster)}"` : ''} controls preload="none" playsinline${b.loop && !reduced ? ' loop' : ''}${tx(b.alt) ? ` aria-label="${T(b.alt)}"` : ''}></video>` : `<img class="reel-v" src="${esc(poster)}" alt="${T(b.alt)}" loading="lazy">`}
       </div>${tx(b.caption) ? `<figcaption>${T(b.caption)}</figcaption>` : ''}
     </figure>`;
   },
@@ -56,11 +53,11 @@ export const CHAPTERS = {
       if (it.phone) vis = phoneHTML(it.phone, { size: 'M', label: it.alt || it.caption, reduced: ctx.reduced });
       else if (it.cycle && it.cycle.length) vis = `<div class="rib-cyc" data-cycle="${+it.every || 1500}">${it.cycle.map((s, i) => img(s, i ? '' : (it.alt || it.caption), i ? ' class="" aria-hidden="true"' : ' class="is-on"')).join('')}</div>`;
       else vis = img(it.image, it.alt || it.caption, ' class="rib-img"');
-      return `<article class="rib-card"><h3 class="rib-cap">${ML(it.caption)}</h3><div class="rib-vis">${vis}</div></article>`;
+      return `<div class="rib-card" role="group" aria-roledescription="слайд" aria-label="${items.indexOf(it) + 1} из ${items.length}"><h3 class="rib-cap">${ML(it.caption)}</h3><div class="rib-vis">${vis}</div></div>`;
     };
     return `<section class="blk rib" data-rib>
-      <div class="rib-track" data-track tabindex="0" aria-label="${T(b.label || 'Главное')}">${items.map(card).join('')}</div>
-      <div class="rib-ctl"><button type="button" class="rib-btn" data-prev aria-label="Назад">${CHEV('l')}</button><div class="rib-dots" aria-hidden="true">${items.map((_, i) => `<i${i ? '' : ' class="is-on"'}></i>`).join('')}</div><button type="button" class="rib-btn" data-next aria-label="Вперёд">${CHEV('r')}</button></div>
+      <div class="rib-track" data-track tabindex="0" role="region" aria-roledescription="карусель" aria-label="${T(b.label || 'Главное')}">${items.map(card).join('')}</div>
+      <div class="rib-ctl"><button type="button" class="rib-btn" data-prev aria-label="Предыдущая карточка">${CHEV('l')}</button><div class="rib-dots" aria-hidden="true">${items.map((_, i) => `<i${i ? '' : ' class="is-on"'}></i>`).join('')}</div><button type="button" class="rib-btn" data-next aria-label="Следующая карточка">${CHEV('r')}</button></div>
     </section>`;
   },
 
@@ -146,7 +143,7 @@ export const CHAPTERS = {
       const cards = r.map((c) => img(c.src || c, c.alt || '', ' class="mq-c"')).join('');
       return `<div class="mq-row${i % 2 ? ' is-rev' : ''}"><div class="mq-in" style="--dur:${+b.speed || 60}s">${cards}${cards.replace(/alt="[^"]*"/g, 'alt="" aria-hidden="true"')}</div></div>`;
     };
-    return `<section class="blk mq" aria-label="${T(b.label || 'Дизайны карт')}">${rows.map(row).join('')}</section>`;
+    return `<section class="blk mq" data-mq aria-label="${T(b.label || 'Дизайны карт')}">${rows.map(row).join('')}</section>`;
   },
 
   // Плитки в сетке заданной пропорции (сцены коллабораций)
@@ -171,8 +168,9 @@ export const CHAPTERS = {
     const parts = b.or && items.length === 2
       ? `${fig(items[0], 0)}<span class="scn-or">${T(b.or)}</span>${fig(items[1], 2)}`
       : items.map(fig).join('');
-    const track = !b.or && items.length > 4;
-    return `<section class="blk scn${b.or ? ' scn--or' : ''}${track ? ' scn--track' : ''}" data-anim${track ? '' : ''}><div class="scn-row"${track ? ' data-track tabindex="0"' : ''}>${parts}</div></section>`;
+    const track = !b.or && items.length > 4, pair = !b.or && items.length === 2;
+    const ctl = track ? `<div class="rib-ctl"><button type="button" class="rib-btn" data-prev aria-label="Предыдущий экран">${CHEV('l')}</button><div class="rib-dots" aria-hidden="true">${items.map((_, i) => `<i${i ? '' : ' class="is-on"'}></i>`).join('')}</div><button type="button" class="rib-btn" data-next aria-label="Следующий экран">${CHEV('r')}</button></div>` : '';
+    return `<section class="blk scn${b.or ? ' scn--or' : ''}${track ? ' scn--track' : ''}${pair ? ' scn--pair' : ''}" data-anim${track ? ' data-rib' : ''}><div class="scn-row"${track ? ` data-track tabindex="0" role="region" aria-roledescription="лента" aria-label="${T(b.label || 'Экраны по шагам')}"` : ''}>${parts}</div>${ctl}</section>`;
   },
 
   // Текст слева, телефон справа; пилюли под текстом подсвечивают места на экране (наведите или нажмите)
@@ -223,7 +221,7 @@ export const CHAPTERS = {
     const btn = (x) => {
       const inner = srcOf(x.img) ? `<img src="${esc(srcOf(x.img))}" alt="${T(x.label)}">` : T(x.label);
       const url = String(x.url || '').trim();
-      return /^(https?:)?\/\//i.test(url) ? `<a class="fin-b" href="${esc(url)}" target="_blank" rel="noopener">${inner}</a>` : `<span class="fin-b is-off" title="Ссылка появится позже">${inner}</span>`;
+      return /^(https?:)?\/\//i.test(url) ? `<a class="fin-b" href="${esc(url)}" target="_blank" rel="noopener">${inner}</a>` : `<span class="fin-b is-off" role="link" aria-disabled="true" aria-label="${T(x.label)} — ссылка появится позже" title="Ссылка появится позже">${inner}</span>`;
     };
     return `<section class="blk fin"${color(b.bg) ? ` style="--bg:${color(b.bg)}"` : ''}><div class="fin-c">${srcOf(b.title) ? `<img class="fin-t" src="${esc(srcOf(b.title))}" alt="${T(b.titleAlt)}">` : `<h2 class="ch-t">${T(b.titleAlt)}</h2>`}${tx(b.lead) ? `<p class="fin-l">${T(b.lead)}</p>` : ''}${btns.length ? `<div class="fin-bs">${btns.map(btn).join('')}</div>` : ''}</div>${img(b.visual, '', ' class="fin-v" aria-hidden="true"')}</section>`;
   },
@@ -252,9 +250,12 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
     const sync = () => {
       const i = Math.min(cards.length - 1, idx()), max = tr.scrollWidth - tr.clientWidth - 2;
       dots.forEach((d, k) => d.classList.toggle('is-on', k === (tr.scrollLeft >= max ? cards.length - 1 : i)));
-      prev.disabled = tr.scrollLeft <= 2; next.disabled = tr.scrollLeft >= max;
+      prev.setAttribute('aria-disabled', String(tr.scrollLeft <= 2)); next.setAttribute('aria-disabled', String(tr.scrollLeft >= max));
     };
-    const go = (d) => tr.scrollTo({ left: Math.max(0, (idx() + d) * step()), behavior: reduced ? 'auto' : 'smooth' });
+    const go = (d) => {
+      if ((d < 0 ? prev : next).getAttribute('aria-disabled') === 'true') return;
+      tr.scrollTo({ left: Math.max(0, (idx() + d) * step()), behavior: reduced ? 'auto' : 'smooth' });
+    };
     on(prev, 'click', () => go(-1)); on(next, 'click', () => go(1));
     on(tr, 'scroll', () => requestAnimationFrame(sync), { passive: true });
     on(tr, 'keydown', (e) => { if (e.key === 'ArrowRight') { e.preventDefault(); go(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); } });
@@ -306,18 +307,56 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
     const pills = [...ft.querySelectorAll('[data-pill]')];
     const ph = ft.querySelector('[data-ph]');
     const api = phoneApi && ph ? phoneApi(ph) : null;
-    if (!pills.length || !api) return;
+    if (!pills.length) return;
+    if (!api) { pills.forEach((p) => { const t = document.createElement('span'); t.className = 'pill'; t.textContent = p.textContent; p.replaceWith(t); }); return; }
     let hold = -1;
-    const show = (i) => { pills.forEach((p, k) => p.classList.toggle('is-on', k === i)); };
+    const show = (i) => { pills.forEach((p, k) => { p.classList.toggle('is-on', k === i); p.setAttribute('aria-pressed', String(k === i)); }); };
+    // на узком экране пилюли и телефон не всегда влезают в окно вместе: после касания подсвеченное место — в центр экрана
+    // (рамка доезжает до места с переходом, поэтому её конечное положение считаем по стилю, а не по текущему кадру)
+    const reveal = () => requestAnimationFrame(() => {
+      const f = ph.querySelector('.sc-f2'), c = f && f.offsetParent; if (!c) return;
+      const cr = c.getBoundingClientRect(), k = cr.width / (c.offsetWidth || 393);
+      const top = cr.top + (parseFloat(f.style.top) || 0) * k, bottom = top + (parseFloat(f.style.height) || 0) * k;
+      const lo = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 72) + 12, hi = window.innerHeight - 110;
+      if (top < lo || bottom > hi) window.scrollBy({ top: (top + bottom) / 2 - (lo + hi) / 2, behavior: reduced ? 'auto' : 'smooth' });
+    });
     pills.forEach((p, i) => {
       const enter = () => { hold = i; show(i); api.hold(i); };
       const leave = () => { hold = -1; api.release(); };
-      on(p, 'mouseenter', enter); on(p, 'mouseleave', leave); on(p, 'focus', enter); on(p, 'blur', leave);
-      on(p, 'click', () => (hold === i ? leave() : enter()));
+      // касание на телефоне даёт и «наведение», и нажатие: наведение слушаем только у мыши, иначе нажатие тут же гасит подсветку
+      on(p, 'pointerenter', (e) => { if (e.pointerType === 'mouse') enter(); });
+      on(p, 'pointerleave', (e) => { if (e.pointerType === 'mouse' && hold === i) leave(); });
+      on(p, 'focus', () => { if (p.matches(':focus-visible')) enter(); });
+      on(p, 'blur', () => { if (hold === i) leave(); });
+      on(p, 'click', (e) => { if (e.pointerType === 'mouse' && hold === i) return; if (hold === i) leave(); else { enter(); if (e.pointerType !== 'mouse') reveal(); } });
     });
     const tick = setInterval(() => { if (hold < 0) show(api.focusIndex()); }, 180);
     offs.push(() => clearInterval(tick));
   });
+
+  // ленты без своих кнопок (лесенка, шаги лентой, пара экранов): фокус с клавиатуры, когда есть что листать.
+  // Название ленты — по ближайшему заголовку главы, чтобы у скринридера не было двух одинаковых областей
+  const used = new Set();
+  const nameOf = (el) => {
+    let h = null;
+    for (let n = el.closest('[data-b]'); n && !h; n = n.previousElementSibling) h = n.querySelector('h2');
+    const t = h ? h.textContent.replace(/\s+/g, ' ').trim().slice(0, 70) : '';
+    let name = t ? `${t}: лента, листается стрелками` : 'Лента, листается стрелками';
+    for (let k = 2; used.has(name); k++) name = `${t || 'Лента'}: лента ${k}, листается стрелками`;
+    used.add(name);
+    return name;
+  };
+  root.querySelectorAll('.ld, .ps-strip, .scn-row:not([data-track])').forEach((el) => {
+    const f = () => {
+      if (el.scrollWidth > el.clientWidth + 2) { el.setAttribute('tabindex', '0'); el.setAttribute('role', 'region'); if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', nameOf(el)); }
+      else { el.removeAttribute('tabindex'); el.removeAttribute('role'); }
+    };
+    f();
+    if ('ResizeObserver' in window) { const ro = new ResizeObserver(f); ro.observe(el); offs.push(() => ro.disconnect()); }
+  });
+
+  // стена карт: касание останавливает и снова запускает
+  root.querySelectorAll('[data-mq]').forEach((mq) => on(mq, 'click', () => mq.classList.toggle('is-paused')));
 
   // всплытие по частям: ступени, выноски, эмоции, лаймовая карточка — когда блок доехал до экрана
   const anims = root.querySelectorAll('[data-anim]');
@@ -330,39 +369,25 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
     }
   }
 
-  // шоурил: своя кнопка и полоса перемотки
-  root.querySelectorAll('[data-reel]').forEach((reel) => {
-    const v = reel.querySelector('video'), btn = reel.querySelector('[data-reel-play]');
-    if (!v || !btn) return;
-    const seek = reel.querySelector('[data-reel-seek]'), cur = reel.querySelector('[data-reel-cur]'), dur = reel.querySelector('[data-reel-dur]');
-    let hideT = 0;
-    const state = () => {
-      const playing = !v.paused && !v.ended;
-      reel.classList.toggle('is-playing', playing);
-      reel.classList.toggle('is-started', v.currentTime > 0 || playing);
-      btn.setAttribute('aria-label', playing ? 'Пауза' : (v.ended ? 'Смотреть ещё раз' : 'Смотреть шоурил'));
-    };
-    const time = () => {
-      const d = v.duration || 0;
-      const p = d ? v.currentTime / d : 0;
-      reel.style.setProperty('--p', p.toFixed(4));
-      seek.value = String(Math.round(p * 1000));
-      cur.textContent = fmt(v.currentTime);
-      if (d) dur.textContent = fmt(d);
-    };
-    const wake = () => { reel.classList.add('is-awake'); clearTimeout(hideT); hideT = setTimeout(() => reel.classList.remove('is-awake'), 1800); };
-    on(btn, 'click', () => { if (v.paused || v.ended) { v.play().catch(() => {}); } else v.pause(); wake(); });
-    on(reel, 'pointermove', wake);
-    on(v, 'click', () => btn.click());
-    ['play', 'pause', 'ended'].forEach((ev) => on(v, ev, state));
-    on(v, 'timeupdate', time); on(v, 'loadedmetadata', time);
-    on(seek, 'input', () => { if (v.duration) v.currentTime = (seek.value / 1000) * v.duration; time(); });
-    // уехал с экрана — пауза
+  // шоурил: уехал с экрана — пауза (плеер стандартный)
+  root.querySelectorAll('[data-reel] video').forEach((v) => {
+    // Chrome на компьютере не запускает видео кликом по кадру, Firefox и Safari — запускают. Если после клика мышью
+    // браузер сам ничего не сделал, запускаем или ставим на паузу сами; полосу плеера внизу не трогаем
+    let ptr = '';
+    on(v, 'pointerdown', (e) => { ptr = e.pointerType; });
+    on(v, 'click', (e) => {
+      if (ptr !== 'mouse' || e.offsetY > v.clientHeight - 64) return;
+      const was = v.paused;
+      setTimeout(() => {
+        if (v.paused !== was) return;
+        if (was) { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } else v.pause();
+      }, 0);
+    });
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver((es) => es.forEach((e) => { if (!e.isIntersecting && !v.paused) v.pause(); }), { threshold: .2 });
-      io.observe(reel); offs.push(() => io.disconnect());
+      io.observe(v); offs.push(() => io.disconnect());
     }
-    offs.push(() => { try { v.pause(); } catch (_) { /* noop */ } clearTimeout(hideT); });
+    offs.push(() => { try { v.pause(); } catch (_) { /* noop */ } });
   });
 
   return () => offs.forEach((f) => f());

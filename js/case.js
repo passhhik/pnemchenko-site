@@ -14,7 +14,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const color = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : '');
 
 const paras = (s) => String(tx(s) || '').split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)
-  .map((x) => `<p>${esc(x).replace(/\n/g, '<br>')}</p>`).join('');
+  .map((x) => `<p>${esc(x).replace(/\n/g, ' <br class="nl">')}</p>`).join('');   // переносы строк из макета — только на широком экране
 const h2 = (b) => (tx(b.title) ? `<h2 class="sec-title">${esc(tx(b.title))}</h2>` : '');
 const cap = (b) => (tx(b.caption) ? `<figcaption>${esc(tx(b.caption))}</figcaption>` : '');
 const pic = (src, alt, extra = '') => `<img src="${esc(src)}" alt="${esc(tx(alt) || '')}" loading="lazy" decoding="async"${extra}>`;
@@ -233,7 +233,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
     <header class="case-top${peek ? ' is-peek' : ''}">
       <div class="cover-card rv${peek ? ' cover--peek' : ''}"${cardStyle}>
         <div class="cover-text">
-          <h1 class="cover-title" tabindex="-1">${logo ? `<img class="cover-logo" src="${esc(logo)}" alt="${esc(title)}" decoding="async" fetchpriority="high">` : esc(title)}</h1>
+          <h1 class="cover-title" tabindex="-1">${logo ? `<img class="cover-logo" src="${esc(logo)}" alt="${esc(tx(p.logoAlt) ? `${tx(p.logoAlt)} — ${title}` : title)}" decoding="async" fetchpriority="high">` : esc(title)}</h1>
           ${lead && !peek ? `<p class="cover-lead">${esc(lead)}</p>` : ''}
         </div>
         ${vis ? `<div class="cover-visual">${vis.video
@@ -291,6 +291,9 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
   const setU = () => { if (caseIn) root.style.setProperty('--u', `${(caseIn.clientWidth / 1206).toFixed(4)}px`); };
   setU();
   window.addEventListener('resize', setU);
+  // iPhone при повороте иногда шлёт resize раньше, чем перестроит страницу: следим и за самой колонкой
+  const roU = 'ResizeObserver' in window && caseIn ? new ResizeObserver(setU) : null;
+  if (roU) roU.observe(caseIn);
   const offPhones = initPhones(root, { reduced });
   const offCycles = initCycles(root, { reduced });
   const offChapters = initChapters(root, { reduced, phoneApi });
@@ -334,7 +337,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
     destroy() {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
-      window.removeEventListener('resize', setU);
+      window.removeEventListener('resize', setU); if (roU) roU.disconnect();
       offPhones(); offCycles(); offChapters();
       cancelAnimationFrame(raf);
       ios.forEach((o) => o.disconnect());

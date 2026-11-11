@@ -37,8 +37,15 @@ function glue(prev, next) {
   return false;
 }
 
+const NBH = '\u2011';                                                // неразрывный дефис
+const hyph = (s) => s
+  .replace(/(^|[\s«(])([А-ЯЁA-Z0-9]{1,4})-(?=[А-ЯЁA-Zа-яё])/g, `$1$2${NBH}`)   // Т-Банк, 152-ФЗ, Wi-Fi
+  .replace(/([а-яё])-(то|либо|нибудь|таки)(?![а-яё])/gi, `$1${NBH}$2`)        // что-то, кто-нибудь
+  .replace(/(чек)-(лист)/gi, `$1${NBH}$2`);                                     // чек-лист в любом падеже
 export function typo(s) {
-  if (typeof s !== 'string' || s.indexOf(' ') < 0) return s;
+  if (typeof s !== 'string') return s;
+  if (s.indexOf('-') >= 0 && !LINKY.test(s.trim())) s = hyph(s);
+  if (s.indexOf(' ') < 0) return s;
   const trimmed = s.trim();
   if (LINKY.test(trimmed) || /^[^\s]+@[^\s]+$/.test(trimmed)) return s;
   const parts = s.split(/( +)/);                                     // слова и обычные пробелы; переносы строк остаются в словах

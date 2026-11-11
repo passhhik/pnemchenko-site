@@ -78,8 +78,8 @@
        "phone": {
         "src": "assets/cases/svoi-dengi/v2/scr-r3-level.webp",
         "scene": {
-         "base": "assets/cases/svoi-dengi/v2/scr-r3-level.webp",
-         "dur": 5.85,
+         "base": "assets/cases/svoi-dengi/v2/sc-level-base.webp",
+         "dur": 9.76,
          "focus": [
           {
            "x": 20,
@@ -106,6 +106,19 @@
            "y": 773,
            "at": 3.42
           }
+         ],
+         "layers": [
+          {
+           "name": "btn",
+           "src": "assets/cases/svoi-dengi/v2/sc-level-btn.webp",
+           "x": 19,
+           "y": 746,
+           "w": 355,
+           "h": 55,
+           "press": [
+            3.42
+           ]
+          }
          ]
         }
        }
@@ -117,7 +130,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-refuse.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-refuse-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "pause",
@@ -160,6 +173,17 @@
            "in": "burst",
            "at": 1.95,
            "idle": "bob"
+          },
+          {
+           "name": "btn",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-btn.webp",
+           "x": 19,
+           "y": 663,
+           "w": 355,
+           "h": 62,
+           "press": [
+            3.9
+           ]
           }
          ],
          "tap": [
@@ -179,7 +203,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-u1-hook.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-hook-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "t1",
@@ -233,7 +257,7 @@
            "y": 135.8,
            "w": 347.1,
            "h": 166,
-           "in": "pop",
+           "in": "slam",
            "at": 0.49,
            "d": 0.55
           },
@@ -358,6 +382,17 @@
            "y": 401,
            "w": 60,
            "h": 8
+          },
+          {
+           "name": "btn",
+           "src": "assets/cases/svoi-dengi/v2/sc-choose-btn.webp",
+           "x": 19,
+           "y": 739,
+           "w": 355,
+           "h": 62,
+           "press": [
+            6.83
+           ]
           }
          ],
          "strip": {
@@ -443,7 +478,7 @@
       "iconAlt": "Свои деньги",
       "bg": "#daff6d",
       "title": "Взросление",
-      "text": "Ребёнок сам распоряжается своими деньгами в рамках уровня доверия, а родитель повышает уровень, когда ребёнок учится."
+      "text": "Ребёнок сам распоряжается своими деньгами в рамках уровня доверия, а родитель повышает уровень, когда ребёнок учится"
      }
     },
     {
@@ -610,7 +645,7 @@
        "title": "Приглашение ребёнку",
        "text": "Ребёнок получает своё приложение и знает, какие операции видите вы",
        "phone": {
-        "src": "assets/cases/svoi-dengi/v2/scr-r6-invite.webp"
+        "src": "assets/cases/svoi-dengi/v2/scr-r6-invite-852.webp"
        }
       }
      ]
@@ -648,6 +683,17 @@
          "y": 401,
          "w": 60,
          "h": 8
+        },
+        {
+         "name": "btn",
+         "src": "assets/cases/svoi-dengi/v2/sc-choose-btn.webp",
+         "x": 19,
+         "y": 739,
+         "w": 355,
+         "h": 62,
+         "press": [
+          6.83
+         ]
         }
        ],
        "strip": {
@@ -707,8 +753,8 @@
        "depth": 0.8,
        "front": false,
        "m": {
-        "x": -120,
-        "y": 520,
+        "x": 285,
+        "y": 560,
         "w": 130
        }
       },
@@ -723,19 +769,6 @@
         "x": 300,
         "y": -70,
         "w": 140
-       }
-      },
-      {
-       "src": "assets/cases/svoi-dengi/v2/float-pig.webp",
-       "x": 362,
-       "y": 206,
-       "w": 647,
-       "depth": 1.8,
-       "front": true,
-       "m": {
-        "x": 230,
-        "y": 600,
-        "w": 240
        }
       }
      ]
@@ -836,19 +869,19 @@
        },
        {
         "src": "assets/cases/svoi-dengi/v2/card-b22.webp",
-        "alt": "Карта «image 43»"
+        "alt": "Дизайн карты"
        },
        {
         "src": "assets/cases/svoi-dengi/v2/card-b23.webp",
-        "alt": "Карта «image 44»"
+        "alt": "Дизайн карты"
        },
        {
         "src": "assets/cases/svoi-dengi/v2/card-b24.webp",
-        "alt": "Карта «image 49»"
+        "alt": "Дизайн карты"
        },
        {
         "src": "assets/cases/svoi-dengi/v2/card-b25.webp",
-        "alt": "Карта «image 50»"
+        "alt": "Дизайн карты"
        }
       ]
      ]
@@ -954,16 +987,209 @@
        "scroll": [
         {
          "to": 435,
-         "at": 1.95,
-         "d": 2
+         "at": 6.34,
+         "d": 1.3
         },
         {
          "to": 0,
-         "at": 6.35,
-         "d": 1.8
+         "at": 11.71,
+         "d": 1.4
         }
        ],
-       "dur": 9.76
+       "dur": 13.66,
+       "pops": [
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-balance.webp",
+         "x": 20,
+         "y": 205,
+         "w": 353,
+         "h": 171,
+         "at": 0.49,
+         "d": 1.85,
+         "slots": [
+          [
+           20,
+           205,
+           353,
+           171,
+           24
+          ]
+         ],
+         "with": [
+          "pig"
+         ],
+         "sh": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-balance-shs.webp",
+           "x": -42,
+           "y": -93,
+           "w": 457,
+           "h": 306
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-balance-shc.webp",
+           "x": -12,
+           "y": -63,
+           "w": 397,
+           "h": 246
+          }
+         ]
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-asksend.webp",
+         "x": 20,
+         "y": 384,
+         "w": 353,
+         "h": 60,
+         "at": 2.44,
+         "d": 1.85,
+         "slots": [
+          [
+           20,
+           384,
+           172,
+           60,
+           16
+          ],
+          [
+           201,
+           384,
+           172,
+           60,
+           16
+          ]
+         ],
+         "sh": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-asksend-shs.webp",
+           "x": -42,
+           "y": -42,
+           "w": 437,
+           "h": 144
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-asksend-shc.webp",
+           "x": -12,
+           "y": -12,
+           "w": 377,
+           "h": 84
+          }
+         ]
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks.webp",
+         "x": 20,
+         "y": 476,
+         "w": 322,
+         "h": 157,
+         "at": 4.39,
+         "d": 1.85,
+         "slots": [
+          [
+           20,
+           476,
+           157,
+           157,
+           16
+          ],
+          [
+           185,
+           476,
+           157,
+           157,
+           16
+          ]
+         ],
+         "sh": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks-shs.webp",
+           "x": -42,
+           "y": -42,
+           "w": 406,
+           "h": 241
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks-shc.webp",
+           "x": -12,
+           "y": -12,
+           "w": 346,
+           "h": 181
+          }
+         ]
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-goal.webp",
+         "x": 20,
+         "y": 710,
+         "w": 353,
+         "h": 110,
+         "at": 7.8,
+         "d": 1.85,
+         "slots": [
+          [
+           20,
+           710,
+           353,
+           110,
+           23
+          ]
+         ],
+         "sh": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-goal-shs.webp",
+           "x": -42,
+           "y": -42,
+           "w": 437,
+           "h": 194
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-goal-shc.webp",
+           "x": -12,
+           "y": -12,
+           "w": 377,
+           "h": 134
+          }
+         ]
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-lesson.webp",
+         "x": 20,
+         "y": 920,
+         "w": 353,
+         "h": 240,
+         "at": 9.76,
+         "d": 1.85,
+         "slots": [
+          [
+           20,
+           920,
+           353,
+           240,
+           24
+          ]
+         ],
+         "with": [
+          "coin1",
+          "coin2"
+         ],
+         "sh": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-lesson-shs.webp",
+           "x": -42,
+           "y": -53,
+           "w": 437,
+           "h": 335
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-lesson-shc.webp",
+           "x": -12,
+           "y": -23,
+           "w": 377,
+           "h": 275
+          }
+         ]
+        }
+       ]
       }
      },
      "alt": "Главная ребёнка 6–9 лет",
@@ -1064,7 +1290,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-send.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-send-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "lines",
@@ -1129,7 +1355,7 @@
            "y": 198,
            "w": 340.4,
            "h": 230.4,
-           "in": "pop",
+           "in": "slam",
            "at": 0.49,
            "d": 0.55
           },
@@ -1282,7 +1508,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-allowed.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-allowed-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "check",
@@ -1324,6 +1550,17 @@
            "in": "burst",
            "at": 1.95,
            "idle": "bob"
+          },
+          {
+           "name": "btn",
+           "src": "assets/cases/svoi-dengi/v2/sc-allowed-btn.webp",
+           "x": 19,
+           "y": 739,
+           "w": 355,
+           "h": 62,
+           "press": [
+            3.9
+           ]
           }
          ],
          "tap": [
@@ -1343,7 +1580,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-refuse.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-refuse-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "pause",
@@ -1386,6 +1623,17 @@
            "in": "burst",
            "at": 1.95,
            "idle": "bob"
+          },
+          {
+           "name": "btn",
+           "src": "assets/cases/svoi-dengi/v2/sc-refuse-btn.webp",
+           "x": 19,
+           "y": 663,
+           "w": 355,
+           "h": 62,
+           "press": [
+            3.9
+           ]
           }
          ],
          "tap": [
@@ -1417,7 +1665,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-u1-hook.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-hook-base.webp",
-         "dur": 5.85,
+         "dur": 9.76,
          "layers": [
           {
            "name": "t1",
@@ -1471,7 +1719,7 @@
            "y": 135.8,
            "w": 347.1,
            "h": 166,
-           "in": "pop",
+           "in": "slam",
            "at": 0.49,
            "d": 0.55
           },
@@ -1955,7 +2203,8 @@
    "colorSpace": "p3",
    "ogImage": "assets/cases/svoi-dengi/og.jpg",
    "ogImageW": 1200,
-   "ogImageH": 630
+   "ogImageH": 630,
+   "logoAlt": "Свои деньги"
   },
   {
    "slug": "spartakiada-2027",

@@ -421,7 +421,7 @@ html.is-cat .site-footer{ display:none; }
    Как страница продукта Apple: обложка-карточка цвета проекта → факты → главы по одной мысли. Ширина — 1206 (--case-w),
    по центру; каждая глава мягко всплывает, когда доезжает до экрана (.rv → .is-in, один раз) */
 .case{ position:relative; z-index:20; color:var(--fg); overflow-x:clip; }      /* визуал обложки может выйти за край карточки, но не за край экрана */
-.case-in,.case-top{ width:min(var(--case-w), calc(100% - var(--pad-x) * 2)); margin:0 auto; }
+.case-in,.case-top{ width:min(var(--case-w), calc(100% - max(var(--pad-x), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px)) * 2)); margin:0 auto; }
 .case-top{ padding-top:calc(var(--hdr) + var(--sp-50)); }
 /* обложка: цвет проекта, скругление 56; визуал справа может выходить за край карточки */
 .cover-card{ position:relative; display:flex; flex-direction:column; justify-content:flex-start; min-height:0; aspect-ratio:1206 / 593; border-radius:var(--radius-card); background:var(--cc, var(--tile)); color:var(--cf, var(--fg)); }
