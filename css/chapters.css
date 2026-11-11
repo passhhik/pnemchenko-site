@@ -41,7 +41,7 @@
 .ph--S{ --pw:calc(208 * var(--u)); aspect-ratio:208 / 437; }
 .ph-scr{ position:absolute; inset:calc(var(--pw) * .0286); overflow:hidden; border-radius:calc(var(--pw) * .132); background:#e5e7eb; isolation:isolate;
   -webkit-mask-image:-webkit-radial-gradient(white, black); }   /* Safari: углы экрана не вылезают за рамку во время анимаций */
-.ph-isl{ position:absolute; z-index:6; left:50%; top:calc(var(--pw) * .0257); width:calc(var(--pw) * .303); height:calc(var(--pw) * .0876); border-radius:999px; background:#000; transform:translateX(-50%); pointer-events:none; }
+.ph-isl{ position:absolute; z-index:6; left:50%; top:calc(var(--pw) * .0543); width:calc(var(--pw) * .303); height:calc(var(--pw) * .0886); border-radius:999px; background:#000; transform:translateX(-50%); pointer-events:none; }
 .ph-img{ position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
 /* экран 393×852 внутри — в точках макета экрана, масштаб --k ставит js/phone.js по ширине экрана */
 .ph-st{ position:absolute; left:0; top:0; width:393px; height:852px; transform:scale(var(--k, .66)); transform-origin:0 0; }
