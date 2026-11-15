@@ -1,3 +1,4 @@
+import { aiReportHTML, importAiFile, loadAi } from './ai-report.js';
 // Админка портфолио. Работает в браузере, без сервера. Содержимое (content/*.json и картинки) она умеет:
 // — публиковать на сайт: одним коммитом в репозиторий на GitHub (см. github.js), сайт пересобирается сам;
 // — читать и сохранять прямо в папке сайта на компьютере (Chrome, Edge);
@@ -1149,7 +1150,8 @@ function dashBody(d) {
       ${barsHTML('Экран', tally(vs, (v) => v.x.scr || 'неизвестно'), s.n)}
     </div>
     <section class="db-card db-card--wide"><h3>Кейсы</h3>${casesHTML(vs)}</section>
-    <section class="db-card db-card--wide"><h3>Последние визиты</h3>
+    ${aiReportHTML(S.days, esc, when, caseName)}
+    <section class="db-card db-card--wide"><h3>Последние визиты в браузере</h3>
       ${shown.length ? `<ul class="db-visits">${shown.map(visitHTML).join('')}</ul>` : '<p class="hint">Пока пусто.</p>'}
       ${vs.length > shown.length ? `<button class="btn btn--line btn--sm" type="button" data-act="stats-more">Показать ещё (${vs.length - shown.length})</button>` : ''}
     </section>`;
@@ -1187,6 +1189,7 @@ async function statsLoad() {
     const r = await fetch(`${api}?stats=1&days=${want(S.days)}`, { cache: 'no-store', mode: 'cors', credentials: 'omit', headers: { 'x-mod-key': key } });
     if (!r.ok) { const e = new Error(String(r.status)); e.status = r.status; throw e; }
     S.data = await r.json();
+    await loadAi(api, key, S.data.days);
     S.keyOpen = false;
     S.note = `обновлено в ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
   } catch (e) {
@@ -1897,6 +1900,7 @@ document.addEventListener('input', (e) => {
   changed(path);
 });
 document.addEventListener('change', (e) => {
+  if (e.target.matches('[data-ai-file]') && e.target.files[0]) { importAiFile(e.target.files[0]).then(statsRedraw); return; }
   const el = e.target;
   // адрес страницы приводим в порядок, когда поле оставили
   if (el.dataset && el.dataset.kind === 'slug') { const p = cur(); p.slug = uniqueSlug(slugify(el.value) || slugify(txAny(p.title)) || 'project', p); el.value = p.slug; changed('slug'); }

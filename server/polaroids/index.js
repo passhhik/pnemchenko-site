@@ -30,8 +30,8 @@
 const crypto = require('crypto');
 
 const BASE = process.env.TABLE || 'polaroids';
-const T = { cards: BASE, img: `${BASE}_img`, rate: `${BASE}_rate`, stats: `${BASE}_stats` };
-const KEYS = { [T.cards]: [['p', 'HASH'], ['id', 'RANGE']], [T.img]: [['id', 'HASH']], [T.rate]: [['k', 'HASH']], [T.stats]: [['d', 'HASH'], ['k', 'RANGE']] };
+const T = { cards: BASE, img: `${BASE}_img`, rate: `${BASE}_rate`, stats: `${BASE}_stats`, ai: `${BASE}_ai` };
+const KEYS = { [T.ai]: [['d', 'HASH'], ['k', 'RANGE']], [T.cards]: [['p', 'HASH'], ['id', 'RANGE']], [T.img]: [['id', 'HASH']], [T.rate]: [['k', 'HASH']], [T.stats]: [['d', 'HASH'], ['k', 'RANGE']] };
 const IP_HOUR = Number(process.env.IP_HOUR) || 6;          // карточек в час с одного адреса
 const DAY_MAX = Number(process.env.DAY_MAX) || 300;        // карточек в сутки на весь архив
 const MAX_IMG = 200 * 1024;                                // фото не больше 200 КБ (сайт присылает 30–90 КБ)
@@ -322,7 +322,7 @@ function cleanEvents(list, now) {
 async function hit(event) {
   const none = { statusCode: 204, headers: { ...CORS }, body: '' };
   const ua = header(event, 'user-agent');
-  if (!ua || BOT.test(ua)) return none;
+  if (!ua || BOT.test(ua) || (await import('./ai-traffic.mjs')).identify(ua)) return none;
   let raw = event.body || '';
   if (event.isBase64Encoded) raw = Buffer.from(raw, 'base64').toString('utf8');
   if (raw.length > 12000) return reply(413, { error: 'too large' });
@@ -405,6 +405,56 @@ async function stats(q) {
   return { days: ever ? 'all' : days, now, visits };
 }
 
+// Server requests stay separate from browser sessions and their conversions.
+async function syncAi() {
+  const { state, rows } = await require('./ai-sync').collect();
+  const groups = new Map();
+  for (const row of rows) {
+    const key = [row.at, row.page, row.agent].join('|');
+    const group = groups.get(key) || { ...row, total: 0, checked: 0 };
+    group.total += row.count;
+    if (row.confirmed) group.checked += row.count;
+    groups.set(key, group);
+  }
+  const entries = [...groups.entries()];
+  for (let i = 0; i < entries.length; i += 8) {
+    await Promise.all(entries.slice(i, i + 8).map(async ([k, row]) => {
+      const key = { d: { S: new Date(row.at).toISOString().slice(0, 10) }, k: { S: k } };
+      // Overlapping log windows and retries must not increment an existing hit.
+      for (const [field, value] of [['hits', row.total], ['verified', row.checked]]) {
+        if (!value) continue;
+        try {
+          await withTable(T.ai, () => ddb('UpdateItem', {
+            TableName: T.ai, Key: key, UpdateExpression: 'SET #n = :n',
+            ConditionExpression: 'attribute_not_exists(#n) OR #n < :n',
+            ExpressionAttributeNames: { '#n': field }, ExpressionAttributeValues: { ':n': { N: String(value) } }
+          }));
+        } catch (err) { if (err.name !== 'ConditionalCheckFailedException') throw err; }
+      }
+    }));
+  }
+  return state;
+}
+async function aiReport(q) {
+  let state;
+  try { state = await syncAi(); } catch { state = 'unavailable'; }
+  const from = q.days === 'all' ? 0 : Date.now() - Math.max(1, Math.min(3660, Number(q.days) || 30)) * 864e5;
+  const rows = [];
+  let start;
+  do {
+    const page = await withTable(T.ai, () => ddb('Scan', { TableName: T.ai, ExclusiveStartKey: start }));
+    for (const item of page.Items || []) {
+      const [time, path, agent] = item.k.S.split('|');
+      if (+time < from) continue;
+      const count = Number(item.hits?.N || 0), checked = Math.min(count, Number(item.verified?.N || 0));
+      if (checked) rows.push({ at: +time, page: path, agent, confirmed: true, count: checked });
+      if (checked < count) rows.push({ at: +time, page: path, agent, confirmed: false, count: count - checked });
+    }
+    start = page.LastEvaluatedKey;
+  } while (start);
+  return { state, rows: rows.sort((a,b) => b.at-a.at) };
+}
+
 // ---------- с какого сайта ----------
 // ALLOW_ORIGIN — адреса сайта через запятую: он открывается и с www, и без («https://pnemchenko.ru, https://www.pnemchenko.ru»).
 // Браузеру отвечаем тем адресом из списка, с которого пришёл запрос. Пусто — любой адрес (*).
@@ -422,6 +472,7 @@ async function route(event) {
     const mod = isMod(event);
     if (method === 'GET') {
       if (q.img) return await image(String(q.img), mod);
+      if (q.ai) return mod ? reply(200, await aiReport(q)) : reply(401, { error: 'moderator key required' });
       if (q.stats) return mod ? reply(200, await stats(q)) : reply(401, { error: 'moderator key required' });
       if (q.all) return mod ? reply(200, await list({ before: q.before, n: q.n, all: true })) : reply(401, { error: 'moderator key required' });
       if (q.list) return reply(200, await list({ before: q.before, n: q.n, all: false }));
@@ -450,3 +501,11 @@ module.exports.handler = async (event, context) => {
 };
 // для проверки фильтра мата (node -e "console.log(require('./index.js')._bad('…'))")
 module.exports._bad = bad;
+
+// Entrypoint for a separate private function invoked by a Yandex timer.
+module.exports.collectTraffic = async (_event, context) => {
+  TOKEN = context?.token?.access_token || process.env.YDB_TOKEN || '';
+  const state = await syncAi();
+  if (state !== 'ok') throw new Error('AI traffic collection: ' + state);
+  return { state };
+};
