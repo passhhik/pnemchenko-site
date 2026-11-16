@@ -376,84 +376,8 @@
        "caption": "Карту ребёнок выбирает сам",
        "alt": "Ребёнок выбирает дизайн своей карты",
        "phone": {
-        "src": "assets/cases/svoi-dengi/v2/scr-choose-card.webp",
-        "scene": {
-         "base": "assets/cases/svoi-dengi/v2/sc-choose-base.webp",
-         "picker": [
-          {
-           "title": "Снэки",
-           "icon": "assets/cases/svoi-dengi/v2/pick-snacks.webp",
-           "cards": [
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a10.webp",
-             "alt": "Снэки · дизайн 1"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a03.webp",
-             "alt": "Снэки · дизайн 2"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-b17.webp",
-             "alt": "Снэки · дизайн 3"
-            }
-           ]
-          },
-          {
-           "title": "Животные",
-           "icon": "assets/cases/svoi-dengi/v2/pick-animals.webp",
-           "cards": [
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a01.webp",
-             "alt": "Животные · дизайн 1"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a08.webp",
-             "alt": "Животные · дизайн 2"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-b15.webp",
-             "alt": "Животные · дизайн 3"
-            }
-           ]
-          },
-          {
-           "title": "Hello Kitty",
-           "icon": "assets/cases/svoi-dengi/v2/pick-kitty.webp",
-           "cards": [
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a09.webp",
-             "alt": "Hello Kitty · дизайн 1"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-b16.webp",
-             "alt": "Hello Kitty · дизайн 2"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a02.webp",
-             "alt": "Hello Kitty · дизайн 3"
-            }
-           ]
-          },
-          {
-           "title": "Игры",
-           "icon": "assets/cases/svoi-dengi/v2/pick-games.webp",
-           "cards": [
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-a07.webp",
-             "alt": "Игры · дизайн 1"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-b14.webp",
-             "alt": "Игры · дизайн 2"
-            },
-            {
-             "src": "assets/cases/svoi-dengi/v2/card-b21.webp",
-             "alt": "Игры · дизайн 3"
-            }
-           ]
-          }
-         ]
-        }
+        "src": "assets/cases/svoi-dengi/v2/picker-shot-still.webp",
+        "previewVideo": "assets/cases/svoi-dengi/v2/picker-shot.mp4"
        }
       }
      ]

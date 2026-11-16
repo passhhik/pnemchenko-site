@@ -43,6 +43,8 @@
   -webkit-mask-image:-webkit-radial-gradient(white, black); }   /* Safari: углы экрана не вылезают за рамку во время анимаций */
 .ph-isl{ position:absolute; z-index:6; left:50%; top:calc(var(--pw) * .0543); width:calc(var(--pw) * .303); height:calc(var(--pw) * .0886); border-radius:999px; background:#000; transform:translateX(-50%); pointer-events:none; }
 .ph-img{ position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
+.ph-preview{ opacity:0; pointer-events:none; object-position:50% 0; }
+.ph-preview.is-playing{ opacity:1; }
 /* экран 393×852 внутри — в точках макета экрана, масштаб --k ставит js/phone.js по ширине экрана */
 .ph-st{ position:absolute; left:0; top:0; width:393px; height:852px; transform:scale(var(--k, .66)); transform-origin:0 0; }
 .sc-c{ position:absolute; left:0; top:0; width:393px; }
@@ -498,6 +500,9 @@ html{ scroll-padding-top:calc(var(--hdr, 72px) + 12px); }
 .case .ph-isl{top:calc(var(--frame-unit) * .0543);width:calc(var(--frame-unit) * .303);height:calc(var(--frame-unit) * .0886);}
 .rib-card:has(.ph) .rib-vis{container-type:size;}
 .rib-card .rib-vis .ph{--pw:min(calc(276 * var(--u)),94cqw,46cqh);}
+@media (max-width:560px){
+  .rib-card .rib-vis .ph--preview{--pw:min(52vw,230px,94cqw,46cqh);}
+}
 .card-picker{position:absolute;inset:0;pointer-events:none;font-family:Inter,Arial,sans-serif;color:#23252a;}
 .card-picker > *,.task-track{pointer-events:auto;}
 .pick-track,.task-track{position:absolute;display:flex;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;scroll-snap-type:x mandatory;cursor:grab;}

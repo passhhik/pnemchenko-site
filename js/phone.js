@@ -59,9 +59,10 @@ export function phoneHTML(ph, { size = 'M', label = '', cls = '', reduced = fals
   } else {
     const pos = p.pos === 'bottom' ? 'bottom' : 'top';
     inner = p.src ? `<img class="ph-img" src="${esc(p.src)}" alt="" style="object-position:50% ${pos === 'bottom' ? '100%' : '0'}" decoding="async" loading="lazy">` : '';
+    if (p.previewVideo && !reduced) inner += `<video class="ph-img ph-preview" data-preview-src="${esc(p.previewVideo)}" muted playsinline loop preload="none" disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>`;
   }
   const role = alt ? (sc && (sc.hot?.length || sc.picker || sc.tasks) ? ` role="group" aria-label="${alt}"` : ` role="img" aria-label="${alt}"`) : '';
-  return `<div class="ph ph--${size}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
+  return `<div class="ph ph--${size}${p.previewVideo ? ' ph--preview' : ''}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
 }
 
 // Блоки, которые «выходят из экрана»: свой слой над телефоном (вне маски экрана), в тех же точках экрана
@@ -172,6 +173,27 @@ function segFrames(steps, T, prop, start = 0) {
 
 // ---------- запуск сцен ----------
 // Вызывается после вставки разметки. Возвращает destroy().
+// Пассивный шот открывается на постере. Загружаем ролик при первом появлении плашки.
+function initPreview(el, video) {
+  let visible = false;
+  const events = new AbortController();
+  const opts = { signal: events.signal };
+  function sync() {
+    if (!visible || document.hidden) { video.pause(); return; }
+    if (!video.hasAttribute('src')) video.src = video.dataset.previewSrc;
+    video.muted = true;
+    video.play().catch(() => {}); // Если браузер запрещает автопоказ, остаётся постер.
+  }
+  video.addEventListener('playing', () => video.classList.add('is-playing'), opts);
+  video.addEventListener('error', () => video.classList.remove('is-playing'), opts);
+  document.addEventListener('visibilitychange', sync, opts);
+  return {
+    el,
+    visible(on) { visible = on; sync(); },
+    destroy() { events.abort(); video.pause(); }
+  };
+}
+
 export function initPhones(root, { reduced = false } = {}) {
   const phones = [...root.querySelectorAll('[data-ph]')];
   if (!phones.length) return () => {};
@@ -189,6 +211,8 @@ export function initPhones(root, { reduced = false } = {}) {
   const demos = [];
   const order = new Map();
   for (const ph of phones) {
+    const preview = ph.querySelector('video[data-preview-src]');
+    if (preview) { live.push(initPreview(ph, preview)); continue; }
     const spec = reg.get(ph.dataset.ph);
     if (!spec) continue;
     if (spec.scene.tasks || spec.scene.picker) demos.push(initDemo(ph, spec.scene, reduced));
