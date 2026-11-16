@@ -825,14 +825,14 @@
       {
        "src": "assets/cases/svoi-dengi/v2/float-pig-leap.webp",
        "kind": "leapingPig",
-       "x": 437,
-       "y": 432,
-       "w": 275,
+       "x": 374,
+       "y": 186,
+       "w": 605,
        "depth": 0.55,
        "m": {
-        "x": 258,
-        "y": 756,
-        "w": 162
+        "x": 84,
+        "y": 808,
+        "w": 356.4
        }
       },
       {

@@ -225,13 +225,21 @@
 /* ---------- сцена с предметами (глава «Своя карта») ---------- */
 .stg-box{ position:relative; width:calc(350 * var(--u)); aspect-ratio:350 / 735; margin:0 auto; }
 .stg-ph{ position:relative; z-index:2; }
+.stg:where(:has(.stg-o--leap)){ container:card-stage / inline-size; width:min(calc(350 * var(--u)), var(--phone-fit)); margin-inline:auto; }
+.stg-box:has(.stg-o--leap) .stg-ph{ left:clamp(-18%, calc(50vw - 231% - 18px), 0px); }
 .stg-o{ position:absolute; left:var(--l); top:var(--t); z-index:var(--z, 1); width:var(--w); height:auto; max-width:none; translate:0 var(--py, 0px); animation:stg-float 7s ease-in-out infinite; animation-delay:calc(var(--d) * -1.7s); pointer-events:none; }
 .stg-o--pack{ left:max(var(--l), calc(50% - 50vw + 20%)); rotate:-12.58deg; }
 @keyframes stg-float{ 50%{ transform:translateY(-12px) rotate(1.5deg); } }
-.stg-o--leap{ left:min(var(--l), calc(50% + 50vw - var(--w) - 20px)); animation:stg-leap 5.6s cubic-bezier(.37,0,.25,1) infinite; }
+.stg-o--leap{ left:min(var(--l), calc(50% + 50vw - var(--w) - 5% - 16px)); animation:stg-leap 5.6s cubic-bezier(.37,0,.25,1) infinite; }
 @keyframes stg-leap{
   0%,100%{ transform:translate(0,0) rotate(-2deg); }
   48%{ transform:translate(3%,-11%) rotate(2deg) scale(.99,1.015); }
+}
+/* На узкой сцене свин прыгает у нижнего угла телефона, над лентой карт. */
+@container card-stage (width > calc(23.5vw - 8px)){
+  .stg-box{ margin-bottom:calc(153cqw + 30px); }
+  .stg-box:has(.stg-o--leap) .stg-ph{ left:0; }
+  .stg-o--leap{ top:calc(97% + 12px); }
 }
 
 /* ---------- стена карт: два ряда навстречу ---------- */
@@ -401,7 +409,8 @@ a.fin-b:active{ transform:scale(.97); }
 
   /* сцена: телефон крупнее, предметы — ближе к нему и за ним, чтобы не уходили за край и не закрывали экран */
   .stg{ --sw:min(56vw, 260px); padding:calc(var(--sw) * .3) 0 calc(var(--sw) * .26); overflow:hidden; width:100vw; margin-left:calc(50% - 50vw); }
-  .stg:has(.stg-o--leap){ padding-block:calc(var(--sw) * .51 + 20px) calc(var(--sw) * .5 + 10px); }
+  .stg:has(.stg-o--leap){ container:none; padding-block:calc(var(--sw) * .51 + 20px) calc(var(--sw) * 1.1 + 18px); }
+  .stg-box:has(.stg-o--leap) .stg-ph{ left:0; }
   .stg-o--pack,.stg-o--leap{ translate:0 clamp(-8px, var(--py, 0px), 8px); }
   .stg-box{ width:var(--sw); }
   .stg-box .ph{ --pw:var(--sw); }
