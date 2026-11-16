@@ -32,7 +32,7 @@
   --btn-h:calc(var(--button-height) * var(--k-btn));
   --btn-fs:calc(var(--button-fs) * var(--k-btn));
   --btn-px:calc(var(--button-px) * var(--k-btn));
-  --corner:clamp(120px, calc(var(--u) * 19), 380px);       /* кружок с головой в каталоге и кейсе */
+  --corner:clamp(110px, calc(var(--u) * 14.2), 230px);       /* кружок с головой в каталоге и кейсе */
   --corner-r:var(--pad-x);                                  /* его отступ справа — по правому краю кнопок шапки */
   --corner-b:clamp(12px, calc(var(--u) * 1.6), 36px);
   --hdr:96px;                            /* высота шапки — уточняется скриптом */
@@ -42,7 +42,7 @@
   --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.7 -.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 /* в кейсе голова не должна мешать чтению: кружок меньше и прижат к краю (в каталоге головы нет, кружок там же — погасший) */
-body[data-view="case"],body[data-view="work"]{ --corner:clamp(96px, calc(var(--u) * 11), 200px); --corner-r:clamp(12px, calc(var(--u) * 2), 40px); }
+body[data-view="case"],body[data-view="work"]{ --corner-r:clamp(12px, calc(var(--u) * 2), 40px); }
 /* тёмный фон проекта в каталоге и в шапке кейса: интерфейс становится белым */
 body[data-tone="dark"]{ --fg:var(--ink-dark); --on-fg:var(--ink); --mute:rgba(244,246,246,.7); --mute:color-mix(in srgb, var(--ink-dark) 70%, transparent); --line:rgba(255,255,255,.26); --pill:rgba(255,255,255,.18); --glow:var(--ink-dark); }
 /* Стекло дока (Figma: «Панель (телефон)»): панель кнопок, кружок архива и кружок головы — одной подложкой везде.
@@ -688,7 +688,7 @@ body[data-view] .pol-say .subs-line .s{ display:inline; }
 .is-pol .arch-btn{ z-index:66; }
 
 /* кружок «Архив» на главной (Figma: 171 при экране 1440×803, справа внизу): серый диск и две карточки */
-.arch-btn{ --ab:clamp(110px, calc(var(--u) * 14.2), 230px); position:fixed; z-index:30; right:var(--pad-x); bottom:clamp(16px, calc(var(--u) * 2.5), 40px); display:block; width:var(--ab); height:var(--ab);
+.arch-btn{ --ab:var(--corner); position:fixed; z-index:30; right:var(--pad-x); bottom:clamp(16px, calc(var(--u) * 2.5), 40px); display:block; width:var(--ab); height:var(--ab);
   text-decoration:none; -webkit-tap-highlight-color:transparent; animation:view-in .5s ease both; }
 body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
 .arch-disc{ position:absolute; inset:0; border-radius:50%; background:var(--dock-bg); -webkit-backdrop-filter:var(--dock-fx); backdrop-filter:var(--dock-fx); box-shadow:var(--dock-ring); transition:transform .45s var(--spring), background-color .35s; }
@@ -797,7 +797,7 @@ body:not([data-view="hero"]) .arch-btn,.no-pol .arch-btn{ display:none; }
   .site-footer{ padding-bottom:calc(var(--bar-gap) + var(--dock-c) + 24px); }
   /* полароид: кружок «Архив» — в доке слева от кнопок, того же стекла и размера, что кружок с головой; есть и в каталоге;
      голова и реплика на главной встают над ним (barH() в js/app.js) */
-  .arch-btn{ --ab:var(--dock-c); left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
+  .arch-btn{ left:var(--dock-l); right:auto; bottom:var(--bar-gap); }
   body[data-view="work"]:not(.no-pol) .arch-btn{ display:block; }
   .arch-mini--a{ left:1%; top:-2%; }
   .arch-mini--b{ left:44%; top:20%; }

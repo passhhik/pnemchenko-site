@@ -100,7 +100,7 @@ export const CHAPTERS = {
   flows(b) {
     const items = (b.items || []).filter((it) => tx(it.title));
     if (!items.length) return '';
-    return `<section class="blk fl" style="--n:${items.length}">${items.map((it) => `<div class="fl-c"><h3><i style="--c:${color(it.color) || '#2dbe60'}" aria-hidden="true"></i>${T(it.title)}</h3><ol>${(it.steps || []).map((s) => `<li>${ML(s)}</li>`).join('')}</ol></div>`).join('')}</section>`;
+    return `<section class="blk fl" style="--n:${items.length}">${items.map((it) => `<div class="fl-c"><h3><i style="--c:${color(it.color) || '#2dbe60'}" aria-hidden="true"></i>${T(it.title)}</h3>${tx(it.route) ? `<div class="level-route"><div aria-hidden="true" class="level-line level-line--${['rise','recover','keep'].includes(it.trend) ? it.trend : 'keep'}"><i></i><i></i><i></i></div><b>${T(it.route)}</b></div>` : ''}<ol>${(it.steps || []).map((s) => `<li>${ML(s)}</li>`).join('')}</ol></div>`).join('')}</section>`;
   },
 
   // Шаги в телефоне (Figma: «Кейс / Шаги в телефоне»): телефон прилипает, пока листаются шаги; активный шаг —
@@ -235,7 +235,7 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
   // ленты: перетаскивание мышью (на тачпаде и телефоне — родной свайп)
   root.querySelectorAll('[data-track]').forEach((tr) => {
     let down = false, x0 = 0, s0 = 0, moved = false;
-    on(tr, 'pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button) return; down = true; moved = false; x0 = e.clientX; s0 = tr.scrollLeft; tr.classList.add('is-drag'); });
+    on(tr, 'pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button || e.target.closest('.card-picker,.task-track,button')) return; down = true; moved = false; x0 = e.clientX; s0 = tr.scrollLeft; tr.classList.add('is-drag'); });
     on(window, 'pointermove', (e) => { if (!down) return; const dx = e.clientX - x0; if (Math.abs(dx) > 4) moved = true; tr.scrollLeft = s0 - dx; });
     on(window, 'pointerup', () => { if (!down) return; down = false; tr.classList.remove('is-drag'); });
     on(tr, 'click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
@@ -245,20 +245,30 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
   root.querySelectorAll('[data-rib]').forEach((rib) => {
     const tr = rib.querySelector('[data-track]'), cards = [...tr.children], dots = [...rib.querySelectorAll('.rib-dots i')];
     const prev = rib.querySelector('[data-prev]'), next = rib.querySelector('[data-next]');
-    const step = () => (cards[1] ? cards[1].offsetLeft - cards[0].offsetLeft : tr.clientWidth);
-    const idx = () => Math.round(tr.scrollLeft / Math.max(1, step()));
+    let stops = [], active = 0;
     const sync = () => {
-      const i = Math.min(cards.length - 1, idx()), max = tr.scrollWidth - tr.clientWidth - 2;
-      dots.forEach((d, k) => d.classList.toggle('is-on', k === (tr.scrollLeft >= max ? cards.length - 1 : i)));
-      prev.setAttribute('aria-disabled', String(tr.scrollLeft <= 2)); next.setAttribute('aria-disabled', String(tr.scrollLeft >= max));
+      const max = Math.max(0,tr.scrollWidth - tr.clientWidth);
+      const positions = cards.map(card => Math.min(max,card.offsetLeft - cards[0].offsetLeft));
+      stops = positions.filter((x,i) => i === 0 || x - positions[i-1] > 1);
+      active = stops.reduce((best,x,i) => Math.abs(tr.scrollLeft-x) < Math.abs(tr.scrollLeft-stops[best]) ? i : best,0);
+      dots.forEach((dot,i) => { dot.hidden = i >= stops.length; dot.classList.toggle('is-on', i === active); });
+      prev.disabled = active === 0;
+      next.disabled = active >= stops.length - 1;
+      prev.setAttribute('aria-disabled', String(prev.disabled));
+      next.setAttribute('aria-disabled', String(next.disabled));
     };
-    const go = (d) => {
-      if ((d < 0 ? prev : next).getAttribute('aria-disabled') === 'true') return;
-      tr.scrollTo({ left: Math.max(0, (idx() + d) * step()), behavior: reduced ? 'auto' : 'smooth' });
+    const go = (delta) => {
+      const to = stops[active+delta];
+      if (to !== undefined) tr.scrollTo({ left:to, behavior:reduced ? 'instant' : 'smooth' });
     };
+    if ('ResizeObserver' in window) {
+      const resize = new ResizeObserver(sync);
+      resize.observe(tr); cards.forEach(card => resize.observe(card));
+      offs.push(() => resize.disconnect());
+    }
     on(prev, 'click', () => go(-1)); on(next, 'click', () => go(1));
     on(tr, 'scroll', () => requestAnimationFrame(sync), { passive: true });
-    on(tr, 'keydown', (e) => { if (e.key === 'ArrowRight') { e.preventDefault(); go(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); } });
+    on(tr, 'keydown', (e) => { if (e.target !== tr) return; if (e.key === 'ArrowRight') { e.preventDefault(); go(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); } });
     sync();
   });
 
@@ -355,8 +365,6 @@ export function initChapters(root, { reduced = false, phoneApi = null } = {}) {
     if ('ResizeObserver' in window) { const ro = new ResizeObserver(f); ro.observe(el); offs.push(() => ro.disconnect()); }
   });
 
-  // стена карт: касание останавливает и снова запускает
-  root.querySelectorAll('[data-mq]').forEach((mq) => on(mq, 'click', () => mq.classList.toggle('is-paused')));
 
   // всплытие по частям: ступени, выноски, эмоции, лаймовая карточка — когда блок доехал до экрана
   const anims = root.querySelectorAll('[data-anim]');

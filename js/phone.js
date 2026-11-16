@@ -22,8 +22,9 @@
 //               — блок «выходит из экрана» к зрителю: копия над телефоном +22 % и выше на 9 pt, две мягкие тени,
 //                 в экране на его месте — пустое место #EDEEEE (как фокус на главной в шоуриле)
 //     } }
-// Цикл идёт, только пока телефон на экране; кнопка паузы — в углу телефона (WCAG 2.2.2). При «уменьшить движение» — кадр.
+// Цикл идёт, только пока телефон на экране; вне видимой области — остановка. При «уменьшить движение» — кадр.
 import { esc } from './content.js';
+import { demoHTML, initDemo } from './phone-demos.js';
 
 const SCR_W = 393, SCR_H = 852;
 // Изинг ключа After Effects (скорость 0, влияние выхода и входа в процентах) → кривая Безье для браузера
@@ -43,25 +44,24 @@ const px = (n) => `${Math.round(n * 100) / 100}px`;
 export function phoneHTML(ph, { size = 'M', label = '', cls = '', reduced = false, tilt = false } = {}) {
   if (!ph) return '';
   const p = typeof ph === 'string' ? { src: ph } : ph;
-  const sc = !reduced && isObj(p.scene) ? p.scene : null;
+  const sc = isObj(p.scene) && (!reduced || p.scene.picker || p.scene.tasks) ? p.scene : null;
   const id = `ph${++seq}`;
   if (sc) reg.set(id, p);
   const alt = esc(label || p.alt || '');
   let inner;
   if (sc) {
     const H = sc.h || SCR_H;
-    const lay = (sc.layers || []).map((l, i) => layerHTML(l, i)).join('');
-    const fixed = (sc.fixed || []).map((f) => `<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`).join('');
+    const lay = (reduced ? [] : sc.layers || []).map((l, i) => layerHTML(l, i)).join('');
+    const fixed = (reduced ? [] : sc.fixed || []).map((f) => `<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`).join('');
     const hot = (sc.hot || []).map((h, i) => `<button type="button" class="sc-hot" data-hot="${i}" style="left:${px(h.x)};top:${px(h.y)};width:${px(h.w)};height:${px(h.h)}" aria-label="${esc(h.label || '')}"></button>`).join('');
     const slots = (sc.pops || []).map((q, i) => (q.slots || []).map((r) => `<i class="sc-slot" data-slot="${i}" style="left:${px(r[0])};top:${px(r[1])};width:${px(r[2])};height:${px(r[3])};border-radius:${px(r[4] || 0)}"></i>`).join('')).join('');
-    inner = `<div class="ph-st" style="--sh:${H}"><div class="sc-c" style="height:${px(H)}"><img class="sc-b" src="${esc(sc.base)}" alt="" style="height:${px(H)}" decoding="async" loading="lazy">${slots}${lay}<i class="sc-focus" aria-hidden="true"></i><i class="sc-f2" aria-hidden="true"></i>${hot}</div>${fixed}<i class="sc-tap" aria-hidden="true"></i><img class="sc-go" alt="" decoding="async" hidden></div>`;
+    inner = `<div class="ph-st" style="--sh:${H}"><div class="sc-c" style="height:${px(H)}"><img class="sc-b" src="${esc(reduced && sc.tasks ? p.src : sc.base)}" alt="" style="height:${px(H)}" decoding="async" loading="lazy">${slots}${lay}${demoHTML(sc)}<i class="sc-focus" aria-hidden="true"></i><i class="sc-f2" aria-hidden="true"></i>${hot}</div>${fixed}<i class="sc-tap" aria-hidden="true"></i><img class="sc-go" alt="" decoding="async" hidden></div>`;
   } else {
     const pos = p.pos === 'bottom' ? 'bottom' : 'top';
     inner = p.src ? `<img class="ph-img" src="${esc(p.src)}" alt="" style="object-position:50% ${pos === 'bottom' ? '100%' : '0'}" decoding="async" loading="lazy">` : '';
   }
-  const ctl = sc ? `<button type="button" class="ph-ctl" data-ph-ctl aria-label="Пауза анимации${alt ? `: ${alt}` : ''}" aria-pressed="false"><img src="assets/ui/pause.svg" alt="" class="ph-ctl-pause"><img src="assets/ui/play.svg" alt="" class="ph-ctl-play"></button>` : '';
-  const role = alt ? (sc && sc.hot && sc.hot.length ? ` role="group" aria-label="${alt}"` : ` role="img" aria-label="${alt}"`) : '';
-  return `<div class="ph ph--${size}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc ? popsHTML(sc) : ''}${ctl}</div>`;
+  const role = alt ? (sc && (sc.hot?.length || sc.picker || sc.tasks) ? ` role="group" aria-label="${alt}"` : ` role="img" aria-label="${alt}"`) : '';
+  return `<div class="ph ph--${size}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
 }
 
 // Блоки, которые «выходят из экрана»: свой слой над телефоном (вне маски экрана), в тех же точках экрана
@@ -186,10 +186,13 @@ export function initPhones(root, { reduced = false } = {}) {
   if (ro) phones.forEach((ph) => ro.observe(ph.querySelector('.ph-scr') || ph));
 
   const live = [];
+  const demos = [];
   const order = new Map();
   for (const ph of phones) {
     const spec = reg.get(ph.dataset.ph);
-    if (!spec || reduced) continue;
+    if (!spec) continue;
+    if (spec.scene.tasks || spec.scene.picker) demos.push(initDemo(ph, spec.scene, reduced));
+    if (reduced || spec.scene.picker) continue;
     const blk = ph.closest('[data-b]') || root, n = order.get(blk) || 0;
     order.set(blk, n + 1);
     const s = makeScene(ph, spec, n * 1.2);
@@ -218,6 +221,7 @@ export function initPhones(root, { reduced = false } = {}) {
   return () => {
     io && io.disconnect(); ro && ro.disconnect();
     live.forEach((s) => s.destroy());
+    demos.forEach(dispose => dispose());
     offs.forEach((f) => f());
     phones.forEach((ph) => reg.delete(ph.dataset.ph));
   };
@@ -301,10 +305,12 @@ function makeScene(el, spec, phase = 0) {
       { offset: o(peak), transform: `translateY(${up}px) scale(${k})`, opacity: opv },
       { offset: o(back), transform: `translateY(${up}px) scale(${k})`, opacity: opv, easing: ae(55, 80) },
       { offset: o(end), transform: 'none', opacity: 0 }, { offset: 1, transform: 'none', opacity: 0 }];
+    const scale = q.scale ?? 1.22;
+    const liftY = q.liftY ?? -9;
     run(p, hold);
-    run(p.querySelector('.pop-im'), lift(-9, 1.22, 1).map((k) => ({ ...k, opacity: 1 })));
-    run(p.querySelector('.pop-sh--s'), lift(8, 1.196, .3));
-    run(p.querySelector('.pop-sh--c'), lift(-4, 1.22, .16));
+    run(p.querySelector('.pop-im'), lift(liftY, scale, 1).map((k) => ({ ...k, opacity: 1 })));
+    run(p.querySelector('.pop-sh--s'), lift(liftY + 17, scale * .98, .3));
+    run(p.querySelector('.pop-sh--c'), lift(liftY + 5, scale, .16));
     el.querySelectorAll(`.sc-slot[data-slot="${i}"]`).forEach((sl) => run(sl, hold));
     // слои, которые выходят вместе с блоком (свинья на балансе, монеты на уроке): в экране на это время прячем
     (q.with || []).forEach((n) => {
@@ -318,23 +324,13 @@ function makeScene(el, spec, phase = 0) {
   // сдвиг по фазе для соседей (в секундах): все анимации этого телефона сдвигаются вместе и остаются синхронными
   if (phase) anims.forEach((a) => { if (a.effect.getTiming().duration === ms) a.currentTime = (phase * 1000) % ms; });
   const loops = anims.slice();
-  let shown = false, userPaused = false, playing = false;
+  let shown = false, playing = false;
   const sync = () => {
-    const go = shown && !userPaused && !el.classList.contains('is-hold');
+    const go = shown && !el.classList.contains('is-hold');
     if (go === playing) return;
     playing = go;
     loops.forEach((a) => (go ? a.play() : a.pause()));
-    el.classList.toggle('is-paused', !go && userPaused);
   };
-  // кнопка паузы
-  const ctl = el.querySelector('[data-ph-ctl]');
-  const onCtl = (e) => {
-    e.stopPropagation();
-    userPaused = !userPaused;
-    ctl.setAttribute('aria-pressed', String(userPaused));   // подпись постоянная, меняется только «нажата / не нажата»
-    sync();
-  };
-  ctl && ctl.addEventListener('click', onCtl);
   // нажимаемые места: экран меняется, как в прототипе; через 2,8 с (или по второму нажатию) — обратно в цикл
   const go = el.querySelector('.sc-go');
   let hotT = 0;
@@ -375,7 +371,7 @@ function makeScene(el, spec, phase = 0) {
   return {
     el, api,
     visible(v) { shown = v; sync(); },
-    destroy() { anims.forEach((a) => a.cancel()); clearTimeout(hotT); ctl && ctl.removeEventListener('click', onCtl); st && st.removeEventListener('click', onHot); },
+    destroy() { anims.forEach((a) => a.cancel()); clearTimeout(hotT); st && st.removeEventListener('click', onHot); },
   };
 }
 

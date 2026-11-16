@@ -159,20 +159,15 @@
            "x": 20,
            "y": 466,
            "w": 353,
-           "h": 174,
-           "in": "pop",
-           "at": 1.46
+           "h": 174
           },
           {
            "name": "pig",
-           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pig.webp",
-           "x": 159,
-           "y": 444,
-           "w": 234,
-           "h": 196,
-           "in": "burst",
-           "at": 1.95,
-           "idle": "bob"
+           "src": "assets/cases/svoi-dengi/v2/refusal-pig-full.webp",
+           "x": 185,
+           "y": 441,
+           "w": 184,
+           "h": 195
           },
           {
            "name": "btn",
@@ -365,66 +360,78 @@
         "src": "assets/cases/svoi-dengi/v2/scr-choose-card.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-choose-base.webp",
-         "dur": 7.8,
-         "layers": [
+         "picker": [
           {
-           "name": "strip",
-           "src": "assets/cases/svoi-dengi/v2/sc-choose-strip.webp",
-           "x": -312,
-           "y": 167,
-           "w": 1015.7,
-           "h": 202
-          },
-          {
-           "name": "dots",
-           "src": "assets/cases/svoi-dengi/v2/sc-choose-dots.webp",
-           "x": 166,
-           "y": 401,
-           "w": 60,
-           "h": 8
-          },
-          {
-           "name": "btn",
-           "src": "assets/cases/svoi-dengi/v2/sc-choose-btn.webp",
-           "x": 19,
-           "y": 739,
-           "w": 355,
-           "h": 62,
-           "press": [
-            6.83
+           "title": "Снэки",
+           "icon": "assets/cases/svoi-dengi/v2/pick-snacks.webp",
+           "cards": [
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a10.webp",
+             "alt": "Снэки · дизайн 1"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a03.webp",
+             "alt": "Снэки · дизайн 2"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-b17.webp",
+             "alt": "Снэки · дизайн 3"
+            }
            ]
-          }
-         ],
-         "strip": {
-          "layer": "strip",
-          "steps": [
-           {
-            "to": -345.3,
-            "at": 0.98,
-            "d": 0.7
-           },
-           {
-            "to": 0,
-            "at": 2.44,
-            "d": 0.7
-           },
-           {
-            "to": 345.3,
-            "at": 3.9,
-            "d": 0.7
-           },
-           {
-            "to": 0,
-            "at": 5.37,
-            "d": 0.7
-           }
-          ]
-         },
-         "tap": [
+          },
           {
-           "x": 196,
-           "y": 770,
-           "at": 6.83
+           "title": "Животные",
+           "icon": "assets/cases/svoi-dengi/v2/pick-animals.webp",
+           "cards": [
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a01.webp",
+             "alt": "Животные · дизайн 1"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a08.webp",
+             "alt": "Животные · дизайн 2"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-b15.webp",
+             "alt": "Животные · дизайн 3"
+            }
+           ]
+          },
+          {
+           "title": "Hello Kitty",
+           "icon": "assets/cases/svoi-dengi/v2/pick-kitty.webp",
+           "cards": [
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a09.webp",
+             "alt": "Hello Kitty · дизайн 1"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-b16.webp",
+             "alt": "Hello Kitty · дизайн 2"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a02.webp",
+             "alt": "Hello Kitty · дизайн 3"
+            }
+           ]
+          },
+          {
+           "title": "Игры",
+           "icon": "assets/cases/svoi-dengi/v2/pick-games.webp",
+           "cards": [
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-a07.webp",
+             "alt": "Игры · дизайн 1"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-b14.webp",
+             "alt": "Игры · дизайн 2"
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/card-b21.webp",
+             "alt": "Игры · дизайн 3"
+            }
+           ]
           }
          ]
         }
@@ -580,7 +587,9 @@
         "Заявка: приложение само собирает резюме достижений",
         "Родитель решает по чек-листу: права до и после",
         "Ритуал нового уровня и новые права"
-       ]
+       ],
+       "route": "4 недели → заявка на повышение",
+       "trend": "rise"
       },
       {
        "title": "Вниз",
@@ -590,7 +599,9 @@
         "Понижение на один уровень — причина обязательна, ребёнок её видит",
         "План возврата сразу: те же условия, 14 дней вместо 30",
         "Заявка — и уровень возвращается"
-       ]
+       ],
+       "route": "14 дней → заявка на возврат",
+       "trend": "recover"
       },
       {
        "title": "Не наказываем",
@@ -599,7 +610,9 @@
         "Жёлтый инцидент: потратил копилку, вышел за план — тема для разговора",
         "Пожалел о покупке — не инцидент, а повод для урока",
         "Право на ошибку — основа модели"
-       ]
+       ],
+       "route": "Уровень сохраняется",
+       "trend": "keep"
       }
      ]
     },
@@ -666,66 +679,78 @@
       "src": "assets/cases/svoi-dengi/v2/scr-choose-card.webp",
       "scene": {
        "base": "assets/cases/svoi-dengi/v2/sc-choose-base.webp",
-       "dur": 7.8,
-       "layers": [
+       "picker": [
         {
-         "name": "strip",
-         "src": "assets/cases/svoi-dengi/v2/sc-choose-strip.webp",
-         "x": -312,
-         "y": 167,
-         "w": 1015.7,
-         "h": 202
-        },
-        {
-         "name": "dots",
-         "src": "assets/cases/svoi-dengi/v2/sc-choose-dots.webp",
-         "x": 166,
-         "y": 401,
-         "w": 60,
-         "h": 8
-        },
-        {
-         "name": "btn",
-         "src": "assets/cases/svoi-dengi/v2/sc-choose-btn.webp",
-         "x": 19,
-         "y": 739,
-         "w": 355,
-         "h": 62,
-         "press": [
-          6.83
+         "title": "Снэки",
+         "icon": "assets/cases/svoi-dengi/v2/pick-snacks.webp",
+         "cards": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a10.webp",
+           "alt": "Снэки · дизайн 1"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a03.webp",
+           "alt": "Снэки · дизайн 2"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-b17.webp",
+           "alt": "Снэки · дизайн 3"
+          }
          ]
-        }
-       ],
-       "strip": {
-        "layer": "strip",
-        "steps": [
-         {
-          "to": -345.3,
-          "at": 0.98,
-          "d": 0.7
-         },
-         {
-          "to": 0,
-          "at": 2.44,
-          "d": 0.7
-         },
-         {
-          "to": 345.3,
-          "at": 3.9,
-          "d": 0.7
-         },
-         {
-          "to": 0,
-          "at": 5.37,
-          "d": 0.7
-         }
-        ]
-       },
-       "tap": [
+        },
         {
-         "x": 196,
-         "y": 770,
-         "at": 6.83
+         "title": "Животные",
+         "icon": "assets/cases/svoi-dengi/v2/pick-animals.webp",
+         "cards": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a01.webp",
+           "alt": "Животные · дизайн 1"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a08.webp",
+           "alt": "Животные · дизайн 2"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-b15.webp",
+           "alt": "Животные · дизайн 3"
+          }
+         ]
+        },
+        {
+         "title": "Hello Kitty",
+         "icon": "assets/cases/svoi-dengi/v2/pick-kitty.webp",
+         "cards": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a09.webp",
+           "alt": "Hello Kitty · дизайн 1"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-b16.webp",
+           "alt": "Hello Kitty · дизайн 2"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a02.webp",
+           "alt": "Hello Kitty · дизайн 3"
+          }
+         ]
+        },
+        {
+         "title": "Игры",
+         "icon": "assets/cases/svoi-dengi/v2/pick-games.webp",
+         "cards": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-a07.webp",
+           "alt": "Игры · дизайн 1"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-b14.webp",
+           "alt": "Игры · дизайн 2"
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/card-b21.webp",
+           "alt": "Игры · дизайн 3"
+          }
+         ]
         }
        ]
       }
@@ -941,12 +966,11 @@
        "layers": [
         {
          "name": "pig",
-         "src": "assets/cases/svoi-dengi/v2/sc-home-pig.webp",
-         "x": 164.2,
+         "src": "assets/cases/svoi-dengi/v2/home-balance-pig.webp",
+         "x": 20,
          "y": 154,
-         "w": 228.8,
-         "h": 222,
-         "idle": "bob"
+         "w": 373,
+         "h": 251.5
         },
         {
          "name": "coin1",
@@ -1074,48 +1098,9 @@
            "w": 377,
            "h": 84
           }
-         ]
-        },
-        {
-         "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks.webp",
-         "x": 20,
-         "y": 476,
-         "w": 322,
-         "h": 157,
-         "at": 4.39,
-         "d": 1.85,
-         "slots": [
-          [
-           20,
-           476,
-           157,
-           157,
-           16
-          ],
-          [
-           185,
-           476,
-           157,
-           157,
-           16
-          ]
          ],
-         "sh": [
-          {
-           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks-shs.webp",
-           "x": -42,
-           "y": -42,
-           "w": 406,
-           "h": 241
-          },
-          {
-           "src": "assets/cases/svoi-dengi/v2/sc-home-pop-tasks-shc.webp",
-           "x": -12,
-           "y": -12,
-           "w": 346,
-           "h": 181
-          }
-         ]
+         "liftY": 2,
+         "scale": 1.09
         },
         {
          "src": "assets/cases/svoi-dengi/v2/sc-home-pop-goal.webp",
@@ -1189,6 +1174,23 @@
           }
          ]
         }
+       ],
+       "tasks": [
+        {
+         "when": "Папа",
+         "title": "Выкинуть мусор",
+         "reward": "+ 125 ₽"
+        },
+        {
+         "when": "Через 5 дней",
+         "title": "Карманные деньги",
+         "reward": "+ 500 ₽"
+        },
+        {
+         "when": "Через 17 дней",
+         "title": "На обеды в школе",
+         "reward": "+ 2 500 ₽"
+        }
        ]
       }
      },
@@ -1224,14 +1226,6 @@
      "type": "scenario",
      "gap": 60,
      "items": [
-      {
-       "phone": {
-        "src": "assets/cases/svoi-dengi/v2/scr-d3-over.webp",
-        "pos": "top"
-       },
-       "caption": "Больше лимита",
-       "alt": "Оплата больше лимита: приложение предлагает спросить маму"
-      },
       {
        "phone": {
         "src": "assets/cases/svoi-dengi/v2/scr-d3-over.webp",
@@ -1282,7 +1276,7 @@
          ]
         }
        },
-       "caption": "Зачем это тебе",
+       "caption": "Больше лимита — объясняем зачем",
        "alt": "Ребёнок пишет, зачем ему покупка"
       },
       {
@@ -1361,14 +1355,13 @@
           },
           {
            "name": "pig",
-           "src": "assets/cases/svoi-dengi/v2/sc-send-pig.webp",
-           "x": 0,
-           "y": 299.5,
-           "w": 256.1,
-           "h": 229.9,
-           "in": "burst",
-           "at": 0.98,
-           "idle": "run"
+           "src": "assets/cases/svoi-dengi/v2/pig-run-loop.webp",
+           "x": 15,
+           "y": 315,
+           "w": 249,
+           "h": 232.5,
+           "in": "fade",
+           "at": 0.98
           },
           {
            "name": "buy",
@@ -1609,20 +1602,15 @@
            "x": 20,
            "y": 466,
            "w": 353,
-           "h": 174,
-           "in": "pop",
-           "at": 1.46
+           "h": 174
           },
           {
            "name": "pig",
-           "src": "assets/cases/svoi-dengi/v2/sc-refuse-pig.webp",
-           "x": 159,
-           "y": 444,
-           "w": 234,
-           "h": 196,
-           "in": "burst",
-           "at": 1.95,
-           "idle": "bob"
+           "src": "assets/cases/svoi-dengi/v2/refusal-pig-full.webp",
+           "x": 185,
+           "y": 441,
+           "w": 184,
+           "h": 195
           },
           {
            "name": "btn",
