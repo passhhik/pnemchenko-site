@@ -156,7 +156,8 @@
 /* Поля прозрачного холста убираются из раскладки. Текст и весь силуэт, включая монеты, занимают своё место. */
 .ld-art{ flex:1 0 auto; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; margin-inline:calc(-1 * var(--inset)); }
 .ld-art .ld-img{ --zoom:1.36; flex:none; width:calc(100% * var(--zoom)); max-width:none; height:auto;
-  margin-block:calc(-1 * var(--zoom) * var(--art-top,25%)) calc(-11% * var(--zoom)); }
+  margin-block:calc(-1 * var(--zoom) * var(--art-top,25%)) calc(-11% * var(--zoom));
+  transform:scale(.85); transform-origin:50% 88.65%; } /* Линия копыт на прозрачном холсте. */
 @media (min-width:761px) and (max-width:960px) and (min-aspect-ratio:17/20){
   .ld--mascot{ --inset:10px; }
   .ld--mascot .ld-s{ gap:5px; padding-bottom:6px; }
