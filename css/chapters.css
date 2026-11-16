@@ -197,14 +197,14 @@
 
 /* ---------- шаги в телефоне (Figma: «Кейс / Шаги в телефоне»): телефон прилипает, шаги листаются ---------- */
 .ps{ position:relative; height:calc(100vh + var(--n, 5) * 34vh); }
-.ps-pin{ position:sticky; top:0; display:flex; align-items:center; justify-content:center; height:100vh; padding-top:var(--hdr, 72px); box-sizing:border-box; }
+.ps-pin{ --pin-top:calc(var(--hdr, 72px) + 12px); position:sticky; top:var(--pin-top); display:flex; align-items:flex-start; justify-content:center; height:calc(100vh - var(--pin-top)); }
 /* телефон шагов целиком влезает в экран по высоте (ноутбук 13–14″: окно браузера ~780 px), шапка сайта его не закрывает */
 .ps-ph .ph{ --pw:min(calc(350 * var(--u)), calc((100vh - var(--hdr, 72px) - 40px) * .476)); }
 @supports (height:100svh){
-  .ps{ height:calc(100svh + var(--n, 5) * 34svh); } .ps-pin{ height:100svh; }
+  .ps{ height:calc(100svh + var(--n, 5) * 34svh); } .ps-pin{ height:calc(100svh - var(--pin-top)); }
   .ps-ph .ph{ --pw:min(calc(350 * var(--u)), calc((100svh - var(--hdr, 72px) - 40px) * .476)); }
 }
-.ps-in{ display:flex; align-items:center; gap:calc(100 * var(--u)); }
+.ps-in{ display:flex; align-items:flex-start; gap:calc(100 * var(--u)); }
 .ps-list{ display:flex; flex-direction:column; gap:10px; width:calc(520 * var(--u)); margin:0; padding:0; list-style:none; }
 .ps-b{ display:flex; align-items:flex-start; gap:20px; width:100%; padding:25px 30px; border:0; border-radius:32px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:background-color .4s; }
 .ps-i.is-on .ps-b{ background:var(--card); }

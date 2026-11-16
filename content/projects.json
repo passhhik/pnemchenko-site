@@ -674,7 +674,7 @@
     },
     {
      "type": "phoneSteps",
-     "gap": 60,
+     "gap": 40,
      "items": [
       {
        "title": "Расскажите о ребёнке",
