@@ -144,7 +144,8 @@ export const CHAPTERS = {
     };
     const objs = (b.objects || []).map((o) => {
       const m = mob(o);
-      return `<img class="stg-o" src="${esc(srcOf(o.src))}" alt="" aria-hidden="true" loading="lazy" decoding="async" style="--l:${pct(o.x, PW)};--t:${pct(o.y, PH)};--w:${pct(o.w, PW)};--z:${o.front ? 3 : 1};--ml:${pct(m.x, PW)};--mt:${pct(m.y, PH)};--mw:${pct(m.w, PW)};--mz:${m.front ? 3 : 1};--d:${+o.depth || 1}">`;
+      const modifier = { pack: ' stg-o--pack', leapingPig: ' stg-o--leap' }[o.kind] || '';
+      return `<img class="stg-o${modifier}" src="${esc(srcOf(o.src))}" alt="" aria-hidden="true" loading="lazy" decoding="async" style="--l:${pct(o.x, PW)};--t:${pct(o.y, PH)};--w:${pct(o.w, PW)};--z:${o.front ? 3 : 1};--ml:${pct(m.x, PW)};--mt:${pct(m.y, PH)};--mw:${pct(m.w, PW)};--mz:${m.front ? 3 : 1};--d:${+o.depth || 1}">`;
     }).join('');
     return `<section class="blk stg" data-stage><div class="stg-box">${objs}<div class="stg-ph">${phoneHTML(b.phone, { size: 'L', label: b.alt, reduced: ctx.reduced, tilt: true })}</div></div></section>`;
   },

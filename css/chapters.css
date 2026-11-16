@@ -226,7 +226,13 @@
 .stg-box{ position:relative; width:calc(350 * var(--u)); aspect-ratio:350 / 735; margin:0 auto; }
 .stg-ph{ position:relative; z-index:2; }
 .stg-o{ position:absolute; left:var(--l); top:var(--t); z-index:var(--z, 1); width:var(--w); height:auto; max-width:none; translate:0 var(--py, 0px); animation:stg-float 7s ease-in-out infinite; animation-delay:calc(var(--d) * -1.7s); pointer-events:none; }
+.stg-o--pack{ left:max(var(--l), calc(50% - 50vw + 20%)); rotate:-12.58deg; }
 @keyframes stg-float{ 50%{ transform:translateY(-12px) rotate(1.5deg); } }
+.stg-o--leap{ left:min(var(--l), calc(50% + 50vw - var(--w) - 20px)); scale:-1 1; animation:stg-leap 5.6s cubic-bezier(.37,0,.25,1) infinite; }
+@keyframes stg-leap{
+  0%,100%{ transform:translate(0,0) rotate(-2deg); }
+  48%{ transform:translate(3%,-11%) rotate(2deg) scale(.99,1.015); }
+}
 
 /* ---------- стена карт: два ряда навстречу ---------- */
 .mq{ display:flex; flex-direction:column; gap:15px; width:100vw; margin-left:calc(50% - 50vw); overflow:hidden; }
@@ -395,6 +401,8 @@ a.fin-b:active{ transform:scale(.97); }
 
   /* сцена: телефон крупнее, предметы — ближе к нему и за ним, чтобы не уходили за край и не закрывали экран */
   .stg{ --sw:min(56vw, 260px); padding:calc(var(--sw) * .3) 0 calc(var(--sw) * .26); overflow:hidden; width:100vw; margin-left:calc(50% - 50vw); }
+  .stg:has(.stg-o--leap){ padding-block:calc(var(--sw) * .51 + 20px) calc(var(--sw) * .5 + 10px); }
+  .stg-o--pack,.stg-o--leap{ translate:0 clamp(-8px, var(--py, 0px), 8px); }
   .stg-box{ width:var(--sw); }
   .stg-box .ph{ --pw:var(--sw); }
   .stg-o{ left:var(--ml); top:var(--mt); width:var(--mw); z-index:var(--mz, 1); }

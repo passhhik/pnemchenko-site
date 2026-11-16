@@ -809,15 +809,30 @@
      "objects": [
       {
        "src": "assets/cases/svoi-dengi/v2/float-pack.webp",
-       "x": -545,
-       "y": -168,
-       "w": 471.3,
-       "depth": 1.4,
+       "kind": "pack",
+       "x": -436,
+       "y": 54,
+       "w": 280,
+       "depth": 0.65,
        "front": false,
        "m": {
-        "x": -120,
-        "y": -95,
-        "w": 190
+        "x": -103,
+        "y": -150,
+        "w": 115,
+        "front": true
+       }
+      },
+      {
+       "src": "assets/cases/svoi-dengi/v2/float-pig-leap.webp",
+       "kind": "leapingPig",
+       "x": 437,
+       "y": 432,
+       "w": 275,
+       "depth": 0.55,
+       "m": {
+        "x": 258,
+        "y": 756,
+        "w": 162
        }
       },
       {
