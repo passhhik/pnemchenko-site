@@ -154,7 +154,7 @@
 .ld--mascot .ld-s{ align-self:stretch; margin-top:calc((var(--n) - 1 - var(--i)) * var(--rise)); height:auto;
   min-height:calc(var(--h) * var(--step-unit)); gap:6px; padding:var(--inset) var(--inset) calc(10 * var(--u)); }
 /* Поля прозрачного холста убираются из раскладки. Текст и весь силуэт, включая монеты, занимают своё место. */
-.ld-art{ flex:1 0 auto; display:flex; flex-direction:column; justify-content:center; align-items:center; margin-inline:calc(-1 * var(--inset)); }
+.ld-art{ flex:1 0 auto; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; margin-inline:calc(-1 * var(--inset)); }
 .ld-art .ld-img{ --zoom:1.36; flex:none; width:calc(100% * var(--zoom)); max-width:none; height:auto;
   margin-block:calc(-1 * var(--zoom) * var(--art-top,25%)) calc(-11% * var(--zoom)); }
 @media (min-width:761px) and (max-width:960px) and (min-aspect-ratio:17/20){
