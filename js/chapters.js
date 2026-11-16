@@ -51,7 +51,12 @@ export const CHAPTERS = {
     const card = (it) => {
       let vis = '';
       if (it.phone) vis = phoneHTML(it.phone, { size: 'M', label: it.alt || it.caption, reduced: ctx.reduced });
-      else if (it.cycle && it.cycle.length) vis = `<div class="rib-cyc" data-cycle="${+it.every || 1500}">${it.cycle.map((s, i) => img(s, i ? '' : (it.alt || it.caption), i ? ' class="" aria-hidden="true"' : ' class="is-on"')).join('')}</div>`;
+      else if (it.cycle && it.cycle.length) {
+        const cycle = `<div class="rib-cyc" data-cycle="${+it.every || 1500}">${it.cycle.map((s, i) => img(s, i ? '' : (it.alt || it.caption), i ? ' aria-hidden="true"' : ' class="is-on"')).join('')}</div>`;
+        vis = srcOf(it.cycleShadow)
+          ? `<div class="rib-mascot">${img(it.cycleShadow, '', ' class="rib-ground" aria-hidden="true"')}${cycle}</div>`
+          : cycle;
+      }
       else vis = img(it.image, it.alt || it.caption, ' class="rib-img"');
       return `<div class="rib-card" role="group" aria-roledescription="слайд" aria-label="${items.indexOf(it) + 1} из ${items.length}"><h3 class="rib-cap">${ML(it.caption)}</h3><div class="rib-vis">${vis}</div></div>`;
     };

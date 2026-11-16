@@ -94,6 +94,11 @@
 .rib-cyc{ position:relative; width:100%; height:100%; }
 .rib-cyc img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .3s ease-in-out; }
 .rib-cyc img.is-on{ opacity:1; }
+.rib-card:has(.rib-mascot){ position:relative; isolation:isolate; }
+.rib-card:has(.rib-mascot) .rib-vis{ position:absolute; inset:0; container-type:size; pointer-events:none; }
+/* Центр корпуса в девяти исходниках — (50%, 57.1%). Монеты могут заходить на заголовок. */
+.rib-mascot{ position:absolute; left:50%; top:50%; width:min(115cqw,89cqh); aspect-ratio:1; transform:translate(-50%,-57.1%); }
+.rib-ground{ position:absolute; left:19.75%; top:68.65%; width:58.71%; height:auto; }
 .rib-ctl{ display:flex; justify-content:center; align-items:center; gap:20px; margin-top:calc(40 * var(--u)); }
 .rib-btn{ display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:22px; background:rgba(29,29,31,.2); color:#1d1d1f; cursor:pointer; transition:opacity .25s, background-color .25s, transform .2s; }
 .rib-btn:disabled,.rib-btn[aria-disabled="true"]{ opacity:.35; cursor:default; }

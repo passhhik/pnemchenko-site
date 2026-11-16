@@ -155,19 +155,11 @@
           },
           {
            "name": "save",
-           "src": "assets/cases/svoi-dengi/v2/sc-refuse-save.webp",
+           "src": "assets/cases/svoi-dengi/v2/ribbon-refusal-banner.webp",
            "x": 20,
-           "y": 466,
-           "w": 353,
-           "h": 174
-          },
-          {
-           "name": "pig",
-           "src": "assets/cases/svoi-dengi/v2/refusal-pig-full.webp",
-           "x": 185,
-           "y": 441,
-           "w": 184,
-           "h": 195
+           "y": 444,
+           "w": 396,
+           "h": 196
           },
           {
            "name": "btn",
@@ -340,6 +332,7 @@
       {
        "caption": "Маскот тут ассистент, \nа не главный герой",
        "alt": "Свин-банкир — маскот приложения",
+       "cycleShadow": "assets/cases/svoi-dengi/v2/ribbon-hoof-shadow.webp",
        "cycle": [
         "assets/cases/svoi-dengi/v2/pig-support.webp",
         "assets/cases/svoi-dengi/v2/pig-joy.webp",
