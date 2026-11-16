@@ -332,17 +332,43 @@
       {
        "caption": "Маскот тут ассистент, \nа не главный герой",
        "alt": "Свин-банкир — маскот приложения",
-       "cycleShadow": "assets/cases/svoi-dengi/v2/ribbon-hoof-shadow.webp",
        "cycle": [
-        "assets/cases/svoi-dengi/v2/pig-support.webp",
-        "assets/cases/svoi-dengi/v2/pig-joy.webp",
-        "assets/cases/svoi-dengi/v2/pig-touched.webp",
-        "assets/cases/svoi-dengi/v2/pig-cool.webp",
-        "assets/cases/svoi-dengi/v2/pig-rich.webp",
-        "assets/cases/svoi-dengi/v2/pig-calc.webp",
-        "assets/cases/svoi-dengi/v2/pig-puzzled.webp",
-        "assets/cases/svoi-dengi/v2/pig-lost.webp",
-        "assets/cases/svoi-dengi/v2/pig-hurt.webp"
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-support.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/support.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-joy.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/joy.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-touched.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/touched.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-cool.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/cool.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-rich.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/rich.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-calc.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/calc.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-puzzled.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/puzzled.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-lost.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/lost.webp"
+        },
+        {
+         "src": "assets/cases/svoi-dengi/v2/pig-hurt.webp",
+         "shadow": "assets/cases/svoi-dengi/v2/ribbon-shadows/hurt.webp"
+        }
        ],
        "every": 1500
       },

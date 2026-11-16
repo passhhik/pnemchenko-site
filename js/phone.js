@@ -382,15 +382,15 @@ export function initCycles(root, { reduced = false } = {}) {
   const timers = [];
   const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { e.target.dataset.vis = e.isIntersecting ? '1' : ''; }), { threshold: .3 }) : null;
   for (const el of els) {
-    const imgs = [...el.querySelectorAll('img')];
-    if (imgs.length < 2) continue;
+    const frames = [...el.children];
+    if (frames.length < 2) continue;
     io ? io.observe(el) : (el.dataset.vis = '1');
     let i = 0;
     timers.push(setInterval(() => {
       if (!el.dataset.vis || document.hidden) return;
-      imgs[i].classList.remove('is-on');
-      i = (i + 1) % imgs.length;
-      imgs[i].classList.add('is-on');
+      frames[i].classList.remove('is-on');
+      i = (i + 1) % frames.length;
+      frames[i].classList.add('is-on');
     }, +el.dataset.cycle || 1600));
   }
   return () => { timers.forEach(clearInterval); io && io.disconnect(); };

@@ -52,8 +52,14 @@ export const CHAPTERS = {
       let vis = '';
       if (it.phone) vis = phoneHTML(it.phone, { size: 'M', label: it.alt || it.caption, reduced: ctx.reduced });
       else if (it.cycle && it.cycle.length) {
-        const cycle = `<div class="rib-cyc" data-cycle="${+it.every || 1500}">${it.cycle.map((s, i) => img(s, i ? '' : (it.alt || it.caption), i ? ' aria-hidden="true"' : ' class="is-on"')).join('')}</div>`;
-        vis = srcOf(it.cycleShadow)
+        const frames = it.cycle.map((frame, i) => {
+          const state = i ? ' aria-hidden="true"' : ' class="is-on"';
+          const alt = i ? '' : (it.alt || it.caption);
+          if (!srcOf(frame?.shadow)) return img(frame, alt, state);
+          return `<span${state}>${img(frame.shadow, '')}${img(frame, alt)}</span>`;
+        });
+        const cycle = `<div class="rib-cyc" data-cycle="${+it.every || 1500}">${frames.join('')}</div>`;
+        vis = srcOf(it.cycleShadow) || it.cycle.some(frame => srcOf(frame?.shadow))
           ? `<div class="rib-mascot">${img(it.cycleShadow, '', ' class="rib-ground" aria-hidden="true"')}${cycle}</div>`
           : cycle;
       }
