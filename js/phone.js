@@ -53,7 +53,7 @@ export function phoneHTML(ph, { size = 'M', label = '', cls = '', reduced = fals
   if (sc) {
     const H = sc.h || SCR_H;
     const lay = (reduced ? [] : sc.layers || []).map((l, i) => layerHTML(l, i)).join('');
-    const fixed = reduced ? '' : fixedHTML(sc.fixed);
+    const fixed = fixedHTML(reduced ? sc.fixed?.filter(f => sc.tasks && f.at === 'bottom') : sc.fixed);
     const shots = (reduced ? [] : sc.shots || []).map(shotHTML).join('');
     const hot = (sc.hot || []).map((h, i) => `<button type="button" class="sc-hot" data-hot="${i}" style="left:${px(h.x)};top:${px(h.y)};width:${px(h.w)};height:${px(h.h)}" aria-label="${esc(h.label || '')}"></button>`).join('');
     const slots = (sc.pops || []).map((q, i) => (q.slots || []).map((r) => `<i class="sc-slot" data-slot="${i}" style="left:${px(r[0])};top:${px(r[1])};width:${px(r[2])};height:${px(r[3])};border-radius:${px(r[4] || 0)}"></i>`).join('')).join('');
@@ -64,11 +64,14 @@ export function phoneHTML(ph, { size = 'M', label = '', cls = '', reduced = fals
     if (p.previewVideo && !reduced) inner += `<video class="ph-img ph-preview" data-preview-src="${esc(p.previewVideo)}" muted playsinline loop preload="none" disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>`;
   }
   const role = alt ? (sc && (sc.hot?.length || sc.picker || sc.tasks) ? ` role="group" aria-label="${alt}"` : ` role="img" aria-label="${alt}"`) : '';
-  return `<div class="ph ph--${size}${p.previewVideo ? ' ph--preview' : ''}${p.scene?.shots?.length ? ' ph--story' : ''}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
+  return `<div class="ph ph--${size}${p.previewVideo ? ' ph--preview' : ''}${p.scene?.shots?.length ? ' ph--story' : ''}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt && !sc?.camera ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
 }
 
 function fixedHTML(layers) {
-  return (layers || []).map(f => `<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`).join('');
+  return (layers || []).map(f => {
+    const backdrop = f.scrollBackdrop ? '<i class="sc-status-band" aria-hidden="true"></i>' : '';
+    return `${backdrop}<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`;
+  }).join('');
 }
 
 function shotHTML(shot) {
@@ -169,16 +172,16 @@ const IDLE = {
   run: [[{ transform: 'translateY(0) rotate(-8deg) scale(1.07,.92)' }, { transform: 'translateY(-16px) rotate(-3deg) scale(.98,1.03)', offset: .45 }, { transform: 'translateY(0) rotate(-8deg) scale(1.07,.92)' }], 333],
 };
 // Прокрутка и лента: значение по сегментам [{to, at, d}] — между сегментами стоит
-function segFrames(steps, T, prop, start = 0) {
+function segFrames(steps, T, prop, start = 0, property = 'transform') {
   const o = (t) => Math.min(1, Math.max(0, t / T));
-  const kf = [{ offset: 0, transform: prop(start) }];
+  const kf = [{ offset: 0, [property]: prop(start) }];
   let cur = start;
   for (const s of steps) {
-    kf.push({ offset: o(s.at), transform: prop(cur), easing: EASE_IO });
+    kf.push({ offset: o(s.at), [property]: prop(cur), easing: EASE_IO });
     cur = +s.to || 0;
-    kf.push({ offset: o(s.at + (s.d || .8)), transform: prop(cur) });
+    kf.push({ offset: o(s.at + (s.d || .8)), [property]: prop(cur) });
   }
-  kf.push({ offset: 1, transform: prop(cur) });
+  kf.push({ offset: 1, [property]: prop(cur) });
   return kf.sort((a, b) => a.offset - b.offset);
 }
 
@@ -267,6 +270,10 @@ function makeScene(el, spec, phase = 0) {
   const anims = [];
   const run = (node, kf, opt) => { if (!node) return null; const a = node.animate(kf, { duration: ms, iterations: Infinity, fill: 'both', ...opt }); a.pause(); anims.push(a); return a; };
   const st = el.querySelector('.ph-st'), cont = el.querySelector('.sc-c');
+  // Ключи камеры из AE: секунда, масштаб, вертикальный сдвиг в процентах, наклон.
+  if (sc.camera) run(el, sc.camera.map(([t, zoom, y, angle]) => ({
+    offset: t / T, transform: `translateY(${y}%) rotate(${angle}deg) scale(${zoom})`, easing: EASE
+  })));
   // слои: вход и уход по таймлайну цикла, «дыхание» — своим циклом
   (sc.layers || []).forEach((l, i) => {
     const node = el.querySelector(`.sc-l[data-l="${i}"]`);
@@ -284,11 +291,14 @@ function makeScene(el, spec, phase = 0) {
   if (sc.scroll && sc.scroll.length) {
     run(cont, segFrames(sc.scroll, T, (v) => `translateY(${-v}px)`));
     if (popC) run(popC, segFrames(sc.scroll, T, (v) => `translateY(${-v}px)`));
+    const band = el.querySelector('.sc-status-band');
+    if (band) run(band, segFrames(sc.scroll, T, v => Math.min(1, v / 80), 0, 'opacity'));
   }
   // лента карточек едет вбок
   if (sc.strip && sc.strip.steps) {
     const li = (sc.layers || []).findIndex((l) => l.name === sc.strip.layer);
-    const node = li >= 0 ? el.querySelector(`.sc-l[data-l="${li}"] .sc-i`) : null;
+    const node = sc.strip.layer === 'tasks' ? el.querySelector('.task-strip')
+      : el.querySelector(`.sc-l[data-l="${li}"] .sc-i`);
     run(node, segFrames(sc.strip.steps, T, (v) => `translateX(${v}px)`));
   }
   // рамка-фокус: переезжает с одного важного места на другое, между ними гаснет

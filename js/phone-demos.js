@@ -11,22 +11,32 @@ export function demoHTML(scene) {
       <div class="pick-categories" role="group" aria-label="Категории карт">${categories.join('')}</div></div>`;
   }
   if (!scene.tasks) return '';
-  const tasks = scene.tasks.map(task =>
-    `<article><small>${esc(task.when)}</small><span>${esc(task.title)}</span><strong>${esc(task.reward)}</strong></article>`);
-  return `<div class="task-track" tabindex="0" role="region" aria-label="Задания и поступления">${tasks.join('')}</div>`;
+  const tasks = scene.tasks.map((task, i) =>
+    `<article class="${(task.blue ?? i === 0) ? 'task-blue' : ''}"><small>${esc(task.when)}</small><span>${esc(task.title)}</span><strong>${esc(task.reward)}</strong></article>`).join('');
+  const cards = scene.strip?.layer === 'tasks' ? `<div class="task-strip">${tasks}</div>` : tasks;
+  return `<div class="task-track" tabindex="0" role="region" aria-label="Задания и поступления">${cards}</div>`;
 }
 
 export function initDemo(phone, scene, reduced) {
   const track = phone.querySelector('.pick-track, .task-track');
   if (!track) return () => {};
   const picker = phone.querySelector('[data-picker]');
+  const strip = track.querySelector('.task-strip');
   const pages = phone.querySelector('.pick-pages');
   const events = new AbortController();
   const opts = { signal: events.signal };
   const behavior = reduced ? 'instant' : 'smooth';
   let index = 0, direction = 1, timer = 0, lastUse = 0;
   let holding = false, dragged = false, startX = 0, startLeft = 0;
-  const markUse = () => { lastUse = Date.now(); };
+  const markUse = () => {
+    lastUse = Date.now();
+    if (!strip || reduced || track.classList.contains('is-browsing')) return;
+    // Передаём ленту пальцу в том же положении, где её застал пользователь.
+    const transform = getComputedStyle(strip).transform;
+    const left = transform === 'none' ? 0 : -new DOMMatrixReadOnly(transform).m41;
+    track.classList.add('is-browsing');
+    track.scrollLeft = left;
+  };
 
   function target(i) {
     return Math.min(track.scrollWidth - track.clientWidth, track.children[i].offsetLeft - track.firstElementChild.offsetLeft);
@@ -65,7 +75,9 @@ export function initDemo(phone, scene, reduced) {
     }, opts);
   }
   track.addEventListener('scroll', sync, opts);
-  track.addEventListener('wheel', markUse, { ...opts, passive: true });
+  track.addEventListener('wheel', e => {
+    if (!strip || Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) markUse();
+  }, { ...opts, passive: true });
   track.addEventListener('keydown', e => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
@@ -119,7 +131,12 @@ export function initDemo(phone, scene, reduced) {
   }
   function setVisible(visible) {
     clearInterval(timer);
-    if (visible && !reduced) timer = setInterval(tick, picker ? 2350 : 3300);
+    if (strip) {
+      if (!visible && track.classList.contains('is-browsing')) {
+        track.scrollLeft = 0;
+        track.classList.remove('is-browsing');
+      }
+    } else if (visible && !reduced) timer = setInterval(tick, picker ? 2350 : 3300);
   }
   const observer = 'IntersectionObserver' in window
     ? new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting))

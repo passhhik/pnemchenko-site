@@ -71,6 +71,7 @@
 .sc-i,.sc-l img{ display:block; width:100%; height:100%; max-width:none; }
 .sc-fx{ position:absolute; z-index:2; left:0; width:393px; max-width:none; pointer-events:none; }
 .sc-fx--t{ top:0; } .sc-fx--b{ bottom:0; }
+.sc-status-band{position:absolute;z-index:1;inset:0 0 auto;height:54px;background:#f4f5f6;opacity:0;pointer-events:none;}
 .sc-shot{ position:absolute; z-index:4; left:0; width:393px; overflow:hidden; opacity:0; pointer-events:none; }
 .sc-shot-body{ display:block; width:100%; max-width:none; }
 /* палец — как в шоуриле: круг 48, графит 22 %, белая обводка */
@@ -575,10 +576,20 @@ html{ scroll-padding-top:calc(var(--hdr, 72px) + 12px); }
 .card-picker::after{content:'';position:absolute;left:20px;top:740px;width:353px;height:60px;border-radius:16px;background:url('../assets/cases/svoi-dengi/v2/sc-choose-btn.webp') center / 100% 100% no-repeat;pointer-events:none;}
 .task-track{top:476px;left:0;width:393px;height:158px;padding:0 20px;gap:8px;scroll-padding:0 20px;background:#f3f5f7;color:#23252a;font:16px/1.3 Inter,Arial,sans-serif;}
 .task-track article{display:flex;flex-direction:column;align-items:start;flex:0 0 157px;height:157px;padding:12px;border-radius:16px;background:#fff;scroll-snap-align:start;}
-.task-track article:first-child{background:#5c7eff;color:white;}
+.task-track .task-blue{background:#5c7eff;color:white;}
 .task-track small{border-radius:18px;background:#0001;padding:4px 9px;color:#64666a;font:13px/18px Inter,Arial,sans-serif;}
-.task-track article:first-child small{background:#ffffff59;color:#23252a;}
+.task-track .task-blue small{background:#ffffff59;color:#23252a;}
 .task-track article span{margin-top:8px;}.task-track strong{align-self:end;margin-top:auto;font-size:22px;}
+.task-track:has(.task-strip){padding:0;scroll-snap-type:none;}
+.task-strip{display:flex;gap:8px;padding:0 20px;flex:none;}
+.task-track.is-browsing .task-strip{transform:none!important;}
+.ph-st:has(.task-track.is-browsing) > .sc-tap{visibility:hidden;}
+/* Первые две карточки — исходный слой из Figma в композиции «Главная». */
+[data-project="svoi-dengi"] .co .task-strip article:nth-child(-n+2){
+  background:transparent url('../assets/cases/svoi-dengi/v2/sc-home-pop-tasks.webp') 0 0 / 322px 157px no-repeat;
+}
+[data-project="svoi-dengi"] .co .task-strip article:nth-child(2){background-position:-165px 0;}
+[data-project="svoi-dengi"] .co .task-strip article:nth-child(-n+2) > *{opacity:0;}
 .card-picker :focus-visible,.task-track:focus-visible{outline:3px solid #264be6;outline-offset:-3px;}
 .level-route{padding:16px 0 20px;color:inherit;}
 .level-route b{font-size:15px;line-height:1.35;}
