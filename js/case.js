@@ -246,7 +246,7 @@ export function renderCase(root, p, { reduced = false, say = null } = {}) {
     <div class="case-in" data-sheet>
       ${results.length ? `<section class="case-results rv" style="--n:${results.length}" aria-label="${esc(t('results'))}">${results.map((m) => `<div><p class="result-v">${esc(tx(m.v))}</p><p class="result-l">${esc(tx(m.l))}</p></div>`).join('')}</section>` : ''}
       ${tldr.length ? `<section class="case-tldr rv" style="--n:${tldr.length}">${tldr.map(([k, v]) => `<div><h2>${esc(t(k))}</h2><p>${esc(v)}</p></div>`).join('')}</section>` : ''}
-      ${blocks ? `<div class="case-blocks">${blocks}</div>` : ''}
+      ${blocks ? `<div class="case-blocks" data-project="${esc(p.slug)}">${blocks}</div>` : ''}
       ${tags.length ? `<ul class="case-tags" aria-label="${esc(t('tags'))}">${tags.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
       <section class="case-end">
         <div class="vcard rv" data-vcard>

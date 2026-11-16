@@ -24,6 +24,25 @@
 .ch-t{ margin:0; font:var(--w-title) clamp(34px, calc(56 * var(--u)), 56px)/1.08 var(--font); letter-spacing:var(--tr-title); text-wrap:balance; }
 .ch-lead{ margin:25px 0 0; color:var(--mute); font:var(--w-text) clamp(18px, calc(24 * var(--u)), 24px)/1.4 var(--font-text); text-wrap:pretty; }
 .ch--l{ max-width:none; margin:0; text-align:left; }
+
+/* Общая типографика вводных блоков «Своих денег», в том числе внутри цветной полосы. */
+.case-blocks[data-project="svoi-dengi"]{
+  --section-lead-size:calc(clamp(18px, 24 * var(--u), 24px) * var(--k-text));
+  --section-lead-gap:clamp(16px, 25 * var(--u), 25px);
+}
+.case-blocks[data-project="svoi-dengi"] :is(.ch:not(.ch--l), .blk-text.is-center){
+  max-width:min(100%, calc(34 * var(--section-lead-size)));
+}
+.case-blocks[data-project="svoi-dengi"] :is(.sec-title, .ch-t){
+  margin:0; font:var(--w-title) calc(var(--fs-h2) * var(--k-title))/var(--lh-narrow) var(--font);
+  letter-spacing:var(--tr-title); text-wrap:balance;
+}
+.case-blocks[data-project="svoi-dengi"] :is(.ch-lead, .blk-text > .prose > p, .fin-l){
+  font:var(--w-text) var(--section-lead-size)/1.4 var(--font-text); text-wrap:pretty;
+}
+.case-blocks[data-project="svoi-dengi"] :is(.sec-title, .ch-t, .fin-t) + :is(.prose, .ch-lead, .fin-l){
+  margin-block-start:var(--section-lead-gap);
+}
 .case .pill{ display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:8px 14px; border:0; border-radius:100px; background:var(--ink-10); color:var(--ink-70); font:400 16px/1.35 var(--font-text); white-space:nowrap; }
 .band[data-tone="dark"] .pill{ background:rgba(255,255,255,.14); color:rgba(255,255,255,.8); }
 .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
