@@ -578,6 +578,7 @@
     },
     {
      "type": "ladder",
+     "variant": "mascot",
      "gap": 60,
      "items": [
       {
@@ -586,7 +587,7 @@
        "image": "assets/cases/svoi-dengi/v2/pig-joy.webp",
        "alt": "",
        "bg": "#daff6d",
-       "h": 400,
+       "h": 368,
        "dark": false,
        "solid": false
       },
@@ -596,7 +597,7 @@
        "image": "assets/cases/svoi-dengi/v2/pig-calc.webp",
        "alt": "",
        "bg": "#5c7eff",
-       "h": 480,
+       "h": 432,
        "dark": true,
        "solid": false
       },
@@ -606,7 +607,7 @@
        "image": "assets/cases/svoi-dengi/v2/pig-cool.webp",
        "alt": "",
        "bg": "#002987",
-       "h": 560,
+       "h": 496,
        "dark": true,
        "solid": false
       },
@@ -616,7 +617,7 @@
        "image": "assets/cases/svoi-dengi/v2/pig-rich.webp",
        "alt": "",
        "bg": "#1d1d1f",
-       "h": 640,
+       "h": 552,
        "dark": true,
        "solid": true
       }

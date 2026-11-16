@@ -101,9 +101,11 @@ export const CHAPTERS = {
     const items = (b.items || []).filter((it) => tx(it.title));
     if (!items.length) return '';
     const n = items.length;
-    return `<section class="blk ld" data-anim style="--n:${n}">${items.map((it, i) => {
+    const mascot = b.variant === 'mascot';
+    return `<section class="blk ld${mascot ? ' ld--mascot' : ''}" data-anim style="--n:${n}">${items.map((it, i) => {
       const bg = color(it.bg) || '#daff6d';
-      return `<div class="ld-s${it.dark ? ' is-dark' : ''}${it.solid ? ' is-solid' : ''}" style="--bg:${bg};--h:${+it.h || 400 + i * 80};--i:${i}"><h3>${T(it.title)}</h3>${tx(it.text) ? `<p>${ML(it.text)}</p>` : ''}${img(it.image, it.alt, ' class="ld-img"')}</div>`;
+      const art = img(it.image, it.alt, ' class="ld-img"');
+      return `<div class="ld-s${it.dark ? ' is-dark' : ''}${it.solid ? ' is-solid' : ''}" style="--bg:${bg};--h:${+it.h || 400 + i * 80};--i:${i}"><h3>${T(it.title)}</h3>${tx(it.text) ? `<p>${ML(it.text)}</p>` : ''}${mascot && art ? `<div class="ld-art">${art}</div>` : art}</div>`;
     }).join('')}</section>`;
   },
 
