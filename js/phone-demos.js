@@ -8,8 +8,7 @@ export function demoHTML(scene) {
     return `<div class="card-picker" data-picker>
       <div class="pick-track" tabindex="0" role="region" aria-label="Дизайны карт"></div>
       <div class="pick-pages" role="group" aria-label="Страницы коллекции"></div>
-      <div class="pick-categories" role="group" aria-label="Категории карт">${categories.join('')}</div>
-      <button type="button" class="pick-confirm" aria-pressed="false">Выбрать карту</button></div>`;
+      <div class="pick-categories" role="group" aria-label="Категории карт">${categories.join('')}</div></div>`;
   }
   if (!scene.tasks) return '';
   const tasks = scene.tasks.map(task =>
@@ -22,7 +21,6 @@ export function initDemo(phone, scene, reduced) {
   if (!track) return () => {};
   const picker = phone.querySelector('[data-picker]');
   const pages = phone.querySelector('.pick-pages');
-  const confirm = phone.querySelector('.pick-confirm');
   const events = new AbortController();
   const opts = { signal: events.signal };
   const behavior = reduced ? 'instant' : 'smooth';
@@ -30,10 +28,6 @@ export function initDemo(phone, scene, reduced) {
   let holding = false, dragged = false, startX = 0, startLeft = 0;
   const markUse = () => { lastUse = Date.now(); };
 
-  function setChosen(selected) {
-    confirm.setAttribute('aria-pressed', String(selected));
-    confirm.textContent = selected ? 'Карта выбрана ✓' : 'Выбрать карту';
-  }
   function target(i) {
     return Math.min(track.scrollWidth - track.clientWidth, track.children[i].offsetLeft - track.firstElementChild.offsetLeft);
   }
@@ -44,7 +38,6 @@ export function initDemo(phone, scene, reduced) {
     if (!picker) return;
     const closest = [...track.children].reduce((best, _, i) =>
       Math.abs(target(i) - track.scrollLeft) < Math.abs(target(best) - track.scrollLeft) ? i : best, 0);
-    if (closest !== index) setChosen(false);
     index = closest;
     [...pages.children].forEach((dot, i) => dot.setAttribute('aria-current', String(i === index)));
   }
@@ -59,7 +52,6 @@ export function initDemo(phone, scene, reduced) {
     picker.querySelectorAll('[data-category]').forEach((button, i) => button.setAttribute('aria-pressed', String(i === group)));
     showCard(0, 'instant');
     sync();
-    setChosen(false);
   }
   if (picker) {
     showCollection(0);
@@ -70,7 +62,6 @@ export function initDemo(phone, scene, reduced) {
       if (button.hasAttribute('data-category')) showCollection(+button.dataset.category);
       else if (button.hasAttribute('data-page')) showCard(+button.dataset.page);
       else if (button.hasAttribute('data-design')) showCard(+button.dataset.design);
-      else if (button === confirm) setChosen(confirm.getAttribute('aria-pressed') !== 'true');
     }, opts);
   }
   track.addEventListener('scroll', sync, opts);
@@ -122,7 +113,6 @@ export function initDemo(phone, scene, reduced) {
       track.scrollTo({ left: track.scrollLeft > 1 ? 0 : track.scrollWidth, behavior });
       return;
     }
-    if (confirm.getAttribute('aria-pressed') === 'true') return;
     if (index === track.children.length - 1) direction = -1;
     if (index === 0) direction = 1;
     showCard(index + direction);

@@ -572,9 +572,7 @@ html{ scroll-padding-top:calc(var(--hdr, 72px) + 12px); }
 .pick-categories img{width:82px;height:82px;border-radius:16px;}
 .pick-categories [aria-pressed=true] img{outline:2px solid #23252a;outline-offset:-2px;}
 .pick-categories [aria-pressed=true]::after{content:'✓';position:absolute;right:-2px;top:-4px;width:23px;height:23px;border-radius:50%;background:#23252a;color:white;font:15px/23px Arial;}
-.pick-confirm{position:absolute;left:20px;top:740px;width:353px;height:60px;border:0;border-radius:16px;color:#192335;background:#547eff;cursor:pointer;text-transform:uppercase;font:italic 700 19px/1 'Arial Narrow',sans-serif;}
-.pick-confirm[aria-pressed=false]{color:transparent;background:transparent url('../assets/cases/svoi-dengi/v2/sc-choose-btn.webp') center / 100% 100% no-repeat;}
-.pick-confirm[aria-pressed=true]{background:#daff6d;}
+.card-picker::after{content:'';position:absolute;left:20px;top:740px;width:353px;height:60px;border-radius:16px;background:url('../assets/cases/svoi-dengi/v2/sc-choose-btn.webp') center / 100% 100% no-repeat;pointer-events:none;}
 .task-track{top:476px;left:0;width:393px;height:158px;padding:0 20px;gap:8px;scroll-padding:0 20px;background:#f3f5f7;color:#23252a;font:16px/1.3 Inter,Arial,sans-serif;}
 .task-track article{display:flex;flex-direction:column;align-items:start;flex:0 0 157px;height:157px;padding:12px;border-radius:16px;background:#fff;scroll-snap-align:start;}
 .task-track article:first-child{background:#5c7eff;color:white;}
