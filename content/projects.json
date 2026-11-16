@@ -810,15 +810,15 @@
       {
        "src": "assets/cases/svoi-dengi/v2/float-pack.webp",
        "kind": "pack",
-       "x": -436,
-       "y": 54,
-       "w": 280,
+       "x": -445,
+       "y": 46,
+       "w": 314,
        "depth": 0.65,
        "front": false,
        "m": {
-        "x": -103,
-        "y": -150,
-        "w": 115,
+        "x": -101,
+        "y": -167,
+        "w": 129,
         "front": true
        }
       },

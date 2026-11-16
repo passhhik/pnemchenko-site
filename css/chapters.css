@@ -228,7 +228,7 @@
 .stg-o{ position:absolute; left:var(--l); top:var(--t); z-index:var(--z, 1); width:var(--w); height:auto; max-width:none; translate:0 var(--py, 0px); animation:stg-float 7s ease-in-out infinite; animation-delay:calc(var(--d) * -1.7s); pointer-events:none; }
 .stg-o--pack{ left:max(var(--l), calc(50% - 50vw + 20%)); rotate:-12.58deg; }
 @keyframes stg-float{ 50%{ transform:translateY(-12px) rotate(1.5deg); } }
-.stg-o--leap{ left:min(var(--l), calc(50% + 50vw - var(--w) - 20px)); scale:-1 1; animation:stg-leap 5.6s cubic-bezier(.37,0,.25,1) infinite; }
+.stg-o--leap{ left:min(var(--l), calc(50% + 50vw - var(--w) - 20px)); animation:stg-leap 5.6s cubic-bezier(.37,0,.25,1) infinite; }
 @keyframes stg-leap{
   0%,100%{ transform:translate(0,0) rotate(-2deg); }
   48%{ transform:translate(3%,-11%) rotate(2deg) scale(.99,1.015); }
