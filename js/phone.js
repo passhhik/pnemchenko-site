@@ -16,7 +16,8 @@
 //       scroll: [{ to: 435, at: 1.2, d: 2.2 }]           — прокрутка длинного экрана (to — на сколько точек вниз)
 //       strip:  { layer: 'имя слоя', steps: [{ to: -345, at: 1, d: .7 }] } — лента карточек едет вбок
 //       focus:  [{ x, y, w, h, at, d, r }]               — рамка-фокус на самом важном
-//       tap:    [{ x, y, at }]                           — касание пальцем
+//       tap:    [{ x, y, at, to: [x, y], d }]            — касание; to и d задают движение пальца при свайпе
+//       shots:  [{ src, at, until, slide, y, h, fixed, scroll, contentH }] — следующий кадр сценария или смена состояния
 //       hot:    [{ x, y, w, h, go: 'картинка', label }]  — можно нажать: экран меняется (как в прототипе)
 //       pops:   [{ src, x, y, w, h, at, d, slots: [[x, y, w, h, r]], with: ['имя слоя'] }]
 //               — блок «выходит из экрана» к зрителю: копия над телефоном +22 % и выше на 9 pt, две мягкие тени,
@@ -52,17 +53,27 @@ export function phoneHTML(ph, { size = 'M', label = '', cls = '', reduced = fals
   if (sc) {
     const H = sc.h || SCR_H;
     const lay = (reduced ? [] : sc.layers || []).map((l, i) => layerHTML(l, i)).join('');
-    const fixed = (reduced ? [] : sc.fixed || []).map((f) => `<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`).join('');
+    const fixed = reduced ? '' : fixedHTML(sc.fixed);
+    const shots = (reduced ? [] : sc.shots || []).map(shotHTML).join('');
     const hot = (sc.hot || []).map((h, i) => `<button type="button" class="sc-hot" data-hot="${i}" style="left:${px(h.x)};top:${px(h.y)};width:${px(h.w)};height:${px(h.h)}" aria-label="${esc(h.label || '')}"></button>`).join('');
     const slots = (sc.pops || []).map((q, i) => (q.slots || []).map((r) => `<i class="sc-slot" data-slot="${i}" style="left:${px(r[0])};top:${px(r[1])};width:${px(r[2])};height:${px(r[3])};border-radius:${px(r[4] || 0)}"></i>`).join('')).join('');
-    inner = `<div class="ph-st" style="--sh:${H}"><div class="sc-c" style="height:${px(H)}"><img class="sc-b" src="${esc(reduced && sc.tasks ? p.src : sc.base)}" alt="" style="height:${px(H)}" decoding="async" loading="lazy">${slots}${lay}${demoHTML(sc)}<i class="sc-focus" aria-hidden="true"></i><i class="sc-f2" aria-hidden="true"></i>${hot}</div>${fixed}<i class="sc-tap" aria-hidden="true"></i><img class="sc-go" alt="" decoding="async" hidden></div>`;
+    inner = `<div class="ph-st" style="--sh:${H}"><div class="sc-c" style="height:${px(H)}"><img class="sc-b" src="${esc(reduced && sc.tasks ? p.src : sc.base)}" alt="" style="height:${px(H)}" decoding="async" loading="lazy">${slots}${lay}${demoHTML(sc)}<i class="sc-focus" aria-hidden="true"></i><i class="sc-f2" aria-hidden="true"></i>${hot}</div>${fixed}${shots}<i class="sc-tap" aria-hidden="true"></i><img class="sc-go" alt="" decoding="async" hidden></div>`;
   } else {
     const pos = p.pos === 'bottom' ? 'bottom' : 'top';
     inner = p.src ? `<img class="ph-img" src="${esc(p.src)}" alt="" style="object-position:50% ${pos === 'bottom' ? '100%' : '0'}" decoding="async" loading="lazy">` : '';
     if (p.previewVideo && !reduced) inner += `<video class="ph-img ph-preview" data-preview-src="${esc(p.previewVideo)}" muted playsinline loop preload="none" disablepictureinpicture disableremoteplayback tabindex="-1" aria-hidden="true"></video>`;
   }
   const role = alt ? (sc && (sc.hot?.length || sc.picker || sc.tasks) ? ` role="group" aria-label="${alt}"` : ` role="img" aria-label="${alt}"`) : '';
-  return `<div class="ph ph--${size}${p.previewVideo ? ' ph--preview' : ''}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
+  return `<div class="ph ph--${size}${p.previewVideo ? ' ph--preview' : ''}${p.scene?.shots?.length ? ' ph--story' : ''}${cls ? ` ${cls}` : ''}" data-ph="${id}"${tilt ? ' data-tilt' : ''}><div class="ph-scr"${role}>${inner}</div><i class="ph-isl" aria-hidden="true"></i>${sc && !reduced ? popsHTML(sc) : ''}</div>`;
+}
+
+function fixedHTML(layers) {
+  return (layers || []).map(f => `<img class="sc-fx sc-fx--${f.at === 'bottom' ? 'b' : 't'}" src="${esc(f.src)}" alt="" style="height:${px(f.h)}" decoding="async" loading="lazy">`).join('');
+}
+
+function shotHTML(shot) {
+  const h = shot.h || SCR_H;
+  return `<div class="sc-shot" aria-hidden="true" style="top:${px(shot.y || 0)};height:${px(h)}"><img class="sc-shot-body" src="${esc(shot.src)}" alt="" style="height:${px(shot.contentH || h)}" decoding="async" loading="lazy">${fixedHTML(shot.fixed)}</div>`;
 }
 
 // Блоки, которые «выходят из экрана»: свой слой над телефоном (вне маски экрана), в тех же точках экрана
@@ -219,7 +230,7 @@ export function initPhones(root, { reduced = false } = {}) {
     if (reduced || spec.scene.picker) continue;
     const blk = ph.closest('[data-b]') || root, n = order.get(blk) || 0;
     order.set(blk, n + 1);
-    const s = makeScene(ph, spec, n * 1.2);
+    const s = makeScene(ph, spec, spec.scene.shots?.length ? 0 : n * 1.2);
     apis.set(ph, s.api);
     live.push(s);
   }
@@ -300,6 +311,24 @@ function makeScene(el, spec, phase = 0) {
     });
     run(fo, kf.sort((a, b) => a.offset - b.offset));
   }
+  // Один таймлайн для жестов и смены экранов. Если at > until, кадр виден и на стыке цикла.
+  el.querySelectorAll('.sc-shot').forEach((node, i) => {
+    const shot = sc.shots[i];
+    const duration = shot.transition ?? .32;
+    const shown = { opacity: 1, transform: 'none' };
+    const hidden = { opacity: 0, transform: 'none' };
+    const seam = shot.at > shot.until ? shown : hidden;
+    const key = (t, style) => ({ offset: t / T, ...style });
+    run(node, [
+      key(0, seam),
+      key(shot.at, { opacity: 0, transform: `translateX(${px(shot.slide || 0)})`, easing: EASE_IO }),
+      key(shot.at + duration, shown),
+      key(shot.until, { ...shown, easing: EASE_IO }),
+      key(shot.until + duration, hidden),
+      key(T, seam)
+    ].sort((a, b) => a.offset - b.offset));
+    if (shot.scroll) run(node.querySelector('.sc-shot-body'), segFrames(shot.scroll, T, v => `translateY(${-v}px)`));
+  });
   // касания пальцем
   const tap = el.querySelector('.sc-tap');
   if (tap && sc.tap && sc.tap.length) {
@@ -308,9 +337,11 @@ function makeScene(el, spec, phase = 0) {
     sc.tap.forEach((t) => {
       const pos = { left: px(t.x), top: px(t.y) };
       kf.push({ offset: o(t.at - F(3)), opacity: 0, transform: 'translate(-50%,-50%) scale(.7)', ...pos, easing: ae(65, 65) });
-      kf.push({ offset: o(t.at), opacity: 1, transform: 'translate(-50%,-50%) scale(1)', ...pos, easing: ae(60, 60) });
-      kf.push({ offset: o(t.at + F(4)), opacity: 1, transform: 'translate(-50%,-50%) scale(.96)', ...pos, easing: ae(60, 60) });
-      kf.push({ offset: o(t.at + F(10)), opacity: 0, transform: 'translate(-50%,-50%) scale(1.28)', ...pos });
+      kf.push({ offset: o(t.at), opacity: 1, transform: 'translate(-50%,-50%) scale(1)', ...pos, easing: t.to ? EASE_IO : ae(60, 60) });
+      const end = t.to ? { left: px(t.to[0]), top: px(t.to[1]) } : pos;
+      const release = t.at + (t.to ? (t.d ?? .65) : F(4));
+      kf.push({ offset: o(release), opacity: 1, transform: 'translate(-50%,-50%) scale(.96)', ...end, easing: ae(60, 60) });
+      kf.push({ offset: o(release + F(6)), opacity: 0, transform: 'translate(-50%,-50%) scale(1.28)', ...end });
     });
     kf.push({ offset: 1, opacity: 0, transform: 'translate(-50%,-50%) scale(.5)' });
     run(tap, kf.sort((a, b) => a.offset - b.offset));

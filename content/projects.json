@@ -83,12 +83,12 @@
          "focus": [
           {
            "x": 20,
-           "y": 275,
+           "y": 394,
            "w": 355,
            "h": 103,
            "r": 16,
-           "at": 0.49,
-           "d": 1.95
+           "at": 0.39,
+           "d": 1.05
           },
           {
            "x": 20,
@@ -101,6 +101,11 @@
           }
          ],
          "tap": [
+          {
+           "x": 144,
+           "y": 431,
+           "at": 1.35
+          },
           {
            "x": 196,
            "y": 773,
@@ -119,6 +124,22 @@
             3.42
            ]
           }
+         ],
+         "shots": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/ribbon-level-selected.webp",
+           "y": 272,
+           "h": 228,
+           "at": 1.4,
+           "until": 4.35,
+           "transition": 0.17
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/scr-r4-pocket.webp",
+           "at": 3.58,
+           "until": 8.76,
+           "slide": 38
+          }
          ]
         }
        }
@@ -130,7 +151,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-refuse.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-refuse-base.webp",
-         "dur": 9.76,
+         "dur": 10.4,
          "layers": [
           {
            "name": "pause",
@@ -140,7 +161,7 @@
            "w": 72,
            "h": 72,
            "in": "burst",
-           "at": 0.49,
+           "at": 3.64,
            "idle": "pulse"
           },
           {
@@ -151,7 +172,7 @@
            "w": 353,
            "h": 141,
            "in": "up",
-           "at": 0.98
+           "at": 3.92
           },
           {
            "name": "save",
@@ -169,15 +190,68 @@
            "w": 355,
            "h": 62,
            "press": [
-            3.9
+            6.55
            ]
           }
          ],
          "tap": [
           {
+           "x": 273,
+           "y": 540,
+           "to": [
+            263,
+            362
+           ],
+           "at": 0.97,
+           "d": 0.65
+          },
+          {
+           "x": 178,
+           "y": 773,
+           "at": 3.43
+          },
+          {
            "x": 196,
            "y": 694,
-           "at": 3.9
+           "at": 6.55
+          }
+         ],
+         "shots": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/sc-parent-base.webp",
+           "contentH": 1030,
+           "at": 9.85,
+           "until": 3.55,
+           "transition": 0.36,
+           "scroll": [
+            {
+             "to": 178,
+             "at": 0.97,
+             "d": 0.65
+            },
+            {
+             "to": 0,
+             "at": 4.4,
+             "d": 0.36
+            }
+           ],
+           "fixed": [
+            {
+             "src": "assets/cases/svoi-dengi/v2/sc-parent-top.webp",
+             "at": "top",
+             "h": 103
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/sc-parent-buttons.webp",
+             "at": "bottom",
+             "h": 190
+            },
+            {
+             "src": "assets/cases/svoi-dengi/v2/sc-parent-grabber.webp",
+             "at": "bottom",
+             "h": 30
+            }
+           ]
           }
          ]
         }
@@ -190,7 +264,7 @@
         "src": "assets/cases/svoi-dengi/v2/scr-u1-hook.webp",
         "scene": {
          "base": "assets/cases/svoi-dengi/v2/sc-hook-base.webp",
-         "dur": 9.76,
+         "dur": 11,
          "layers": [
           {
            "name": "t1",
@@ -324,6 +398,43 @@
            "in": "drop",
            "at": 2.438,
            "idle": "bob"
+          }
+         ],
+         "tap": [
+          {
+           "x": 192,
+           "y": 704,
+           "at": 2.78
+          },
+          {
+           "x": 194,
+           "y": 769,
+           "at": 5.17
+          },
+          {
+           "x": 94,
+           "y": 418,
+           "at": 7.12
+          }
+         ],
+         "shots": [
+          {
+           "src": "assets/cases/svoi-dengi/v2/scr-u2-buy.webp",
+           "at": 2.91,
+           "until": 5.72,
+           "slide": 32
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/scr-u3-guess.webp",
+           "at": 5.31,
+           "until": 7.52,
+           "slide": 32
+          },
+          {
+           "src": "assets/cases/svoi-dengi/v2/scr-u3-ok.webp",
+           "at": 7.19,
+           "until": 10.44,
+           "transition": 0.19
           }
          ]
         }

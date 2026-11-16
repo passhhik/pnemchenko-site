@@ -53,6 +53,8 @@
 .sc-i,.sc-l img{ display:block; width:100%; height:100%; max-width:none; }
 .sc-fx{ position:absolute; z-index:2; left:0; width:393px; max-width:none; pointer-events:none; }
 .sc-fx--t{ top:0; } .sc-fx--b{ bottom:0; }
+.sc-shot{ position:absolute; z-index:4; left:0; width:393px; overflow:hidden; opacity:0; pointer-events:none; }
+.sc-shot-body{ display:block; width:100%; max-width:none; }
 /* палец — как в шоуриле: круг 48, графит 22 %, белая обводка */
 .sc-tap{ position:absolute; z-index:5; left:0; top:0; width:48px; height:48px; box-sizing:border-box; border:1.5px solid rgba(255,255,255,.75); border-radius:50%; background:rgba(35,37,42,.22); opacity:0; pointer-events:none; }
 /* фокус — подсветка плиток у мамы в шоуриле (отрезок 07): «Light blue» #EEF4FE и кромка #3A73F6 2,5 px при 786 px экрана
@@ -501,7 +503,7 @@ html{ scroll-padding-top:calc(var(--hdr, 72px) + 12px); }
 .rib-card:has(.ph) .rib-vis{container-type:size;}
 .rib-card .rib-vis .ph{--pw:min(calc(276 * var(--u)),94cqw,46cqh);}
 @media (max-width:560px){
-  .rib-card .rib-vis .ph--preview{--pw:min(52vw,230px,94cqw,46cqh);}
+  .rib-card .rib-vis :is(.ph--preview,.ph--story){--pw:min(52vw,230px,94cqw,46cqh);}
 }
 .card-picker{position:absolute;inset:0;pointer-events:none;font-family:Inter,Arial,sans-serif;color:#23252a;}
 .card-picker > *,.task-track{pointer-events:auto;}
