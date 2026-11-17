@@ -80,7 +80,12 @@ const NAV = [
   { id: 'style', name: 'Стиль', hint: 'Цвета и размеры сайта', ico: SVG('<path d="M8 2.3S3.8 6.6 3.8 9.5a4.2 4.2 0 0 0 8.4 0C12.2 6.6 8 2.3 8 2.3z"/>') },
   { id: 'settings', name: 'Настройки', hint: 'Подключение, функции, ключи, пароль', ico: SVG('<path d="M2.5 4.5h6.2M11.7 4.5h1.8M2.5 11.5h1.8M7.3 11.5h6.2"/><circle cx="10.2" cy="4.5" r="1.5"/><circle cx="5.8" cy="11.5" r="1.5"/>') },
 ];
-const SUBS = { home: [['sections', 'Разделы'], ['lines', 'Реплики головы'], ['fun', 'Пасхалки и звук']], pol: [['cards', 'Карточки'], ['stickers', 'Наклейки'], ['shoot', 'Съёмка']] };
+const UGLOVATO_ADMIN = new URL('https://uglovato.ru/admin/');
+const SUBS = {
+  home: [['sections', 'Разделы'], ['lines', 'Реплики головы'], ['fun', 'Пасхалки и звук']],
+  pol: [['cards', 'Карточки'], ['stickers', 'Наклейки'], ['shoot', 'Съёмка']],
+  stats: [['portfolio', 'Портфолио'], ['uglovato', 'Угловато']],
+};
 const subOf = (page) => (SUBS[page] && SUBS[page].some(([k]) => k === st.sub[page]) ? st.sub[page] : SUBS[page] ? SUBS[page][0][0] : '');
 // предпросмотру нужно хотя бы ~420 пикселей рядом со страницей; уже — он прячется сам (в «Кейсах» мешает ещё и список)
 const narrowScreen = () => window.innerWidth - 84 - (st.page === 'cases' ? 272 : 0) - 440 < 420;
@@ -1156,6 +1161,22 @@ function dashBody(d) {
       ${vs.length > shown.length ? `<button class="btn btn--line btn--sm" type="button" data-act="stats-more">Показать ещё (${vs.length - shown.length})</button>` : ''}
     </section>`;
 }
+function statsProjectsNav() {
+  const project = subOf('stats');
+  const links = SUBS.stats.map(([id, name]) =>
+    `<a href="#/stats/${id}"${project === id ? ' aria-current="page"' : ''}>${name}</a>`).join('');
+  return `<div class="stats-project-bar"><nav class="stats-projects" aria-label="Проекты статистики">${links}</nav>
+    ${project === 'uglovato' ? `<a class="btn btn--line btn--sm" href="${UGLOVATO_ADMIN.href}" target="_blank" rel="noopener noreferrer">Открыть отдельно</a>` : ''}</div>`;
+}
+
+function uglovatoPane() {
+  if (location.origin === UGLOVATO_ADMIN.origin) return '';
+  const policy = document.permissionsPolicy || document.featurePolicy;
+  const canCopy = window.isSecureContext && navigator.clipboard?.writeText && policy?.allowedFeatures?.().includes('clipboard-write');
+  return `<iframe class="stats-embed" src="${UGLOVATO_ADMIN.href}" title="Админка проекта Угловато"
+    sandbox="allow-scripts allow-same-origin allow-forms" referrerpolicy="no-referrer"${canCopy ? ` allow="clipboard-write ${UGLOVATO_ADMIN.origin}"` : ''}></iframe>`;
+}
+
 function statsPane() {
   const api = polaroidsApi(st.site), S = st.stats, key = modKey();
   if (!api) return '<div class="empty"><p>Счётчик работает через функцию архива полароидов — её адрес ещё не вписан.</p><button class="btn btn--sm" type="button" data-act="page" data-page="settings">Открыть настройки</button></div>';
@@ -1252,7 +1273,7 @@ function linesPane() {
 
 // Шапка страницы: заголовок, действия справа от него, пояснение и вкладки раздела
 function head(title, { lead = '', actions = '', h1 = false } = {}) {
-  const tabs = SUBS[st.page] ? `<div class="tabs" role="tablist">${SUBS[st.page].map(([id, name]) => `<button type="button" role="tab" aria-selected="${subOf(st.page) === id}" data-act="sub" data-sub="${id}">${esc(name)}</button>`).join('')}</div>` : '';
+  const tabs = st.page === 'stats' ? statsProjectsNav() : SUBS[st.page] ? `<div class="tabs" role="tablist">${SUBS[st.page].map(([id, name]) => `<button type="button" role="tab" aria-selected="${subOf(st.page) === id}" data-act="sub" data-sub="${id}">${esc(name)}</button>`).join('')}</div>` : '';
   return `<div class="edit-head"><div class="edit-title"><h1${h1 ? ' data-h1' : ''}>${esc(title)}</h1>${actions ? `<div class="edit-actions">${actions}</div>` : ''}</div>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${tabs}`;
 }
 function casePage() {
@@ -1277,7 +1298,9 @@ function pageHTML() {
     }
     case 'pol': return `${head('Полароиды', { actions: sw('polaroidOn', 'На сайте'), lead: 'Голову растянули и подержали — она фоткается. Гости подписывают карточку, лепят наклейки и оставляют в архиве.' })}
         <div class="pane" data-pol-pane>${polaroidPane()}</div>`;
-    case 'stats': return `${head('Статистика')}<div class="pane pane--stats" data-stats-pane>${statsPane()}</div>`;
+    case 'stats': return head('Статистика') + (subOf('stats') === 'uglovato'
+      ? uglovatoPane()
+      : `<div class="pane pane--stats" data-stats-pane>${statsPane()}</div>`);
     case 'profile': return `${head('Профиль', { lead: 'Кто вы и как с вами связаться: это видно на главной, в каждом кейсе и в поисковиках.' })}<div class="pane">${profilePane()}</div>`;
     case 'style': return `${head('Стиль', { lead: 'Дизайн-токены сайта. Правки сразу видны в предпросмотре; пустой цвет — значение по умолчанию.' })}<div class="pane">${stylePane()}</div>`;
     case 'settings': return `${head('Настройки', { lead: 'Подключение сайта, облачные функции и доступ к админке.' })}<div class="pane">${settingsPane()}</div>`;
@@ -1296,6 +1319,7 @@ function renderEdit() {
 // Колонки: разделы | список кейсов (только в «Кейсах») | страница | предпросмотр (где он нужен и не свёрнут)
 function layout() {
   const app = $('[data-app]'), pv = hasPrev(), show = pv && st.prevOn && !narrowScreen();
+  app.dataset.page = st.page;
   app.dataset.list = st.page === 'cases' ? '1' : '0';
   app.dataset.prev = show ? '1' : '0';
   const btn = $('[data-prev-show]');
@@ -1317,6 +1341,11 @@ function readHash() {
   return true;
 }
 function go(page, { sub, idx, quiet = false } = {}) {
+  const focusProject = document.activeElement?.closest('.stats-projects');
+  if (page === 'stats') {
+    sub = SUBS.stats.some(([id]) => id === sub) ? sub : 'portfolio';
+    if (st.page === page && subOf(page) === sub) { syncHash(); return; }
+  }
   if (page === 'cases') {
     st.idx = idx ?? (st.idx >= 0 ? st.idx : st.lastIdx);
     if (st.idx >= st.projects.length) st.idx = st.projects.length - 1;
@@ -1331,8 +1360,9 @@ function go(page, { sub, idx, quiet = false } = {}) {
   st.open.clear(); st.menu = false;
   syncHash(!quiet);
   renderSide(); renderEdit(); renderViews(); sendPreview(false);
-  if (!same && !quiet) $('[data-edit]').scrollTop = 0;
-  if (page === 'stats' && !st.stats.data && !st.stats.busy && modKey()) statsLoad();
+  if (!same && (!quiet || page === 'stats')) $('[data-edit]').scrollTop = 0;
+  if (focusProject && page === 'stats') $('.stats-projects [aria-current]').focus({ preventScroll: true });
+  if (page === 'stats' && sub === 'portfolio' && !st.stats.data && !st.stats.busy && modKey()) statsLoad();
   if (page === 'pol' && subOf('pol') === 'cards' && !st.pol.items.length && !st.pol.busy && !st.pol.note && modKey() && polaroidsApi(st.site)) polLoad(false);
 }
 function renderViews() {
